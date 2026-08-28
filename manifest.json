@@ -1,0 +1,22 @@
+{
+	"name": "企业号",
+	"appid": "__UNI__F19CF1F",
+	"description": "企业号",
+	"versionName": "1.0.0",
+	"versionCode": "100",
+	"uni-app-x": {},
+	"mp-weixin": {
+		"darkmode": true,
+		"appid": "wxbe60c88472c90f82",
+		"setting": {
+			"urlCheck": false,
+			"es6": true,
+			"minified": true
+		},
+		"usingComponents": true
+	},
+	"uniStatistics": {
+		"enable": false
+	},
+	"vueVersion": "3"
+}

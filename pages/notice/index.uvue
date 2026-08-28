@@ -1,0 +1,805 @@
+<template>
+	<cl-page :pt="{ className: 'nt-page' }">
+		<view class="nt-page">
+			<view class="nt-header">
+				<view class="nt-hero">
+					<view class="nt-hero-title-row">
+						<view class="nt-hero-title-left">
+							<text class="nt-hero-title">我的消息</text>
+							<view v-if="unreadCount > 0" class="nt-hero-badge">
+								<view class="nt-hero-badge-dot"></view>
+								<text class="nt-hero-badge-text">{{ unreadCount }} 未读</text>
+							</view>
+						</view>
+						<!-- <view class="nt-hero-mark-btn" @tap="onMarkAllRead">
+							<cl-icon name="check-line" :size="20" color="#ffffff"></cl-icon>
+						</view> -->
+					</view>
+					<!-- <text class="nt-hero-sub">来自平台的政策 / 风控 / 活动 / 系统消息</text> -->
+				</view>
+			</view>
+
+			<view class="nt-body">
+				<view class="nt-filter-panel" v-if="false">
+					<scroll-view class="nt-filter-scroll" scroll-x="true" show-scrollbar="false">
+						<view class="nt-filter-row">
+							<view
+								v-for="(item, index) in categories"
+								:key="index"
+								class="nt-filter-item"
+								:class="{ 'nt-filter-item--active': activeCategory == item.key }"
+								@tap="activeCategory = item.key"
+							>
+								<text class="nt-filter-label">{{ item.label }}</text>
+								<text class="nt-filter-count">{{ item.count }}</text>
+							</view>
+						</view>
+					</scroll-view>
+				</view>
+
+				<scroll-view
+					class="nt-list-scroll"
+					scroll-y="true"
+					show-scrollbar="false"
+					:lower-threshold="120"
+					@scrolltolower="onScrollToLower"
+				>
+					<view class="nt-list">
+						<view v-if="loading && noticeList.length == 0" class="nt-state">
+							<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+							<text class="nt-state-text">加载中...</text>
+						</view>
+						<view v-else-if="noticeList.length == 0" class="nt-state">
+							<text class="nt-state-text">暂无消息</text>
+						</view>
+						<view
+							v-else
+							class="nt-card"
+							:class="{ 'nt-card--pinned': item.pinned }"
+							v-for="(item, index) in noticeList"
+							:key="getRowKey(item, index)"
+							@tap="openNoticeDetail(item)"
+						>
+							<view class="nt-card-main">
+								<view class="nt-card-icon" :style="{ backgroundColor: item.iconBg }">
+									<cl-icon
+										v-if="item.iconName != ''"
+										:name="item.iconName"
+										:size="20"
+										:color="item.iconColor"
+									></cl-icon>
+									<text
+										v-else
+										class="nt-card-icon-text"
+										:style="{ color: item.iconColor }"
+									>
+										{{ item.iconText }}
+									</text>
+								</view>
+
+								<view class="nt-card-content">
+									<view class="nt-card-tags">
+										<view class="nt-card-tag" :style="{ backgroundColor: item.tagBg }">
+											<text class="nt-card-tag-text" :style="{ color: item.tagColor }">
+												{{ item.categoryLabel }}
+											</text>
+										</view>
+										<view v-if="item.urgent" class="nt-card-tag nt-card-tag--urgent">
+											<text class="nt-card-tag-text nt-card-tag-text--urgent">紧急</text>
+										</view>
+										<view v-if="item.unread && !item.pinned" class="nt-card-dot"></view>
+									</view>
+
+									<text class="nt-card-title">{{ item.title }}</text>
+									<text class="nt-card-desc">{{ item.desc }}</text>
+									<view class="nt-card-foot">
+										<text class="nt-card-meta">{{ item.meta }}</text>
+										<view
+											v-if="item.path"
+											class="nt-card-audit"
+											@tap.stop="onGoAudit(item)"
+										>
+											<text class="nt-card-audit-text">去审核</text>
+											<cl-icon name="arrow-right-s-line" :size="14" color="#2b59c3"></cl-icon>
+										</view>
+									</view>
+								</view>
+							</view>
+						</view>
+						<view
+							v-if="noticeList.length > 0"
+							class="nt-loadmore"
+							@tap="onLoadMoreTap"
+						>
+							<cl-loadmore
+								:loading="loadingMore"
+								:finish="!hasMore"
+								finish-text="没有更多了"
+								loading-text="加载中..."
+							></cl-loadmore>
+							<text
+								v-if="hasMore && !loadingMore"
+								class="nt-loadmore-hint"
+							>上拉或点击加载更多</text>
+						</view>
+					</view>
+
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</scroll-view>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getMessageDetail, getMessageList } from "@/.cool/api/message";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { MessageListItem } from "@/.cool";
+
+	type NoticeItem = {
+		id: number;
+		categoryLabel: string;
+		urgent: boolean;
+		pinned: boolean;
+		unread: boolean;
+		iconName: string;
+		iconText: string;
+		iconBg: string;
+		iconColor: string;
+		tagBg: string;
+		tagColor: string;
+		title: string;
+		desc: string;
+		meta: string;
+		path: string;
+	};
+
+	const activeCategory = ref<string>("all");
+
+	const categories = [
+		{ key: "all", label: "全部", count: 0 }
+	];
+
+	const noticeList = ref<NoticeItem[]>([]);
+	const page = ref(1);
+	const limit = 10;
+	const hasMore = ref(true);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const auditJumpingId = ref(0);
+
+	function pickField(row: UTSJSONObject, key: string): string {
+		const val = row[key];
+		return val != null ? `${val}`.trim() : "";
+	}
+
+	function toNumber(val: any, fallback: number = 0): number {
+		if (val == null) {
+			return fallback;
+		}
+		const n = parseInt(`${val}`);
+		return isNaN(n) ? fallback : n;
+	}
+
+	function getRowKey(item: NoticeItem, index: number): string {
+		if (item.id > 0) {
+			return `${item.id}`;
+		}
+		return `${index}`;
+	}
+
+	function extractList(data: UTSJSONObject): MessageListItem[] {
+		const listRaw = data["list"] as MessageListItem[] | null;
+		if (listRaw != null) {
+			return listRaw;
+		}
+		const records = data["records"] as MessageListItem[] | null;
+		if (records != null) {
+			return records;
+		}
+		if (Array.isArray(data)) {
+			return data as MessageListItem[];
+		}
+		return [];
+	}
+
+	function parseListTotal(data: UTSJSONObject): number {
+		const totalVal = data["total"] ?? data["count"];
+		if (totalVal == null) {
+			return 0;
+		}
+		const n = parseInt(`${totalVal}`);
+		return isNaN(n) ? 0 : n;
+	}
+
+	function updateHasMore(data: UTSJSONObject, rowsLength: number, listLength: number) {
+		const total = parseListTotal(data);
+		if (total > 0) {
+			hasMore.value = listLength < total;
+			return;
+		}
+		hasMore.value = rowsLength >= limit;
+	}
+
+	function resolveTypeLabel(type: number, typeText: string): string {
+		if (typeText != "") {
+			return typeText;
+		}
+		if (type == 1) {
+			return "申请加入";
+		}
+		if (type == 2) {
+			return "审核结果";
+		}
+		return "系统";
+	}
+
+	function resolveTypeStyle(type: number): {
+		iconName: string;
+		iconText: string;
+		iconBg: string;
+		iconColor: string;
+		tagBg: string;
+		tagColor: string;
+	} {
+		if (type == 1) {
+			return {
+				iconName: "user-add-line",
+				iconText: "",
+				iconBg: "#eef3fc",
+				iconColor: "#2b59c3",
+				tagBg: "#eef3fc",
+				tagColor: "#2b59c3"
+			};
+		}
+		if (type == 2) {
+			return {
+				iconName: "checkbox-circle-line",
+				iconText: "",
+				iconBg: "#ecfdf5",
+				iconColor: "#22c55e",
+				tagBg: "#ecfdf5",
+				tagColor: "#22c55e"
+			};
+		}
+		return {
+			iconName: "notification-4-line",
+			iconText: "",
+			iconBg: "#f3f4f6",
+			iconColor: "#6b7280",
+			tagBg: "#f3f4f6",
+			tagColor: "#6b7280"
+		};
+	}
+
+	function mapMessageToNotice(item: MessageListItem): NoticeItem {
+		const row = item as UTSJSONObject;
+		const type = toNumber(row["type"], 0);
+		const typeText = pickField(row, "type_text");
+		const style = resolveTypeStyle(type);
+		const title = pickField(row, "title");
+		const content = pickField(row, "content");
+		const createTime = pickField(row, "create_time");
+		const isRead = toNumber(row["is_read"], 0);
+		return {
+			id: toNumber(row["id"], 0),
+			categoryLabel: resolveTypeLabel(type, typeText),
+			urgent: false,
+			pinned: false,
+			unread: isRead == 0,
+			iconName: style.iconName,
+			iconText: style.iconText,
+			iconBg: style.iconBg,
+			iconColor: style.iconColor,
+			tagBg: style.tagBg,
+			tagColor: style.tagColor,
+			title: title != "" ? title : "消息通知",
+			desc: content,
+			meta: createTime,
+			path: pickField(row, "path")
+		};
+	}
+
+	function markItemRead(id: number) {
+		for (let i = 0; i < noticeList.value.length; i++) {
+			if (noticeList.value[i].id == id) {
+				noticeList.value[i].unread = false;
+			}
+		}
+	}
+
+	function resolveMessagePath(rawPath: string): string {
+		const text = rawPath.trim();
+		if (text == "") {
+			return "";
+		}
+		return text.startsWith("/") ? text : `/${text}`;
+	}
+
+	function onGoAudit(item: NoticeItem) {
+		if (item.id <= 0 || item.path == "") {
+			return;
+		}
+		if (auditJumpingId.value > 0) {
+			return;
+		}
+		auditJumpingId.value = item.id;
+		getMessageDetail(item.id)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const detailPath = pickField(data, "path");
+				const targetPath = resolveMessagePath(detailPath != "" ? detailPath : item.path);
+				if (targetPath == "") {
+					uni.showToast({ title: "暂无跳转地址", icon: "none" });
+					return;
+				}
+				markItemRead(item.id);
+				router.push({ path: targetPath });
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				auditJumpingId.value = 0;
+			});
+	}
+
+	function fetchList(reset: boolean) {
+		if (reset) {
+			if (loading.value) {
+				return;
+			}
+			loading.value = true;
+			page.value = 1;
+			hasMore.value = true;
+		} else {
+			if (loadingMore.value || !hasMore.value || loading.value) {
+				return;
+			}
+			loadingMore.value = true;
+		}
+		const reqPage = reset ? 1 : page.value;
+		getMessageList({
+			page: reqPage,
+			limit: limit
+		})
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const rows = extractList(data).map((item) => mapMessageToNotice(item));
+				if (reset) {
+					noticeList.value = rows;
+				} else {
+					noticeList.value = noticeList.value.concat(rows);
+				}
+				updateHasMore(data, rows.length, noticeList.value.length);
+				if (hasMore.value) {
+					page.value = reqPage + 1;
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loading.value = false;
+				loadingMore.value = false;
+			});
+	}
+
+	function onScrollToLower() {
+		fetchList(false);
+	}
+
+	function onLoadMoreTap() {
+		if (!hasMore.value || loadingMore.value || loading.value) {
+			return;
+		}
+		fetchList(false);
+	}
+
+	function openNoticeDetail(item: NoticeItem) {
+		if (item.id <= 0) {
+			return;
+		}
+		router.push({
+			path: "/pages/notice/detail",
+			query: {
+				id: `${item.id}`
+			}
+		});
+	}
+
+	const unreadCount = computed(() => {
+		return noticeList.value.filter((e) => e.unread).length;
+	});
+
+	onShow(() => {
+		fetchList(true);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.nt-page {
+		height: 100vh;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		background-color: #f7f8fa;
+	}
+
+	.nt-header {
+		flex-shrink: 0;
+		position: relative;
+		overflow: hidden;
+		background-image:
+			radial-gradient(circle at 88% -10%, rgba(120, 90, 210, 0.42) 0%, rgba(86, 78, 155, 0.16) 34%, rgba(26, 31, 58, 0) 58%),
+			linear-gradient(135deg, #1e2240 0%, #121520 100%);
+
+		:deep(.cl-safe-area) {
+			background-color: transparent;
+		}
+	}
+
+	.nt-hero {
+		padding: 40rpx 0 40rpx 32rpx;
+
+		.nt-hero-title-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			padding-right: 24rpx;
+		}
+
+		.nt-hero-title-left {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			flex: 1;
+			min-width: 0;
+		}
+
+		.nt-hero-title {
+			font-size: 48rpx;
+			font-weight: 800;
+			color: #ffffff;
+			line-height: 52rpx;
+			letter-spacing: -1rpx;
+		}
+
+		.nt-hero-badge {
+			margin-left: 16rpx;
+			padding: 6rpx 18rpx;
+			border-radius: 999rpx;
+			background-color: rgba(239, 68, 68, 0.18);
+			border-width: 1rpx;
+			border-style: solid;
+			border-color: rgba(239, 68, 68, 0.4);
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.nt-hero-badge-dot {
+			width: 10rpx;
+			height: 10rpx;
+			border-radius: 999rpx;
+			background-color: #ff6b6b;
+			margin-right: 8rpx;
+			flex-shrink: 0;
+		}
+
+		.nt-hero-badge-text {
+			font-size: 22rpx;
+			font-weight: 700;
+			color: #ffb8ad;
+			line-height: 30rpx;
+			letter-spacing: 0.6rpx;
+		}
+
+		.nt-hero-mark-btn {
+			width: 56rpx;
+			height: 56rpx;
+			border-radius: 28rpx;
+			background-color: rgba(255, 255, 255, 0.12);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			margin-left: 24rpx;
+		}
+
+		.nt-hero-sub {
+			margin-top: 10rpx;
+			padding-right: 32rpx;
+			font-size: 23rpx;
+			color: rgba(255, 255, 255, 0.55);
+			line-height: 34rpx;
+		}
+	}
+
+	.nt-body {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		margin-top: -12rpx;
+		border-top-left-radius: 24rpx;
+		border-top-right-radius: 24rpx;
+		overflow: hidden;
+		background-color: #ffffff;
+	}
+
+	.nt-filter-panel {
+		flex-shrink: 0;
+		padding: 28rpx 0 20rpx;
+		background-color: #ffffff;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: rgba(26, 23, 20, 0.05);
+	}
+
+	.nt-filter-scroll {
+		width: 100%;
+		white-space: nowrap;
+	}
+
+	.nt-list-scroll {
+		flex: 1;
+		height: 0;
+		width: 100%;
+		background-color: #f7f8fa;
+	}
+
+	.nt-filter-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 0 32rpx;
+	}
+
+	.nt-filter-item {
+		flex-shrink: 0;
+		padding: 14rpx 28rpx;
+		border-radius: 999rpx;
+		background-color: #f3f4f6;
+		margin-right: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+
+		&:last-child {
+			margin-right: 0;
+		}
+
+		&--active {
+			background-color: #2b59c3;
+		}
+	}
+
+	.nt-filter-label {
+		font-size: 24rpx;
+		color: #333333;
+		line-height: 34rpx;
+		font-weight: 500;
+	}
+
+	.nt-filter-count {
+		margin-left: 8rpx;
+		font-size: 20rpx;
+		color: rgba(51, 51, 51, 0.55);
+		line-height: 28rpx;
+	}
+
+	.nt-filter-item--active {
+		.nt-filter-label,
+		.nt-filter-count {
+			color: #ffffff;
+			font-weight: 700;
+		}
+
+		.nt-filter-count {
+			opacity: 0.8;
+		}
+	}
+
+	.nt-list {
+		display: flex;
+		flex-direction: column;
+		padding: 24rpx 32rpx 40rpx;
+	}
+
+	.nt-state {
+		padding: 120rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.nt-state-text {
+		margin-top: 16rpx;
+		font-size: 28rpx;
+		color: #999999;
+	}
+
+	.nt-loadmore {
+		padding: 16rpx 0 8rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.nt-loadmore-hint {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.nt-card {
+		position: relative;
+		padding: 32rpx 36rpx;
+		margin-bottom: 16rpx;
+		border-radius: 28rpx;
+		background-color: #ffffff;
+		box-shadow: 0 2rpx 4rpx rgba(20, 18, 30, 0.04), 0 8rpx 32rpx -20rpx rgba(20, 18, 30, 0.08);
+
+		&--pinned {
+			box-shadow:
+				0 2rpx 4rpx rgba(20, 18, 30, 0.04),
+				0 12rpx 40rpx -16rpx rgba(43, 89, 195, 0.25),
+				0 0 0 1rpx rgba(43, 89, 195, 0.15);
+		}
+
+		.nt-card-pin {
+			position: absolute;
+			top: 28rpx;
+			right: 28rpx;
+			padding: 4rpx 14rpx;
+			border-radius: 8rpx;
+			background-color: #2b59c3;
+		}
+
+		.nt-card-pin-text {
+			font-size: 19rpx;
+			font-weight: 800;
+			color: #ffffff;
+			line-height: 28rpx;
+			letter-spacing: 0.6rpx;
+		}
+
+		.nt-card-main {
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+		}
+
+		.nt-card-icon {
+			width: 76rpx;
+			height: 76rpx;
+			border-radius: 20rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			margin-right: 24rpx;
+		}
+
+		.nt-card-icon-text {
+			font-size: 34rpx;
+			font-weight: 800;
+			line-height: 44rpx;
+		}
+
+		.nt-card-content {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			min-width: 0;
+		}
+
+		.nt-card-tags {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			margin-bottom: 8rpx;
+		}
+
+		.nt-card-tag {
+			padding: 4rpx 14rpx;
+			border-radius: 8rpx;
+			margin-right: 12rpx;
+
+			&--urgent {
+				background-color: rgba(239, 68, 68, 0.12);
+			}
+		}
+
+		.nt-card-tag-text {
+			font-size: 20rpx;
+			font-weight: 700;
+			line-height: 28rpx;
+			letter-spacing: 0.6rpx;
+
+			&--urgent {
+				color: #dc2626;
+			}
+		}
+
+		.nt-card-dot {
+			width: 12rpx;
+			height: 12rpx;
+			border-radius: 999rpx;
+			background-color: #ef4444;
+			box-shadow: 0 0 10rpx rgba(239, 68, 68, 0.6);
+		}
+
+		.nt-card-title {
+			font-size: 28rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 40rpx;
+			letter-spacing: -0.2rpx;
+		}
+
+		.nt-card-desc {
+			margin-top: 12rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 38rpx;
+		}
+
+		.nt-card-foot {
+			margin-top: 20rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.nt-card-meta {
+			font-size: 21rpx;
+			color: #bbbbbb;
+			line-height: 30rpx;
+			font-weight: 500;
+			flex: 1;
+			min-width: 0;
+		}
+
+		.nt-card-audit {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			flex-shrink: 0;
+			margin-left: 16rpx;
+		}
+
+		.nt-card-audit-text {
+			font-size: 24rpx;
+			color: #2b59c3;
+			font-weight: 600;
+			line-height: 34rpx;
+			margin-right: 2rpx;
+		}
+	}
+</style>

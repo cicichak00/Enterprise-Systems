@@ -1,0 +1,485 @@
+<template>
+	<cl-page :pt="{ className: 'ab-page' }">
+		<view class="ab-page">
+			<view v-if="pageLoading" class="ab-loading-mask">
+				<cl-loading :loading="true" :size="32" color="#2b59c3"></cl-loading>
+				<text class="ab-loading-text">加载中...</text>
+			</view>
+			<view class="ab-header">
+				<view class="ab-brand">
+					<view class="ab-logo">
+						<image
+							v-if="logoUrl != ''"
+							class="ab-logo-img"
+							:src="logoUrl"
+							mode="aspectFill"
+						></image>
+						<text v-else class="ab-logo-text">{{ logoText }}</text>
+					</view>
+					<text class="ab-brand-name">{{ brandName }}</text>
+					<text v-if="brandVersion != ''" class="ab-brand-version">{{ brandVersion }}</text>
+				</view>
+			</view>
+			<view v-if="!pageLoading" class="ab-body">
+				<view class="ab-intro-card">
+					<text class="ab-intro-title">{{ introTitle }}</text>
+					<text class="ab-intro-desc">{{ introDesc }}</text>
+				</view>
+				<view v-if="policyItems.length > 0">
+					<text class="ab-section-label">协议与政策</text>
+					<view class="ab-card ab-card--list">
+						<view
+							class="ab-link-item"
+							v-for="(item, index) in policyItems"
+							:key="item.id"
+							@tap="onPolicyTap(item)"
+						>
+							<text class="ab-link-text">{{ item.title }}</text>
+							<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+							<view v-if="index < policyItems.length - 1" class="ab-row-divider"></view>
+						</view>
+					</view>
+				</view>
+				<view v-if="contactItems.length > 0">
+					<text class="ab-section-label">联系我们</text>
+					<view class="ab-card">
+						<view
+							class="ab-contact-item"
+							v-for="(item, index) in contactItems"
+							:key="item.id"
+							@tap="onContactAction(item)"
+						>
+							<view class="ab-contact-copy">
+								<text class="ab-contact-title">{{ item.title }}</text>
+								<text class="ab-contact-sub">{{ item.sub }}</text>
+							</view>
+							<view class="ab-contact-btn">
+								<text class="ab-contact-btn-text">{{ item.action }}</text>
+							</view>
+							<view v-if="index < contactItems.length - 1" class="ab-row-divider"></view>
+						</view>
+					</view>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getAppInfo } from "@/.cool/api/info";
+	import { isApiSuccess, getApiMessage, router } from "@/.cool";
+	type PolicyItem = {
+		id: string;
+		title: string;
+		content: string;
+		key: string;
+	};
+	type ContactItem = {
+		id: string;
+		title: string;
+		sub: string;
+		action: string;
+		imageUrl: string;
+		phone: string;
+		email: string;
+	};
+	const brandName = ref("");
+	const brandVersion = ref("");
+	const logoUrl = ref("");
+	const logoText = ref("");
+	const introTitle = ref("");
+	const introDesc = ref("");
+	const policyItems = ref<PolicyItem[]>([]);
+	const contactItems = ref<ContactItem[]>([]);
+	const pageLoading = ref(true);
+	function firstChar(text: string, fallback: string): string {
+		const t = text.trim();
+		if (t == "") {
+			return fallback;
+		}
+		return t.charAt(0);
+	}
+	function extractImageUrl(html: string): string {
+		const text = html.trim();
+		if (text == "") {
+			return "";
+		}
+		const srcIdx = text.indexOf('src="');
+		if (srcIdx >= 0) {
+			const start = srcIdx + 5;
+			const end = text.indexOf('"', start);
+			if (end > start) {
+				return text.substring(start, end);
+			}
+		}
+		const srcIdx2 = text.indexOf("src='");
+		if (srcIdx2 >= 0) {
+			const start = srcIdx2 + 5;
+			const end = text.indexOf("'", start);
+			if (end > start) {
+				return text.substring(start, end);
+			}
+		}
+		return "";
+	}
+	function stripHtml(html: string): string {
+		let text = html.trim();
+		if (text == "") {
+			return "";
+		}
+		text = text.replace(/<[^>]+>/g, " ");
+		text = text.replace(/&nbsp;/g, " ");
+		text = text.replace(/\s+/g, " ").trim();
+		return text;
+	}
+	function parseQueryString(qs: string): UTSJSONObject {
+		const query = {} as UTSJSONObject;
+		const parts = qs.split("&");
+		for (let i = 0; i < parts.length; i++) {
+			const part = parts[i].trim();
+			if (part == "") {
+				continue;
+			}
+			const eq = part.indexOf("=");
+			if (eq <= 0) {
+				continue;
+			}
+			const key = part.substring(0, eq);
+			const val = part.substring(eq + 1);
+			if (key != "") {
+				query[key] = val;
+			}
+		}
+		return query;
+	}
+	function mapProtocol(row: UTSJSONObject, index: number): PolicyItem {
+		const idVal = row["id"];
+		const title = `${row["title"] ?? ""}`.trim();
+		const content = `${row["content"] ?? ""}`.trim();
+		const key = `${row["key"] ?? ""}`.trim();
+		return {
+			id: idVal != null ? `${idVal}` : `protocol-${index}`,
+			title: title != "" ? title : "协议",
+			content: content,
+			key: key
+		};
+	}
+	function resolveContactAction(sub: string, imageUrl: string, phone: string, email: string): string {
+		if (imageUrl != "") {
+			return "查看";
+		}
+		if (phone != "") {
+			return "拨打";
+		}
+		if (email != "") {
+			return "复制";
+		}
+		return "查看";
+	}
+	function mapContact(row: UTSJSONObject, index: number): ContactItem {
+		const idVal = row["id"];
+		const title = `${row["title"] ?? row["name"] ?? "联系客服"}`.trim();
+		const summary = `${row["summary"] ?? ""}`.trim();
+		const content = `${row["content"] ?? ""}`.trim();
+		const phone = `${row["phone"] ?? row["mobile"] ?? ""}`.trim();
+		const email = `${row["email"] ?? ""}`.trim();
+		const imageUrl = extractImageUrl(content);
+		let sub = summary;
+		if (sub == "") {
+			sub = stripHtml(content);
+		}
+		if (sub == "" && phone != "") {
+			sub = phone;
+		}
+		if (sub == "" && email != "") {
+			sub = email;
+		}
+		if (sub == "" && imageUrl != "") {
+			sub = "点击查看客服二维码";
+		}
+		if (sub == "") {
+			sub = "点击查看详情";
+		}
+		const action = resolveContactAction(sub, imageUrl, phone, email);
+		return {
+			id: idVal != null ? `${idVal}` : `contact-${index}`,
+			title: title != "" ? title : "联系我们",
+			sub: sub,
+			action: action,
+			imageUrl: imageUrl,
+			phone: phone,
+			email: email
+		};
+	}
+	function applySystem(system: UTSJSONObject) {
+		const title = `${system["title"] ?? ""}`.trim();
+		const version = `${system["version"] ?? ""}`.trim();
+		const logo = `${system["logo"] ?? ""}`.trim();
+		const introTitleRaw = `${system["intro_title"] ?? ""}`.trim();
+		const introContent = `${system["intro_content"] ?? ""}`.trim();
+		if (title != "") {
+			brandName.value = title;
+			logoText.value = firstChar(title, "豹");
+		}
+		if (version != "") {
+			brandVersion.value = version.indexOf("v") == 0 ? version : `v ${version}`;
+		}
+		if (logo != "") {
+			logoUrl.value = logo;
+		}
+		if (introTitleRaw != "") {
+			introTitle.value = introTitleRaw;
+		}
+		if (introContent != "") {
+			introDesc.value = introContent;
+		}
+	}
+	function loadInfo() {
+		pageLoading.value = true;
+		getAppInfo("enterprise")
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const system = data["system"] as UTSJSONObject | null;
+				if (system != null) {
+					applySystem(system);
+				}
+				const protocolRaw = data["protocol"] as any[] | null;
+				const policies: PolicyItem[] = [];
+				if (protocolRaw != null) {
+					for (let i = 0; i < protocolRaw.length; i++) {
+						policies.push(mapProtocol(protocolRaw[i] as UTSJSONObject, i));
+					}
+				}
+				policyItems.value = policies;
+				const contactRaw = data["contact"] as any[] | null;
+				const contacts: ContactItem[] = [];
+				if (contactRaw != null) {
+					for (let i = 0; i < contactRaw.length; i++) {
+						contacts.push(mapContact(contactRaw[i] as UTSJSONObject, i));
+					}
+				}
+				contactItems.value = contacts;
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				pageLoading.value = false;
+			});
+	}
+	function onPolicyTap(item: PolicyItem) {
+		router.push({
+            path: "/pages/protocol/detail",
+            query: {
+                id: item.id
+            }
+        });
+	}
+	function onContactAction(item: ContactItem) {
+		if (item.imageUrl != "") {
+			uni.previewImage({
+				urls: [item.imageUrl],
+				current: item.imageUrl
+			});
+			return;
+		}
+		if (item.action == "复制" && item.email != "") {
+			uni.setClipboardData({
+				data: item.email,
+				success: () => {
+					uni.showToast({ title: "已复制", icon: "none" });
+				}
+			});
+			return;
+		}
+		if (item.action == "拨打" && item.phone != "") {
+			uni.makePhoneCall({ phoneNumber: item.phone });
+			return;
+		}
+		uni.showToast({ title: item.sub, icon: "none" });
+	}
+	onLoad(() => {
+		loadInfo();
+	});
+</script>
+<style lang="scss" scoped>
+	.ab-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+	.ab-header {
+		background-image:
+			radial-gradient(circle at 50% 20%, rgba(110, 100, 190, 0.28) 0%, rgba(86, 78, 155, 0.1) 34%, rgba(26, 31, 58, 0) 62%),
+			linear-gradient(180deg, #1a1f3a 0%, #0d0f18 100%);
+		:deep(.cl-safe-area) {
+			background-color: transparent;
+		}
+	}
+	.ab-brand {
+		padding: 120rpx 30rpx 40rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+	.ab-logo {
+		width: 120rpx;
+		height: 120rpx;
+		border-radius: 28rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+	.ab-logo-img {
+		width: 120rpx;
+		height: 120rpx;
+	}
+	.ab-logo-text {
+		font-size: 56rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 72rpx;
+	}
+	.ab-brand-name {
+		margin-top: 20rpx;
+		font-size: 36rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 50rpx;
+	}
+	.ab-brand-version {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: rgba(255, 255, 255, 0.55);
+		line-height: 34rpx;
+	}
+	.ab-loading-mask {
+		position: fixed;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		z-index: 999;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		background-color: #f7f8fa;
+	}
+
+	.ab-loading-text {
+		margin-top: 20rpx;
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.ab-body {
+		padding: 24rpx 30rpx 40rpx;
+	}
+	.ab-intro-card {
+		padding: 32rpx 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 32rpx;
+	}
+	.ab-intro-title {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 42rpx;
+	}
+	.ab-intro-desc {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+	}
+	.ab-section-label {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		margin-bottom: 16rpx;
+	}
+	.ab-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 32rpx;
+		overflow: hidden;
+	}
+	.ab-card--list {
+		padding: 0 28rpx;
+	}
+	.ab-link-item {
+		position: relative;
+		padding: 32rpx 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+	.ab-link-text {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+	.ab-contact-item {
+		position: relative;
+		padding: 28rpx 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+	.ab-contact-copy {
+		flex: 1;
+		min-width: 0;
+		margin-right: 16rpx;
+	}
+	.ab-contact-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+	.ab-contact-sub {
+		margin-top: 6rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+	.ab-contact-btn {
+		padding: 10rpx 24rpx;
+		border-radius: 24rpx;
+		background-color: #eef3fc;
+		flex-shrink: 0;
+	}
+	.ab-contact-btn-text {
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 34rpx;
+	}
+	.ab-row-divider {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 1rpx;
+		background-color: #f0f0f0;
+	}
+</style>

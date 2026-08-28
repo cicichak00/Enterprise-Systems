@@ -1,0 +1,517 @@
+<template>
+	<cl-page :pt="{ className: 'hp-page' }">
+		<view class="hp-page">
+			<view class="hp-header">
+
+				<view class="hp-hero">
+					<text class="hp-hero-title">遇到问题？</text>
+					<text class="hp-hero-title">先看看这里</text>
+					<text class="hp-hero-sub">90% 的问题都能在 5 秒内找到答案</text>
+
+					<view class="hp-search">
+						<cl-icon name="search-line" :size="18" color="#999999"></cl-icon>
+						<input
+							class="hp-search-input"
+							v-model="searchKeyword"
+							placeholder="搜索问题 / 关键词"
+							placeholder-class="hp-search-placeholder"
+							confirm-type="search"
+						/>
+					</view>
+
+					<view class="hp-hot-row">
+						<text class="hp-hot-label">热门：</text>
+						<view class="hp-hot-tags">
+							<view
+								class="hp-hot-tag"
+								v-for="(item, index) in hotTags"
+								:key="index"
+								@tap="onHotTagTap(item)"
+							>
+								<text class="hp-hot-tag-text">{{ item }}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+			</view>
+
+			<view class="hp-body">
+				<scroll-view class="hp-tab-scroll" scroll-x="true" show-scrollbar="false">
+					<view class="hp-tabs">
+						<view
+							class="hp-tab"
+							v-for="(item, index) in categories"
+							:key="index"
+							:class="{ 'hp-tab--active': activeCategory == item.key }"
+							@tap="onCategoryChange(item.key)"
+						>
+							<text
+								class="hp-tab-text"
+								:class="{ 'hp-tab-text--active': activeCategory == item.key }"
+							>{{ item.label }}</text>
+						</view>
+					</view>
+				</scroll-view>
+
+				<view class="hp-faq-card">
+					<view
+						class="hp-faq-item"
+						v-for="(item, index) in filteredFaqs"
+						:key="item.id"
+					>
+						<view class="hp-faq-head" @tap="onToggleFaq(index)">
+							<view class="hp-faq-q">
+								<text class="hp-faq-q-text">Q</text>
+							</view>
+							<text class="hp-faq-question">{{ item.question }}</text>
+							<cl-icon
+								:name="expandedIndex == index ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+								:size="16"
+								color="#cccccc"
+							></cl-icon>
+						</view>
+						<view v-if="expandedIndex == index" class="hp-faq-answer-wrap">
+							<text class="hp-faq-answer">{{ item.answer }}</text>
+						</view>
+						<view v-if="index < filteredFaqs.length - 1" class="hp-faq-divider"></view>
+					</view>
+				</view>
+
+				<view class="hp-contact-card">
+					<view class="hp-contact-icon">
+						<cl-icon name="chat-3-line" :size="22" color="#a78bfa"></cl-icon>
+					</view>
+					<view class="hp-contact-copy">
+						<text class="hp-contact-title">没找到想问的？</text>
+						<text class="hp-contact-sub">直接找在线客服聊，平均 3 分钟响应</text>
+					</view>
+					<view class="hp-contact-btn" @tap="onContactService">
+						<text class="hp-contact-btn-text">联系客服</text>
+					</view>
+				</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getCapsuleNavStyle, router } from "@/.cool";
+
+	type CategoryKey = "creator" | "mentor" | "advisor" | "tax";
+
+	type FaqItem = {
+		id: string;
+		category: CategoryKey;
+		question: string;
+		answer: string;
+	};
+
+	const categories = [
+		{ key: "creator" as CategoryKey, label: "创作者" },
+		{ key: "mentor" as CategoryKey, label: "导师" },
+		{ key: "advisor" as CategoryKey, label: "领航投顾" },
+		{ key: "tax" as CategoryKey, label: "钱与税" }
+	];
+
+	const hotTags = ["提现到账时间", "实名失败", "团队退款", "账号被封", "邀请码错误", "发票"];
+
+	const activeCategory = ref<CategoryKey>("creator");
+	const expandedIndex = ref<number>(0);
+	const searchKeyword = ref<string>("");
+
+	const faqList: FaqItem[] = [
+		{
+			id: "c1",
+			category: "creator",
+			question: "注册后第一步应该做什么？",
+			answer: "完善实名认证 → 绑定推广任务 → 在任务广场挑选第一个项目。建议从「新手必读」任务开始，完成首条回填熟悉流程。"
+		},
+		{
+			id: "c2",
+			category: "creator",
+			question: "推文号要几个？一个就够吗？",
+			answer: "初期 1 个号跑到稳定赚钱即可。当一个项目被验证了，再考虑用矩阵账号放大。账号随时可以新起，项目经验才是真正的资产。"
+		},
+		{
+			id: "c3",
+			category: "creator",
+			question: "我看到的任务别人也能看到吗？",
+			answer: "大部分任务池是全量的，但「限时爆款」「V8 专享」等会基于你的等级和渠道经验定向露出。主理团队带你时会多看到一部分内测任务。"
+		},
+		{
+			id: "c4",
+			category: "creator",
+			question: "作品没有播放量怎么办？",
+			answer: "先检查 3 点：选品是否在当期榜单前 10、钩子是否套了爆款模板、发布时间是否踩到账号活跃时段。建议拆解 1 条爆款素材逐帧分析。"
+		},
+		{
+			id: "c5",
+			category: "creator",
+			question: "被平台封号了右约会赔吗？",
+			answer: "平台原因封号不在赔付范围，但平台方如果发布规则变更导致的，右约会在 3 日内发出预警。建议多养号分散风险。"
+		},
+		{
+			id: "m1",
+			category: "mentor",
+			question: "怎么成为导师？",
+			answer: "我 → 成为导师 → 资格检查。需要月稳定收益 ≥ ¥3,000 连续 3 个月、近 30 天活跃、完成实名认证、通过 SOP 试讲。符合后进入 7 日审核。"
+		},
+		{
+			id: "m2",
+			category: "mentor",
+			question: "入团服务费分成多少？",
+			answer: "基础档 75% / 进阶 70% / 企业 65% 归主理团队。合约由平台服务费 + 老成员复购分成。老成员复购 = 你之前的主理团队会持续拿到你新成员入团费的 3%。"
+		},
+		{
+			id: "m3",
+			category: "mentor",
+			question: "成员违规了我会被牵连吗？",
+			answer: "若成员作弊刷单被风控，会影响你的「团队健康度」分。连续 2 个成员违规会触发主理团队复审。建议入团前做 1 次通话核身。"
+		},
+		{
+			id: "a1",
+			category: "advisor",
+			question: "领航投顾签约需要什么资质？",
+			answer: "粉丝 ≥ 5万、近 3 个月活跃、实名 + 工商主体、代表带货作品 3 件。填表审核约 5 个工作日。"
+		},
+		{
+			id: "a2",
+			category: "advisor",
+			question: "领航投顾和导师能同时做吗？",
+			answer: "可以。身份互不冲突，只是精力分配问题。已签约领航投顾可在「我 → 身份切换」切换视角。"
+		},
+		{
+			id: "a3",
+			category: "advisor",
+			question: "领航投顾怎么赚钱？",
+			answer: "项目流水抽佣 2-3.5%，无服务费与入团费。伙伴绑定后持续分润，等级越高比例越高。"
+		},
+		{
+			id: "t1",
+			category: "tax",
+			question: "提现多久到账？",
+			answer: "支付宝 / 微信 T+0，银行卡 T+1（工作日）。每月前 3 笔 ¥10 以下免手续费，之后 0.6% 封顶 ¥6。"
+		},
+		{
+			id: "t2",
+			category: "tax",
+			question: "为什么实际到账少了？",
+			answer: "看『到账明细』页会拆给你：应发 -> 手续费 -> 个税 -> 实到。个人综合所得超 ¥800 会预扣 20% 劳务报酬税。"
+		},
+		{
+			id: "t3",
+			category: "tax",
+			question: "发票怎么开？",
+			answer: "我 -> 发票/税务中心 -> 申请开票。个人主体可申请灵活用工平台代开，企业主体对公结算。"
+		},
+		{
+			id: "t4",
+			category: "tax",
+			question: "与主理团队脱钩要间隔吗？",
+			answer: "双方都同意的脱钩立即生效；伙伴单方提出仅需 7 天冷静期；脱钩后 14 天内不能被同一领航投顾名下另一位导师接走。脱钩不涉及退费（平台不向伙伴收付费用）。"
+		}
+	];
+
+	const filteredFaqs = computed(() => {
+		const keyword = searchKeyword.value.trim();
+		return faqList.filter((item) => {
+			if (item.category != activeCategory.value) {
+				return false;
+			}
+			if (keyword == "") {
+				return true;
+			}
+			return item.question.indexOf(keyword) >= 0 || item.answer.indexOf(keyword) >= 0;
+		});
+	});
+
+	function onBack() {
+		router.back();
+	}
+
+	function onCategoryChange(key: CategoryKey) {
+		activeCategory.value = key;
+		expandedIndex.value = 0;
+	}
+
+	function onToggleFaq(index: number) {
+		if (expandedIndex.value == index) {
+			expandedIndex.value = -1;
+		} else {
+			expandedIndex.value = index;
+		}
+	}
+
+	function onHotTagTap(tag: string) {
+		searchKeyword.value = tag;
+		expandedIndex.value = 0;
+	}
+
+	function onContactService() {
+		router.push({ path: "/pages/user/service" });
+	}
+</script>
+
+<style lang="scss" scoped>
+	.hp-page {
+		min-height: 100vh;
+		background-color: #fdfaf5;
+	}
+
+	.hp-header {
+		background-image:
+			radial-gradient(circle at 92% 0%, rgba(255, 200, 150, 0.45) 0%, rgba(255, 220, 180, 0.18) 36%, rgba(253, 250, 245, 0) 68%),
+			linear-gradient(180deg, #ffe9d6 0%, #fdfaf5 100%);
+
+		:deep(.cl-safe-area) {
+			background-color: transparent;
+		}
+	}
+
+	.hp-hero {
+		padding: 32rpx 30rpx 32rpx;
+	}
+
+	.hp-hero-title {
+		display: flex;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 60rpx;
+	}
+
+	.hp-hero-sub {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.hp-search {
+		margin-top: 28rpx;
+		height: 80rpx;
+		padding: 0 28rpx;
+		border-radius: 40rpx;
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.hp-search-input {
+		flex: 1;
+		margin-left: 12rpx;
+		height: 80rpx;
+		font-size: 28rpx;
+		color: #333333;
+	}
+
+	.hp-search-placeholder {
+		color: #cccccc;
+		font-size: 28rpx;
+	}
+
+	.hp-hot-row {
+		margin-top: 20rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+	}
+
+	.hp-hot-label {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 52rpx;
+		flex-shrink: 0;
+	}
+
+	.hp-hot-tags {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.hp-hot-tag {
+		margin: 0 12rpx 12rpx 0;
+		padding: 10rpx 20rpx;
+		border-radius: 26rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+	}
+
+	.hp-hot-tag-text {
+		font-size: 24rpx;
+		color: #333333;
+		line-height: 32rpx;
+	}
+
+	.hp-body {
+		padding: 0 30rpx 40rpx;
+	}
+
+	.hp-tab-scroll {
+		width: 100%;
+		white-space: nowrap;
+	}
+
+	.hp-tabs {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding-bottom: 24rpx;
+	}
+
+	.hp-tab {
+		margin-right: 16rpx;
+		padding: 14rpx 28rpx;
+		border-radius: 32rpx;
+		background-color: #ffffff;
+		flex-shrink: 0;
+	}
+
+	.hp-tab--active {
+		background-color: #1a1a1a;
+	}
+
+	.hp-tab-text {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+	}
+
+	.hp-tab-text--active {
+		color: #ffffff;
+	}
+
+	.hp-faq-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		overflow: hidden;
+		margin-bottom: 24rpx;
+	}
+
+	.hp-faq-item {
+		position: relative;
+	}
+
+	.hp-faq-head {
+		padding: 28rpx 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.hp-faq-q {
+		width: 40rpx;
+		height: 40rpx;
+		border-radius: 10rpx;
+		background-color: #ffe8d6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.hp-faq-q-text {
+		font-size: 22rpx;
+		font-weight: 700;
+		color: #e67e50;
+		line-height: 28rpx;
+	}
+
+	.hp-faq-question {
+		flex: 1;
+		min-width: 0;
+		margin: 0 16rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.hp-faq-answer-wrap {
+		padding: 0 24rpx 28rpx 80rpx;
+	}
+
+	.hp-faq-answer {
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+	}
+
+	.hp-faq-divider {
+		position: absolute;
+		left: 24rpx;
+		right: 24rpx;
+		bottom: 0;
+		height: 1rpx;
+		background-color: #f0f0f0;
+	}
+
+	.hp-contact-card {
+		padding: 28rpx 24rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.hp-contact-icon {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 18rpx;
+		background-color: #fff0e6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.hp-contact-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 16rpx;
+	}
+
+	.hp-contact-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.hp-contact-sub {
+		margin-top: 6rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.hp-contact-btn {
+		padding: 14rpx 24rpx;
+		border-radius: 32rpx;
+		background-color: #e67e50;
+		flex-shrink: 0;
+	}
+
+	.hp-contact-btn-text {
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 34rpx;
+	}
+</style>

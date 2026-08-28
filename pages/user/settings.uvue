@@ -1,0 +1,918 @@
+<template>
+	<cl-page :pt="{ className: 'st-page' }">
+		<view class="st-page">
+			<view v-if="pageLoading" class="st-loading-mask st-loading-mask--full">
+				<cl-loading :loading="true" :size="32" color="#2b59c3"></cl-loading>
+				<text class="st-loading-text">加载中...</text>
+			</view>
+			<view v-if="saving" class="st-loading-mask st-loading-mask--save">
+				<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+				<text class="st-loading-text">保存中...</text>
+			</view>
+
+			<view class="st-header">
+				<view class="st-hero">
+					<view class="st-hero-tag">
+						<view class="st-hero-dot"></view>
+						<text class="st-hero-tag-text">白标 · 员工端品牌可自定义</text>
+					</view>
+					<text class="st-hero-title">{{ heroBrandName }} · 设置</text>
+					<text class="st-hero-sub">品牌名称 · logo · 企业资质</text>
+				</view>
+			</view>
+
+			<view class="st-body">
+					<text class="st-section-label">员工看到的样子 · 实时预览</text>
+					<view class="st-preview-card">
+						<view class="st-preview-phone">
+							<view class="st-preview-phone-inner">
+								<view class="st-preview-phone-bar">
+									<view class="st-preview-logo">
+										<image
+											v-if="logoDisplaySrc != ''"
+											class="st-preview-logo-img"
+											:src="logoDisplaySrc"
+											mode="aspectFill"
+										/>
+										<text v-else class="st-preview-logo-text">{{ logoText }}</text>
+									</view>
+									<text class="st-preview-app-name">{{ miniAppName }}</text>
+								</view>
+								<view class="st-preview-grid">
+									<view
+										class="st-preview-grid-item"
+										v-for="(item, index) in previewGrid"
+										:key="index"
+										:class="{ 'st-preview-grid-item--active': index == 0 }"
+									>
+										<text
+											class="st-preview-grid-text"
+											:class="{ 'st-preview-grid-text--active': index == 0 }"
+										>{{ item }}</text>
+									</view>
+								</view>
+							</view>
+						</view>
+						<view class="st-preview-copy">
+							<text class="st-preview-desc">
+								员工扫您的二维码进入小程序，看到的就是
+								<text class="st-preview-desc-strong">这个样子</text>
+							</text>
+							<text class="st-preview-tip">小程序内全程不出现「企业号」字样，纯白标。修改下方设置，预览同步更新。</text>
+						</view>
+					</view>
+
+					<text class="st-section-label">品牌定制</text>
+					<view class="st-card st-card--list">
+						<view class="st-brand-row">
+							<text class="st-brand-label">小程序名称</text>
+							<view class="st-brand-value">
+								<input
+									class="st-brand-input"
+									v-model="miniAppName"
+									maxlength="16"
+									placeholder="请输入"
+									placeholder-class="st-brand-input-placeholder"
+								/>
+								<text class="st-brand-count">{{ miniAppName.length }}/16</text>
+							</view>
+							<view class="st-row-divider"></view>
+						</view>
+
+						<view class="st-brand-row">
+							<text class="st-brand-label">品牌 Logo</text>
+							<view class="st-brand-logo">
+								<view class="st-logo-box">
+									<image
+										v-if="logoDisplaySrc != ''"
+										class="st-logo-image"
+										:src="logoDisplaySrc"
+										mode="aspectFill"
+									/>
+									<text v-else class="st-logo-text">{{ logoText }}</text>
+								</view>
+								<view class="st-change-btn" @tap="onChangeLogo">
+									<text class="st-change-btn-text">更换</text>
+								</view>
+							</view>
+							<view class="st-row-divider"></view>
+						</view>
+
+						<view class="st-brand-row st-brand-row--last">
+							<text class="st-brand-label">简介</text>
+							<input
+								class="st-brand-input st-brand-input--intro"
+								v-model="introText"
+								placeholder="请输入简介"
+								placeholder-class="st-brand-input-placeholder"
+							/>
+						</view>
+					</view>
+
+					<view class="st-section-head" v-if="false">
+						<text class="st-section-label st-section-label--inline">企业资质</text>
+						<view v-if="showVerifiedTag" class="st-verified-tag">
+							<text class="st-verified-tag-text">{{ certStatusText }}</text>
+						</view>
+					</view>
+					<view class="st-card st-card--list" v-if="false">
+						<view
+							class="st-info-item"
+							v-for="(item, index) in qualificationItems"
+							:key="index"
+						>
+							<text class="st-info-label">{{ item.label }}</text>
+							<view class="st-info-value-row">
+								<text class="st-info-value">{{ item.value }}</text>
+								<cl-icon
+									v-if="item.locked"
+									name="lock-line"
+									:size="14"
+									color="#cccccc"
+								></cl-icon>
+							</view>
+							<view v-if="index < qualificationItems.length - 1" class="st-row-divider"></view>
+						</view>
+					</view>
+
+					<text class="st-section-label">合规与协议</text>
+					<view class="st-card st-card--list">
+					<view
+						class="st-agreement-item"
+						v-for="(item, index) in agreementItems"
+						:key="'protocol-' + (item.id ?? item.protocol_id ?? index)"
+						@tap="onAgreementTap(item)"
+					>
+						<view class="st-agreement-copy">
+							<text class="st-agreement-title">{{ item.protocol_title || '' }}</text>
+						</view>
+							<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+							<view v-if="index < agreementItems.length - 1" class="st-row-divider"></view>
+						</view>
+					</view>
+
+					<view
+						class="st-save-btn"
+						:class="{ 'st-save-btn--disabled': pageLoading || saving }"
+						@tap="onSave"
+					>
+						<text class="st-save-btn-text">{{ saving ? "保存中..." : "保存设置" }}</text>
+					</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref, watch } from "vue";
+	import { getEnterpriseInfo, saveEnterpriseSettings } from "@/.cool/api/enterprise";
+	import { router } from "@/.cool";
+	import { normalizePickDisplayPath, toDisplayImageSrc, uploadImage } from "@/.cool/api/upload";
+	import type { EnterpriseInfo, EnterpriseProtocolItem, Response } from "@/.cool";
+
+	type QualificationItem = {
+		label: string;
+		value: string;
+		locked: boolean;
+	};
+
+	const qualificationItems = ref<QualificationItem[]>([]);
+	const agreementItems = ref<EnterpriseProtocolItem[]>([]);
+
+	const miniAppName = ref<string>("");
+	const introText = ref<string>("");
+	const logoUrl = ref<string>("");
+	const logoDisplaySrc = ref<string>("");
+	const logoText = ref<string>("企");
+	const heroBrandName = ref<string>("企业");
+	const showVerifiedTag = ref(false);
+	const certStatusText = ref<string>("已认证");
+	const pageLoading = ref(false);
+	const saving = ref(false);
+	const infoRequesting = ref(false);
+
+	const previewGrid = ["首页", "任务", "收益", "我的"];
+
+	function isApiSuccess(code: number | string | null | undefined): boolean {
+		return code == 1 || code == "1" || code == 200 || code == "200";
+	}
+
+	function getApiMessage(res: Response | null, fallback: string): string {
+		if (res == null) {
+			return fallback;
+		}
+		const msg = res.msg ?? res.message;
+		if (msg != null && `${msg}`.trim() != "") {
+			return `${msg}`;
+		}
+		return fallback;
+	}
+
+	function getLogoText(name: string): string {
+		const text = name.trim();
+		if (text == "") {
+			return "企";
+		}
+		return text.charAt(0);
+	}
+
+	function refreshLogoDisplay(remoteUrl: string) {
+		logoUrl.value = remoteUrl;
+		if (remoteUrl.trim() == "") {
+			logoDisplaySrc.value = "";
+			return;
+		}
+		toDisplayImageSrc(remoteUrl).then((path) => {
+			logoDisplaySrc.value = path != "" ? path : remoteUrl;
+		});
+	}
+
+	function buildQualificationItems(cert: UTSJSONObject | null): QualificationItem[] {
+		if (cert == null) {
+			return [];
+		}
+		const items: QualificationItem[] = [];
+		const entityName = cert["entity_name"] as string | null;
+		if (entityName != null && `${entityName}`.trim() != "") {
+			items.push({ label: "企业名称", value: `${entityName}`, locked: true });
+		}
+		const creditCode = cert["credit_code"] as string | null;
+		if (creditCode != null && `${creditCode}`.trim() != "") {
+			items.push({ label: "营业执照", value: `${creditCode}`, locked: true });
+		}
+		const legalRep = cert["legal_rep_name"] as string | null;
+		if (legalRep != null && `${legalRep}`.trim() != "") {
+			items.push({ label: "法人", value: `${legalRep}`, locked: false });
+		}
+		const phone = cert["contact_phone"] as string | null;
+		if (phone != null && `${phone}`.trim() != "") {
+			items.push({ label: "联系电话", value: `${phone}`, locked: false });
+		}
+		const code = cert["enterprise_code"] as string | null;
+		if (code != null && `${code}`.trim() != "") {
+			items.push({ label: "邀请码", value: `${code}`, locked: true });
+		}
+		return items;
+	}
+
+	function parseEnterpriseInfo(res: any | null): EnterpriseInfo | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		return data as EnterpriseInfo;
+	}
+
+	function applyEnterpriseInfo(info: EnterpriseInfo) {
+		const name = info.name ?? "";
+		const intro = info.intro ?? "";
+		const logo = info.logo ?? "";
+		miniAppName.value = name;
+		introText.value = intro;
+		logoText.value = getLogoText(name);
+		refreshLogoDisplay(logo);
+
+		const cert = info.cert ?? null;
+		const certObj = cert != null ? (cert as UTSJSONObject) : null;
+		showVerifiedTag.value = cert != null && (cert.is_certified ?? false) == true;
+		certStatusText.value =
+			cert != null && cert.status_text != null && `${cert.status_text}` != ""
+				? `${cert.status_text}`
+				: "已认证";
+		const entityName = cert != null ? cert.entity_name ?? "" : "";
+		heroBrandName.value = entityName != "" ? entityName : name != "" ? name : "企业";
+		qualificationItems.value = buildQualificationItems(certObj);
+		const protocols = info.protocols;
+		if (Array.isArray(protocols)) {
+			agreementItems.value = protocols as EnterpriseProtocolItem[];
+		} else if (protocols != null && protocols.list != null) {
+			agreementItems.value = protocols.list;
+		} else {
+			agreementItems.value = [];
+		}
+	}
+
+	function loadEnterpriseInfo(fullScreen: boolean = true) {
+		if (infoRequesting.value) {
+			return Promise.resolve();
+		}
+		infoRequesting.value = true;
+		if (fullScreen) {
+			pageLoading.value = true;
+		}
+		return getEnterpriseInfo()
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const info = parseEnterpriseInfo(res);
+				if (info == null) {
+					uni.showToast({ title: "企业信息为空", icon: "none" });
+					return;
+				}
+				applyEnterpriseInfo(info);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				infoRequesting.value = false;
+				pageLoading.value = false;
+			});
+	}
+
+	function onChangeLogo() {
+		if (pageLoading.value || saving.value) {
+			return;
+		}
+		uni.chooseImage({
+			count: 1,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				const paths = res.tempFilePaths;
+				if (paths == null || paths.length == 0) {
+					return;
+				}
+				const tempPath = paths[0];
+				uni.showLoading({ title: "上传中..." });
+				normalizePickDisplayPath(tempPath)
+					.then((displayPath) => {
+						logoDisplaySrc.value = displayPath;
+						return uploadImage(tempPath);
+					})
+					.then((url) => {
+						refreshLogoDisplay(url);
+					})
+					.catch((err) => {
+						const msg =
+							err != null && (err as UTSJSONObject)["message"] != null
+								? `${(err as UTSJSONObject)["message"]}`
+								: "上传失败";
+						uni.showToast({ title: msg, icon: "none" });
+					})
+					.finally(() => {
+						uni.hideLoading();
+					});
+			}
+		});
+	}
+
+	function onAgreementTap(item: EnterpriseProtocolItem) {
+		router.push({
+			path: "/pages/protocol/detail",
+			query: {
+				id: item.id,
+			}
+		});
+	}
+
+	function onSave() {
+		if (pageLoading.value || saving.value) {
+			return;
+		}
+		const name = miniAppName.value.trim();
+		if (name == "") {
+			uni.showToast({ title: "请填写小程序名称", icon: "none" });
+			return;
+		}
+		const intro = introText.value.trim();
+		if (intro == "") {
+			uni.showToast({ title: "请填写简介", icon: "none" });
+			return;
+		}
+
+		saving.value = true;
+		saveEnterpriseSettings({
+			name,
+			logo: logoUrl.value,
+			intro
+		})
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "保存失败"), icon: "none" });
+					return Promise.resolve();
+				}
+				uni.showToast({ title: getApiMessage(envelope, "保存成功"), icon: "success" });
+				return loadEnterpriseInfo(false);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "保存失败"), icon: "none" });
+			})
+			.finally(() => {
+				saving.value = false;
+			});
+	}
+
+	watch(miniAppName, (val) => {
+		logoText.value = getLogoText(val);
+	});
+
+	onLoad(() => {
+		loadEnterpriseInfo();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.st-page {
+		position: relative;
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.st-loading-mask {
+		position: fixed;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		z-index: 999;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-loading-mask--full {
+		background-color: #f7f8fa;
+	}
+
+	.st-loading-mask--save {
+		background-color: rgba(247, 248, 250, 0.45);
+	}
+
+	.st-loading-text {
+		margin-top: 20rpx;
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.st-header {
+		background-image:
+			radial-gradient(circle at 90% 8%, rgba(110, 100, 190, 0.34) 0%, rgba(86, 78, 155, 0.14) 30%, rgba(26, 31, 58, 0) 56%),
+			linear-gradient(180deg, #1a1f3a 0%, #0d0f18 100%);
+
+		:deep(.cl-safe-area) {
+			background-color: transparent;
+		}
+	}
+
+	.st-nav {
+		height: 88rpx;
+		padding: 0 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+
+		.st-nav-btn {
+			width: 72rpx;
+			height: 72rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.st-nav-title {
+			font-size: 32rpx;
+			font-weight: 600;
+			color: #ffffff;
+		}
+	}
+
+	.st-hero {
+		padding: 36rpx 30rpx 36rpx;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.st-hero-tag {
+		align-self: flex-start;
+		padding: 6rpx 16rpx 6rpx 12rpx;
+		border-radius: 20rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: rgba(255, 255, 255, 0.35);
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.st-hero-dot {
+		width: 10rpx;
+		height: 10rpx;
+		border-radius: 5rpx;
+		background-color: #22c55e;
+		margin-right: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.st-hero-tag-text {
+		font-size: 20rpx;
+		color: #ffffff;
+		line-height: 28rpx;
+	}
+
+	.st-hero-title {
+		margin-top: 20rpx;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 60rpx;
+	}
+
+	.st-hero-sub {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: rgba(255, 255, 255, 0.55);
+		line-height: 34rpx;
+	}
+
+	.st-body {
+		padding: 24rpx 30rpx 40rpx;
+	}
+
+	.st-section-label {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.st-section-label--inline {
+		margin-bottom: 0;
+	}
+
+	.st-section-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 16rpx;
+	}
+
+	.st-verified-tag {
+		margin-left: 12rpx;
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+		background-color: #ecfdf5;
+	}
+
+	.st-verified-tag-text {
+		font-size: 20rpx;
+		color: #16a34a;
+		line-height: 28rpx;
+	}
+
+	.st-preview-card {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		padding: 24rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 32rpx;
+	}
+
+	.st-preview-phone {
+		width: 160rpx;
+		height: 220rpx;
+		border-radius: 20rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #e5e7eb;
+		background-color: #f9fafb;
+		padding: 12rpx;
+		flex-shrink: 0;
+	}
+
+	.st-preview-phone-inner {
+		width: 100%;
+		height: 100%;
+		border-radius: 12rpx;
+		background-color: #ffffff;
+		overflow: hidden;
+	}
+
+	.st-preview-phone-bar {
+		padding: 16rpx 12rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.st-preview-logo {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 8rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.st-preview-logo-img {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 8rpx;
+	}
+
+	.st-preview-logo-text {
+		font-size: 18rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 24rpx;
+	}
+
+	.st-preview-app-name {
+		margin-left: 8rpx;
+		font-size: 16rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 22rpx;
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.st-preview-grid {
+		padding: 0 12rpx 12rpx;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: space-between;
+	}
+
+	.st-preview-grid-item {
+		width: 58rpx;
+		height: 36rpx;
+		border-radius: 8rpx;
+		margin-bottom: 8rpx;
+		background-color: #f3f4f6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-preview-grid-item--active {
+		background-color: #2b59c3;
+	}
+
+	.st-preview-grid-text {
+		font-size: 14rpx;
+		line-height: 20rpx;
+		color: #9ca3af;
+	}
+
+	.st-preview-grid-text--active {
+		color: #ffffff;
+	}
+
+	.st-preview-copy {
+		flex: 1;
+		min-width: 0;
+		margin-left: 20rpx;
+	}
+
+	.st-preview-desc {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 38rpx;
+	}
+
+	.st-preview-desc-strong {
+		color: #2b59c3;
+		font-weight: 600;
+	}
+
+	.st-preview-tip {
+		margin-top: 12rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.st-card {
+		padding: 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 32rpx;
+	}
+
+	.st-card--list {
+		padding: 0 28rpx;
+	}
+
+	.st-brand-row {
+		position: relative;
+		min-height: 96rpx;
+		padding: 28rpx 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.st-brand-row--last {
+		padding-bottom: 28rpx;
+	}
+
+	.st-brand-label {
+		width: 168rpx;
+		font-size: 28rpx;
+		color: #666666;
+		line-height: 40rpx;
+		flex-shrink: 0;
+	}
+
+	.st-brand-value {
+		flex: 1;
+		min-width: 0;
+		margin-left: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.st-brand-input {
+		flex: 1;
+		min-width: 0;
+		height: 40rpx;
+		font-size: 28rpx;
+		color: #333333;
+		text-align: right;
+	}
+
+	.st-brand-input--intro {
+		margin-left: 24rpx;
+	}
+
+	.st-brand-input-placeholder {
+		color: #cccccc;
+		font-size: 28rpx;
+	}
+
+	.st-brand-count {
+		margin-left: 12rpx;
+		font-size: 24rpx;
+		color: #cccccc;
+		line-height: 34rpx;
+		flex-shrink: 0;
+	}
+
+	.st-brand-logo {
+		flex: 1;
+		min-width: 0;
+		margin-left: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.st-logo-box {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 16rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.st-logo-image {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 16rpx;
+	}
+
+	.st-logo-text {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 44rpx;
+	}
+
+	.st-change-btn {
+		margin-left: 16rpx;
+		padding: 8rpx 20rpx;
+		border-radius: 8rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #e5e7eb;
+		background-color: #ffffff;
+		flex-shrink: 0;
+	}
+
+	.st-change-btn-text {
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.st-row-divider {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 1rpx;
+		background-color: #f0f0f0;
+	}
+
+	.st-info-item {
+		position: relative;
+		padding: 28rpx 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.st-info-label {
+		font-size: 28rpx;
+		color: #666666;
+		line-height: 40rpx;
+		flex-shrink: 0;
+	}
+
+	.st-info-value-row {
+		flex: 1;
+		min-width: 0;
+		margin-left: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.st-info-value {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+		text-align: right;
+	}
+
+	.st-agreement-item {
+		position: relative;
+		padding: 28rpx 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.st-agreement-copy {
+		flex: 1;
+		min-width: 0;
+		margin-right: 12rpx;
+	}
+
+	.st-agreement-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.st-save-btn {
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-top: 8rpx;
+	}
+
+	.st-save-btn--disabled {
+		opacity: 0.6;
+	}
+
+	.st-save-btn-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 42rpx;
+	}
+</style>

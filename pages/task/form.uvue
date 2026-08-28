@@ -1,0 +1,2802 @@
+<template>
+	<cl-page :pt="{ className: 'tf-page' }" :back-top="false">
+		<view class="tf-page">
+			<view v-if="pageLoading" class="tf-loading">
+				<cl-loading :loading="true" :size="28" color="#0651f8"></cl-loading>
+				<text class="tf-loading-text">加载中...</text>
+			</view>
+
+			<view v-else class="tf-body">
+				<scroll-view class="tf-scroll" scroll-y="true" :show-scrollbar="false">
+					<view class="tf-box" :class="{ 'tf-box--empty': formGroups.length == 0 }">
+						<view v-if="formGroups.length == 0" class="tf-empty">
+							<view class="tf-empty-icon-wrap">
+								<cl-icon name="survey-line" :size="56" color="#c5ced9"></cl-icon>
+							</view>
+							<text class="tf-empty-title">暂无表单配置</text>
+						</view>
+
+						<view v-else class="tf-form-list">
+							<view class="tf-group" v-for="(group, gIndex) in formGroups" :key="gIndex">
+								<view class="tf-group-head">
+									<text class="tf-group-title">序号{{ gIndex + 1 }}</text>
+									<view v-if="formGroups.length > 1" class="tf-group-del" @tap="delItem(gIndex)">
+										<text class="tf-group-del-text">删除</text>
+									</view>
+								</view>
+								<view class="tf-group-body">
+									<!-- <view v-if="showCapcutLink" class="tf-field-item">
+										<view class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">capcut主页链接</text>
+											</view>
+											<input
+												class="tf-input"
+												:value="getCapcutLink(gIndex)"
+												placeholder="请输入"
+												placeholder-class="tf-placeholder"
+												@input="onCapcutLinkInput(gIndex, $event)"
+												@blur="onCapcutLinkBlur(gIndex)"
+											/>
+											<view class="tf-tip">CapCut账号和TikTok账号需要一一对应</view>
+										</view>
+									</view>
+									<view v-if="showTiktokLink" class="tf-field-item">
+										<view class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">tiktok主页链接</text>
+											</view>
+											<input
+												class="tf-input"
+												:value="getTiktokLink(gIndex)"
+												placeholder="请输入"
+												placeholder-class="tf-placeholder"
+												@input="onTiktokLinkInput(gIndex, $event)"
+												@blur="onTiktokLinkBlur(gIndex)"
+											/>
+											<view class="tf-tip">TikTok账号和CapCut账号需要一一对应</view>
+										</view>
+									</view> -->
+									<view class="tf-field-item" v-for="(vo, k) in group" :key="`${gIndex}_${k}`">
+										<!-- 单选 type=4（自定义选项，避免原生 radio 与数据不同步） -->
+										<view v-if="normalizeFieldType(vo.type) == 4 && isFieldActive(group, vo)" class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">{{ vo.name }}</text>
+												<text v-if="vo.is_empty == 1" class="tf-required">*</text>
+											</view>
+											<view class="tf-radio-group">
+												<view
+													v-for="(opt, oi) in vo.typeList"
+													:key="oi"
+													class="tf-radio-label"
+													@tap="onRadioChange(gIndex, k, opt)"
+												>
+													<view
+														class="tf-radio-icon"
+														:class="{ 'tf-radio-icon--checked': isRadioOptionSelected(group, k, opt) }"
+													>
+														<text
+															v-if="isRadioOptionSelected(group, k, opt)"
+															class="tf-radio-mark"
+														>✓</text>
+													</view>
+													<text class="tf-radio-text">{{ opt }}</text>
+												</view>
+											</view>
+										</view>
+
+										<!-- 输入框 type=0 -->
+										<view v-if="normalizeFieldType(vo.type) == 0 && isFieldActive(group, vo)" class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">{{ vo.name }}</text>
+												<text v-if="vo.is_empty == 1" class="tf-required">*</text>
+											</view>
+											<view
+												v-if="vo.field == 'book_name' && (projectId == 92 || (projectId == 53 && vo.is_hide == 1))"
+												class="tf-input-wrap tf-input-wrap--picker"
+												@tap="onBookNamePicker(gIndex, k)"
+											>
+												<input
+													class="tf-input"
+													:value="vo.value"
+													disabled="true"
+													:placeholder="'请选择' + vo.name"
+													placeholder-class="tf-placeholder"
+												/>
+												<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+											</view>
+											<input
+												v-else
+												class="tf-input"
+												v-model="vo.value"
+												:type="vo.var_type == 3 ? 'number' : 'text'"
+												:disabled="isLinkFieldLocked(gIndex, k)"
+												:placeholder="'请输入' + vo.name"
+												placeholder-class="tf-placeholder"
+												@blur="onInputBlur(gIndex, k)"
+											/>
+										</view>
+
+										<!-- 单图上传 type=5 -->
+										<view v-if="normalizeFieldType(vo.type) == 5 && isFieldActive(group, vo)" class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">{{ vo.name }}</text>
+												<text v-if="vo.is_empty == 1" class="tf-required">*</text>
+											</view>
+											<view class="tf-upload-box" @tap="onUploadSingle(gIndex, k)">
+												<image
+													v-if="getSinglePreview(vo) != ''"
+													class="tf-upload-img"
+													:src="getSinglePreview(vo)"
+													mode="aspectFill"
+												></image>
+												<cl-icon v-else name="camera-fill" :size="40" color="#0651f8"></cl-icon>
+											</view>
+										</view>
+
+										<!-- 多图上传 type=6 -->
+										<view v-if="normalizeFieldType(vo.type) == 6 && isFieldActive(group, vo)" class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">{{ vo.name }}</text>
+												<text v-if="vo.is_empty == 1" class="tf-required">*</text>
+											</view>
+											<view class="tf-multi-upload">
+												<view
+													class="tf-upload-box tf-upload-box--small"
+													v-for="(img, mi) in vo.multiUrls"
+													:key="mi"
+												>
+													<image class="tf-upload-img" :src="img" mode="aspectFill"></image>
+													<view class="tf-upload-remove" @tap.stop="onRemoveMulti(gIndex, k, mi)">
+														<cl-icon name="close-line" :size="14" color="#ffffff"></cl-icon>
+													</view>
+												</view>
+												<view
+													v-if="vo.multiUrls.length < vo.max_len"
+													class="tf-upload-box tf-upload-box--small"
+													@tap="onUploadMulti(gIndex, k)"
+												>
+													<cl-icon name="add-line" :size="28" color="#0651f8"></cl-icon>
+												</view>
+											</view>
+										</view>
+
+										<!-- 账号下拉 type=2 -->
+										<view v-if="normalizeFieldType(vo.type) == 2 && isFieldActive(group, vo)" class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">{{ vo.name }}</text>
+												<text v-if="vo.is_empty == 1" class="tf-required">*</text>
+											</view>
+											<view class="tf-select-wrap" @tap="showAccountPicker(gIndex, k)">
+												<text
+													class="tf-select-text"
+													:class="{ 'tf-select-text--active': vo.value != '' }"
+												>{{ vo.value != '' ? getAccountDisplay(vo.value) : "请选择" }}</text>
+												<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+											</view>
+										</view>
+
+										<!-- 选项下拉 type=3 -->
+										<view v-if="normalizeFieldType(vo.type) == 3 && isFieldActive(group, vo)" class="tf-row">
+											<view class="tf-label-row">
+												<text class="tf-label">{{ vo.name }}</text>
+												<text v-if="vo.is_empty == 1" class="tf-required">*</text>
+											</view>
+											<view class="tf-select-wrap" @tap="showSelectPicker(gIndex, k)">
+												<text
+													class="tf-select-text"
+													:class="{ 'tf-select-text--active': vo.value != '' }"
+												>{{ vo.value != '' ? vo.value : "请选择" }}</text>
+												<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+											</view>
+										</view>
+
+										<!-- 关联子字段 -->
+										<view
+											v-if="(normalizeFieldType(vo.type) == 3 || normalizeFieldType(vo.type) == 4) && vo.relation_field.length > 0"
+											class="tf-relation-wrap"
+										>
+											<view
+												v-for="(rel, rk) in vo.relation_field"
+												:key="`${gIndex}_${k}_rel_${rk}`"
+											>
+												<view v-if="includesRelationValue(rel.relation_value, vo.value)" class="tf-row tf-row--relation">
+													<view class="tf-label-row">
+														<text class="tf-label">{{ rel.name }}</text>
+														<text v-if="rel.is_empty == 1" class="tf-required">*</text>
+													</view>
+													<input
+														v-if="rel.type == 0"
+														class="tf-input"
+														v-model="rel.value"
+														:placeholder="'请输入' + rel.name"
+														placeholder-class="tf-placeholder"
+													/>
+													<view v-else-if="rel.type == 3" class="tf-select-wrap" @tap="showRelationSelect(gIndex, k, rk)">
+														<text
+															class="tf-select-text"
+															:class="{ 'tf-select-text--active': rel.value != '' }"
+														>{{ rel.value != '' ? rel.value : "请选择" }}</text>
+														<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+													</view>
+													<view v-else-if="rel.type == 5" class="tf-upload-box" @tap="onUploadRelation(gIndex, k, rk)">
+														<image
+															v-if="getSinglePreview(rel) != ''"
+															class="tf-upload-img"
+															:src="getSinglePreview(rel)"
+															mode="aspectFill"
+														></image>
+														<cl-icon v-else name="camera-fill" :size="40" color="#0651f8"></cl-icon>
+													</view>
+												</view>
+											</view>
+										</view>
+
+										<text
+											v-if="vo.front_msg != ''"
+											class="tf-tip"
+											@tap="copyUrlText(vo.front_msg_copy)"
+										>{{ vo.front_msg }}</text>
+									</view>
+								</view>
+							</view>
+						</view>
+
+						<view v-if="fieldTemplate.length > 0" class="tf-add-btn" @tap="addItem">
+							<cl-icon name="add-line" :size="22" color="#ffffff"></cl-icon>
+							<text class="tf-add-btn-text">新增一组</text>
+						</view>
+					</view>
+				</scroll-view>
+
+				<view v-if="formGroups.length > 0" class="tf-footer">
+					<view
+						class="tf-submit-btn"
+						:class="{ 'tf-submit-btn--disabled': submitting || imageUploading }"
+						@tap="onSubmit"
+					>
+						<text class="tf-submit-btn-text">{{ submitting ? "提交中..." : "确认" }}</text>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</view>
+		</view>
+
+		<!-- 账号选择 -->
+		<cl-popup v-model="accountPopupVisible" direction="bottom" size="70%" :show-header="false">
+			<view class="tf-popup-account">
+				<view class="tf-popup-head">
+					<text class="tf-popup-title">请选择账号</text>
+					<input
+						class="tf-popup-search"
+						v-model="accountKeyword"
+						placeholder="请输入关键词"
+						placeholder-class="tf-placeholder"
+					/>
+					<view @tap="accountPopupVisible = false">
+						<cl-icon name="arrow-up-s-line" :size="18" color="#333333"></cl-icon>
+					</view>
+				</view>
+				<scroll-view class="tf-platform-scroll" scroll-x="true" :show-scrollbar="false">
+					<view class="tf-platform-row">
+						<view
+							v-for="(plat, pi) in platformList"
+							:key="pi"
+							class="tf-platform-chip"
+							:class="{ 'tf-platform-chip--active': platformName == plat }"
+							@tap="platformName = plat"
+						>
+							<text class="tf-platform-chip-text">{{ plat }}</text>
+						</view>
+					</view>
+				</scroll-view>
+				<scroll-view class="tf-account-scroll" scroll-y="true" :show-scrollbar="false">
+					<view
+						v-for="(acc, ai) in filteredAccountList"
+						:key="ai"
+						class="tf-account-item"
+						:class="{ 'tf-account-item--checked': isAccountSelected(acc.account_id) }"
+						@tap="chooseAccount(acc)"
+					>
+						<text class="tf-account-item-text">【{{ acc.platform_name }}】【{{ acc.account_title }}】{{ acc.account_id }}</text>
+					</view>
+					<view v-if="filteredAccountList.length == 0" class="tf-account-empty">
+						<text class="tf-account-empty-text">暂无账号</text>
+					</view>
+				</scroll-view>
+			</view>
+		</cl-popup>
+
+		<!-- 普通下拉 -->
+		<cl-popup v-model="selectPopupVisible" direction="bottom" size="50%" :show-header="false">
+			<view class="tf-select-popup">
+				<scroll-view
+					v-if="selectList.length > 0 || !selectPlatformAccount"
+					class="tf-select-scroll"
+					scroll-y="true"
+					:show-scrollbar="false"
+				>
+					<view
+						class="tf-select-option"
+						:class="{ 'tf-select-option--checked': isSelectOptionSelected(opt) }"
+						v-for="(opt, si) in selectList"
+						:key="si"
+						@tap="chooseSelect(opt)"
+					>
+						<text
+							class="tf-select-option-text"
+							:class="{ 'tf-select-option-text--checked': isSelectOptionSelected(opt) }"
+						>{{ opt }}</text>
+						<view v-if="isSelectOptionSelected(opt)" class="tf-select-option-check">
+							<cl-icon name="check-line" :size="18" color="#0651f8"></cl-icon>
+						</view>
+					</view>
+				</scroll-view>
+				<view v-else class="tf-select-empty">
+					<text class="tf-select-empty-text">暂无账号</text>
+				</view>
+				<view v-if="selectPlatformAccount" class="tf-select-add-wrap">
+					<view class="tf-select-add-btn" @tap="onAddPlatformAccount">
+						<cl-icon name="add-line" :size="22" color="#ffffff"></cl-icon>
+						<text class="tf-select-add-btn-text">添加账号</text>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</view>
+		</cl-popup>
+
+		<!-- 影剧综/动漫/电视 -->
+		<cl-popup v-model="mediaPopupVisible" direction="bottom" size="60%" :show-header="false">
+			<view class="tf-media-popup">
+				<view class="tf-media-head">
+					<text class="tf-media-title">请选择{{ mediaSelectTitle }}</text>
+					<view @tap="mediaPopupVisible = false">
+						<cl-icon name="close-circle-fill" :size="22" color="#0651f8"></cl-icon>
+					</view>
+				</view>
+				<scroll-view class="tf-media-scroll" scroll-y="true" :show-scrollbar="false">
+					<view class="tf-media-grid">
+						<view
+							v-for="(item, mi) in mediaSelectList"
+							:key="mi"
+							class="tf-media-chip"
+							:class="{ 'tf-media-chip--active': mediaSelectedName == item.name }"
+							@tap="chooseMediaItem(item.name)"
+						>
+							<text class="tf-media-chip-text">{{ item.name }}</text>
+						</view>
+					</view>
+				</scroll-view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getCapcutLinkInfo, getTiktokLinkInfo, getKeywordUserRequiredFields, editRejectedKeyword, submitKeyword } from "@/.cool/api/keyword";
+	import { getTaskFormFields } from "@/.cool/api/task";
+	import type { KeywordSubmitFormItem } from "@/.cool/types/keyword";
+	import { normalizePickDisplayPath, uploadImage } from "@/.cool/api/upload";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { TaskFormAccountItem, TaskFormNameItem, TaskFormSubmitField, TaskRawFormField } from "@/.cool";
+
+	const linkId = ref(0);
+	const taskId = ref(0);
+	const projectId = ref(0);
+	const keywordId = ref(0);
+	const selectedBookId = ref(0);
+	const selectedBookName = ref("");
+	const selectedBookTags = ref("");
+	const selectedBookKeyword = ref("");
+	const selectedBookTopic = ref("");
+	const selectedBookApplied = ref(false);
+	const fieldTemplate = ref<TaskRawFormField[]>([]);
+	const formGroups = ref<TaskRawFormField[][]>([]);
+	const relationFieldTemplate = ref<TaskRawFormField[]>([]);
+	const pageLoading = ref(false);
+	const formInitialized = ref(false);
+	const formConfigLoading = ref(false);
+	const editFieldsLoaded = ref(false);
+	const editFieldsLoading = ref(false);
+	const submitting = ref(false);
+	const imageUploading = ref(false);
+
+	const accountList = ref<TaskFormAccountItem[]>([]);
+	const platformList = ref<string[]>([]);
+	const accountKeyword = ref("");
+	const platformName = ref("抖音");
+	const accountPopupVisible = ref(false);
+
+	const selectPopupVisible = ref(false);
+	const selectList = ref<string[]>([]);
+	const selectPlatformAccount = ref(false);
+	const selectMode = ref<string>("main");
+	const curGroupIndex = ref(0);
+	const curFieldIndex = ref(0);
+	const curRelationIndex = ref(0);
+
+	const mediaPopupVisible = ref(false);
+	const mediaSelectTitle = ref("");
+	const mediaSelectList = ref<TaskFormNameItem[]>([]);
+	const mediaSelectedName = ref("");
+	const animeLists = ref<TaskFormNameItem[]>([]);
+	const videoLists = ref<TaskFormNameItem[]>([]);
+	const tvLists = ref<TaskFormNameItem[]>([]);
+
+	const showCapcutLink = ref(false);
+	const showTiktokLink = ref(false);
+	const capcutLinks = ref<string[]>([]);
+	const tiktokLinks = ref<string[]>([]);
+	const capcutParsedUrls = ref<string[]>([]);
+	const tiktokParsedUrls = ref<string[]>([]);
+
+	const filteredAccountList = computed((): TaskFormAccountItem[] => {
+		const key = accountKeyword.value.trim();
+		const plat = platformName.value;
+		const result: TaskFormAccountItem[] = [];
+		for (let i = 0; i < accountList.value.length; i++) {
+			const item = accountList.value[i];
+			if (plat != "" && item.platform_name.indexOf(plat) < 0) {
+				continue;
+			}
+			if (key != "" && item.account_title.indexOf(key) < 0) {
+				continue;
+			}
+			result.push(item);
+		}
+		return result;
+	});
+
+	function pickNonEmpty(...values: string[]): string {
+		for (let i = 0; i < values.length; i++) {
+			const text = values[i].trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function toNumber(val: any | null, fallback: number = 0): number {
+		if (typeof val == "number") {
+			return val as number;
+		}
+		const parsed = parseInt(`${val}`);
+		return isNaN(parsed) ? fallback : parsed;
+	}
+
+	function parseStringArray(raw: any | null): string[] {
+		if (raw == null || !(raw instanceof Array)) {
+			return [];
+		}
+		const arr = raw as any[];
+		const result: string[] = [];
+		for (let i = 0; i < arr.length; i++) {
+			const text = `${arr[i]}`.trim();
+			if (text != "") {
+				result.push(text);
+			}
+		}
+		return result;
+	}
+
+	function normalizeFieldType(type: number | string | null | undefined): number {
+		return toNumber(type);
+	}
+
+	function parseTypeListItem(item: any | null): string {
+		if (item == null) {
+			return "";
+		}
+		if (typeof item == "string") {
+			return item.trim();
+		}
+		const obj = item as UTSJSONObject;
+		return pickNonEmpty(
+			`${obj["name"] ?? ""}`,
+			`${obj["label"] ?? ""}`,
+			`${obj["title"] ?? ""}`,
+			`${obj["value"] ?? ""}`,
+			`${obj["text"] ?? ""}`
+		);
+	}
+
+	/** type=3/4 选项：优先 typeList，否则按 type_text 逗号拆分 */
+	function parseTypeList(row: UTSJSONObject): string[] {
+		const rawList = row["typeList"];
+		if (rawList != null && rawList instanceof Array) {
+			const arr = rawList as any[];
+			const parsed: string[] = [];
+			for (let i = 0; i < arr.length; i++) {
+				const text = parseTypeListItem(arr[i]);
+				if (text != "") {
+					parsed.push(text);
+				}
+			}
+			if (parsed.length > 0) {
+				return parsed;
+			}
+		}
+		const fromList = parseStringArray(row["typeList"]);
+		if (fromList.length > 0) {
+			return fromList;
+		}
+		const typeText = `${row["type_text"] ?? ""}`.trim();
+		if (typeText == "") {
+			return [];
+		}
+		const parts = typeText.split(",") as string[];
+		const result: string[] = [];
+		for (let i = 0; i < parts.length; i++) {
+			const text = parts[i].trim();
+			if (text != "") {
+				result.push(text);
+			}
+		}
+		return result;
+	}
+
+	function parseNameList(raw: any | null): TaskFormNameItem[] {
+		if (raw == null || !(raw instanceof Array)) {
+			return [];
+		}
+		const arr = raw as any[];
+		const result: TaskFormNameItem[] = [];
+		for (let i = 0; i < arr.length; i++) {
+			const item = arr[i];
+			if (item == null) {
+				continue;
+			}
+			if (typeof item == "string") {
+				result.push({ name: `${item}`.trim() });
+			} else {
+				const obj = item as UTSJSONObject;
+				const name = pickNonEmpty(`${obj["name"] ?? ""}`, `${obj["title"] ?? ""}`);
+				if (name != "") {
+					result.push({ name: name });
+				}
+			}
+		}
+		return result;
+	}
+
+	/** 提交 form_info.field：取 formFields 接口返回的 value（如 keyword、douyin_id、type） */
+	function readSubmitFieldKey(row: UTSJSONObject, index: number): string {
+		return pickNonEmpty(
+			`${row["value"] ?? ""}`,
+			`${row["field"] ?? ""}`,
+			`${row["key"] ?? ""}`,
+			`${row["submit_field"] ?? ""}`,
+			`field_${index}`
+		);
+	}
+
+	/** 页面逻辑用字段名（book_name、site_type 等），优先 field/key */
+	function readBusinessFieldKey(row: UTSJSONObject, submitField: string, index: number): string {
+		return pickNonEmpty(
+			`${row["field"] ?? ""}`,
+			`${row["key"] ?? ""}`,
+			submitField,
+			`field_${index}`
+		);
+	}
+
+	function isOptionValueInList(typeList: string[], text: string): boolean {
+		const val = text.trim();
+		if (val == "") {
+			return false;
+		}
+		for (let i = 0; i < typeList.length; i++) {
+			if (`${typeList[i]}`.trim() == val) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function readInitialFieldValue(row: UTSJSONObject, fieldType: number, typeList: string[]): string {
+		const presetKeys = ["user_value", "default_value", "defaultValue", "field_value", "content"];
+		for (let i = 0; i < presetKeys.length; i++) {
+			const text = `${row[presetKeys[i]] ?? ""}`.trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		const type = normalizeFieldType(fieldType);
+		// formFields 的 value 列用于提交 field 名，仅当落在选项列表中才作为初始选中值
+		if (type == 4 || type == 3) {
+			const raw = `${row["value"] ?? ""}`.trim();
+			if (raw != "" && isOptionValueInList(typeList, raw)) {
+				return raw;
+			}
+		}
+		return "";
+	}
+
+	function mapRawField(row: UTSJSONObject, index: number): TaskRawFormField {
+		const idVal = row["id"];
+		const fieldType = normalizeFieldType(row["type"]);
+		const typeList = parseTypeList(row);
+		const submitField = readSubmitFieldKey(row, index);
+		const fieldKey = readBusinessFieldKey(row, submitField, index);
+		let userValue = readInitialFieldValue(row, fieldType, typeList);
+		const multiUrls: string[] = [];
+		if (fieldType == 6) {
+			const urlRaw = row["previewUrl"] ?? row["preview_url"];
+			if (typeof urlRaw == "string" && urlRaw.trim() != "") {
+				userValue = urlRaw.trim();
+				multiUrls.push(userValue);
+			}
+		}
+		const relRaw = row["relation_field"] as any[] | null;
+		const relationField: TaskRawFormField[] = [];
+		if (relRaw != null) {
+			for (let i = 0; i < relRaw.length; i++) {
+				relationField.push(mapRawField(relRaw[i] as UTSJSONObject, i));
+			}
+		}
+		return {
+			id: idVal != null ? `${idVal}` : fieldKey,
+			field: fieldKey,
+			submitField: submitField,
+			name: pickNonEmpty(`${row["name"] ?? ""}`, `${row["label"] ?? ""}`, `字段${index + 1}`),
+			type: fieldType,
+			value: userValue,
+			is_empty: toNumber(row["is_empty"]),
+			is_hide: toNumber(row["is_hide"], 1),
+			is_copy: toNumber(row["is_copy"]),
+			var_type: toNumber(row["var_type"]),
+			max_len: toNumber(row["max_len"], 9),
+			typeList: typeList,
+			optionsProvider: pickNonEmpty(`${row["optionsProvider"] ?? ""}`, `${row["options_provider"] ?? ""}`),
+			relation_field: relationField,
+			relation_value: parseStringArray(row["relation_value"]),
+			front_msg: pickNonEmpty(`${row["front_msg"] ?? ""}`),
+			front_msg_copy: pickNonEmpty(`${row["front_msg_copy"] ?? ""}`),
+			previewUrl: userValue,
+			multiUrls: multiUrls,
+			linkFilledBy: ""
+		};
+	}
+
+	/** 新增一组时从上一组带入的字段（按 field/submitField 或展示名匹配） */
+	const COPY_ON_ADD_FIELD_KEYS = ["type", "site_type", "author", "author_name", "book_name", "book_id"];
+	const COPY_ON_ADD_FIELD_NAMES = ["类型", "作者", "书籍名称", "书籍ID"];
+
+	function shouldCopyFieldOnAdd(vo: TaskRawFormField): boolean {
+		const fieldKey = vo.field.trim().toLowerCase();
+		const submitKey = vo.submitField.trim().toLowerCase();
+		for (let i = 0; i < COPY_ON_ADD_FIELD_KEYS.length; i++) {
+			const key = COPY_ON_ADD_FIELD_KEYS[i];
+			if (fieldKey == key || submitKey == key) {
+				return true;
+			}
+		}
+		const name = vo.name.trim();
+		for (let i = 0; i < COPY_ON_ADD_FIELD_NAMES.length; i++) {
+			if (name == COPY_ON_ADD_FIELD_NAMES[i]) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function shouldKeepFieldValue(src: TaskRawFormField, resetValue: boolean): boolean {
+		if (!resetValue && src.is_copy == 1) {
+			return true;
+		}
+		return resetValue && shouldCopyFieldOnAdd(src);
+	}
+
+	function cloneField(src: TaskRawFormField, resetValue: boolean): TaskRawFormField {
+		const relClone: TaskRawFormField[] = [];
+		for (let i = 0; i < src.relation_field.length; i++) {
+			relClone.push(cloneField(src.relation_field[i], resetValue));
+		}
+		const keepValue = shouldKeepFieldValue(src, resetValue);
+		const multiUrls: string[] = [];
+		if (keepValue) {
+			for (let i = 0; i < src.multiUrls.length; i++) {
+				multiUrls.push(src.multiUrls[i]);
+			}
+		}
+		return {
+			id: src.id,
+			field: src.field,
+			submitField: src.submitField,
+			name: src.name,
+			type: src.type,
+			value: keepValue ? src.value : "",
+			is_empty: src.is_empty,
+			is_hide: src.is_hide,
+			is_copy: src.is_copy,
+			var_type: src.var_type,
+			max_len: src.max_len,
+			typeList: src.typeList,
+			optionsProvider: src.optionsProvider,
+			relation_field: relClone,
+			relation_value: src.relation_value,
+			front_msg: src.front_msg,
+			front_msg_copy: src.front_msg_copy,
+			previewUrl: keepValue ? src.previewUrl : "",
+			multiUrls: multiUrls,
+			linkFilledBy: !resetValue && src.is_copy == 1 ? pickNonEmpty(`${src.linkFilledBy ?? ""}`) : ""
+		};
+	}
+
+	function cloneFormGroup(source: TaskRawFormField[], resetValue: boolean): TaskRawFormField[] {
+		const result: TaskRawFormField[] = [];
+		for (let i = 0; i < source.length; i++) {
+			result.push(cloneField(source[i], resetValue));
+		}
+		return result;
+	}
+
+	function attachRelationTemplate() {
+		const template = relationFieldTemplate.value;
+		if (template.length == 0) {
+			return;
+		}
+		const groups = formGroups.value;
+		for (let gi = 0; gi < groups.length; gi++) {
+			const group = groups[gi];
+			for (let fi = 0; fi < group.length; fi++) {
+				if (group[fi].relation_field.length == 0) {
+					group[fi].relation_field = cloneFormGroup(template, true);
+				}
+			}
+		}
+	}
+
+	function extractFormFieldRows(data: UTSJSONObject): UTSJSONObject[] {
+		const keys = ["formField", "form_field", "formFields", "fields"];
+		for (let i = 0; i < keys.length; i++) {
+			const raw = data[keys[i]] as any[] | null;
+			if (raw != null && raw.length > 0) {
+				return raw as UTSJSONObject[];
+			}
+		}
+		return [];
+	}
+
+	/** GET /api/task/formFields 的 id：取链接参数 id */
+	function resolveFormFieldsId(): number {
+		if (linkId.value > 0) {
+			return linkId.value;
+		}
+		if (taskId.value > 0) {
+			return taskId.value;
+		}
+		return projectId.value;
+	}
+
+	function resolveSubmitProjectId(): number {
+		if (projectId.value > 0) {
+			return projectId.value;
+		}
+		return linkId.value > 0 ? linkId.value : taskId.value;
+	}
+
+	function copyStringList(source: string[]): string[] {
+		const result: string[] = [];
+		for (let i = 0; i < source.length; i++) {
+			result.push(source[i]);
+		}
+		return result;
+	}
+
+	function matchTemplateField(template: TaskRawFormField[], field: TaskRawFormField, index: number): TaskRawFormField | null {
+		const submitKey = field.submitField.trim();
+		const fieldKey = field.field.trim();
+		const id = field.id.trim();
+		for (let i = 0; i < template.length; i++) {
+			const item = template[i];
+			if (submitKey != "" && item.submitField == submitKey) {
+				return item;
+			}
+		}
+		for (let i = 0; i < template.length; i++) {
+			const item = template[i];
+			if (fieldKey != "" && item.field == fieldKey) {
+				return item;
+			}
+		}
+		for (let i = 0; i < template.length; i++) {
+			const item = template[i];
+			if (id != "" && item.id == id) {
+				return item;
+			}
+		}
+		if (index >= 0 && index < template.length) {
+			return template[index];
+		}
+		return null;
+	}
+
+	function syncFieldMeta(target: TaskRawFormField, source: TaskRawFormField) {
+		target.typeList = copyStringList(source.typeList);
+		target.optionsProvider = source.optionsProvider;
+	}
+
+	function syncGroupFieldOptions(group: TaskRawFormField[], template: TaskRawFormField[]) {
+		for (let i = 0; i < group.length; i++) {
+			const field = group[i];
+			const tmpl = matchTemplateField(template, field, i);
+			if (tmpl == null) {
+				continue;
+			}
+			syncFieldMeta(field, tmpl);
+			if (field.relation_field.length > 0 && tmpl.relation_field.length > 0) {
+				for (let ri = 0; ri < field.relation_field.length; ri++) {
+					const relTmpl = matchTemplateField(tmpl.relation_field, field.relation_field[ri], ri);
+					if (relTmpl != null) {
+						syncFieldMeta(field.relation_field[ri], relTmpl);
+					}
+				}
+			}
+		}
+	}
+
+	function applyFormMeta(meta: UTSJSONObject | null) {
+		if (meta == null) {
+			return;
+		}
+		const relRaw = meta["relation_field"] as any[] | null;
+		const relMapped: TaskRawFormField[] = [];
+		if (relRaw != null) {
+			for (let i = 0; i < relRaw.length; i++) {
+				relMapped.push(mapRawField(relRaw[i] as UTSJSONObject, i));
+			}
+		}
+		relationFieldTemplate.value = relMapped;
+		const accounts = meta["account_List"] ?? meta["account_list"];
+		if (accounts instanceof Array) {
+			parseAccountList(accounts as any[]);
+		}
+		const platforms = meta["platform_list"] ?? meta["platformList"];
+		if (platforms instanceof Array) {
+			platformList.value = parseStringArray(platforms);
+		}
+		animeLists.value = parseNameList(meta["animeLists"]);
+		videoLists.value = parseNameList(meta["videoLists"]);
+		tvLists.value = parseNameList(meta["tvLists"]);
+	}
+
+	function applyFormInitData(payload: any | null, preserveFormValues: boolean = false) {
+		let rows: UTSJSONObject[] = [];
+		let meta: UTSJSONObject | null = null;
+		if (payload instanceof Array) {
+			rows = payload as UTSJSONObject[];
+		} else if (payload != null) {
+			meta = payload as UTSJSONObject;
+			rows = extractFormFieldRows(meta);
+		}
+		const mapped: TaskRawFormField[] = [];
+		for (let i = 0; i < rows.length; i++) {
+			mapped.push(mapRawField(rows[i], i));
+		}
+		fieldTemplate.value = mapped;
+
+		applyFormMeta(meta);
+
+		showCapcutLink.value = mapped.some((vo) => /capcut/i.test(vo.name));
+		showTiktokLink.value = mapped.some((vo) => /tiktok/i.test(vo.name));
+
+		if (preserveFormValues && formGroups.value.length > 0) {
+			for (let gi = 0; gi < formGroups.value.length; gi++) {
+				syncGroupFieldOptions(formGroups.value[gi], mapped);
+			}
+			refreshFormGroups();
+			return;
+		}
+
+		if (mapped.length > 0) {
+			formGroups.value = [cloneFormGroup(mapped, true)];
+			attachRelationTemplate();
+			resetLinkArrays(formGroups.value.length);
+		} else {
+			formGroups.value = [];
+			resetLinkArrays(0);
+		}
+	}
+
+	function parseAccountList(raw: any[]) {
+		const result: TaskFormAccountItem[] = [];
+		for (let i = 0; i < raw.length; i++) {
+			const row = raw[i] as UTSJSONObject;
+			result.push({
+				account_id: pickNonEmpty(`${row["account_id"] ?? ""}`),
+				account_title: pickNonEmpty(`${row["account_title"] ?? ""}`),
+				platform_name: pickNonEmpty(`${row["platform_name"] ?? ""}`)
+			});
+		}
+		accountList.value = result;
+	}
+
+	function loadFormConfig(options: { silent?: boolean; preserveValues?: boolean } = {}) {
+		if (formConfigLoading.value) {
+			return;
+		}
+		const formId = resolveFormFieldsId();
+		if (formId <= 0) {
+			if (!options.silent) {
+				formGroups.value = [];
+				uni.showToast({ title: "缺少任务或项目 ID", icon: "none" });
+			}
+			return;
+		}
+		const silent = options.silent == true;
+		const preserveValues = options.preserveValues == true;
+		formConfigLoading.value = true;
+		if (!silent) {
+			pageLoading.value = true;
+		}
+		getTaskFormFields({
+			id: formId,
+			type: "keyword"
+		})
+			.then((res) => {
+				if (res == null) {
+					if (!preserveValues) {
+						formGroups.value = [];
+					}
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					if (!silent) {
+						uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					}
+					if (!preserveValues) {
+						formGroups.value = [];
+					}
+					return;
+				}
+				const payload = envelope["data"] ?? envelope;
+				applyFormInitData(payload, preserveValues);
+				applySelectedBook();
+				formInitialized.value = true;
+				if (!preserveValues) {
+					editFieldsLoaded.value = false;
+				}
+				loadEditFieldValues();
+			})
+			.catch((err) => {
+				if (!preserveValues) {
+					formGroups.value = [];
+				}
+				if (!silent) {
+					uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+				}
+			})
+			.finally(() => {
+				formConfigLoading.value = false;
+				if (!silent) {
+					pageLoading.value = false;
+				}
+			});
+	}
+
+	function readValueFromFieldsMap(fields: UTSJSONObject, vo: TaskRawFormField): string {
+		const keys = [vo.submitField, vo.field];
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i].trim();
+			if (key == "") {
+				continue;
+			}
+			const raw = fields[key];
+			if (raw == null) {
+				continue;
+			}
+			if (raw instanceof Array) {
+				const arr = raw as any[];
+				const parts: string[] = [];
+				for (let j = 0; j < arr.length; j++) {
+					const text = `${arr[j]}`.trim();
+					if (text != "") {
+						parts.push(text);
+					}
+				}
+				if (parts.length > 0) {
+					return parts.join(",");
+				}
+				continue;
+			}
+			const text = `${raw}`.trim();
+			if (text != "" && text != "null" && text != "undefined") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function applyValueToField(vo: TaskRawFormField, text: string) {
+		if (text == "") {
+			return;
+		}
+		const fieldType = normalizeFieldType(vo.type);
+		if (fieldType == 6) {
+			const urls: string[] = [];
+			const parts = text.split(",");
+			for (let i = 0; i < parts.length; i++) {
+				const url = parts[i].trim();
+				if (url != "") {
+					urls.push(url);
+				}
+			}
+			vo.multiUrls = urls;
+			vo.value = urls.length > 0 ? urls[0] : "";
+			vo.previewUrl = vo.value;
+			return;
+		}
+		vo.value = text;
+	}
+
+	function applyEditFieldsToForm(fields: UTSJSONObject) {
+		if (formGroups.value.length == 0) {
+			return;
+		}
+		const group = formGroups.value[0];
+		for (let k = 0; k < group.length; k++) {
+			const vo = group[k];
+			const text = readValueFromFieldsMap(fields, vo);
+			if (text != "") {
+				applyValueToField(vo, text);
+			}
+			for (let ri = 0; ri < vo.relation_field.length; ri++) {
+				const sub = vo.relation_field[ri];
+				const subText = readValueFromFieldsMap(fields, sub);
+				if (subText != "") {
+					applyValueToField(sub, subText);
+				}
+			}
+		}
+		refreshFormGroups();
+	}
+
+	function loadEditFieldValues() {
+		if (keywordId.value <= 0 || editFieldsLoaded.value || editFieldsLoading.value) {
+			return;
+		}
+		if (formGroups.value.length == 0) {
+			return;
+		}
+		const pid = resolveSubmitProjectId();
+		if (pid <= 0) {
+			return;
+		}
+		editFieldsLoading.value = true;
+		getKeywordUserRequiredFields({
+			project_id: pid,
+			keyword_id: keywordId.value
+		})
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "回填失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const fieldsRaw = data["fields"];
+				if (fieldsRaw == null || typeof fieldsRaw != "object" || Array.isArray(fieldsRaw)) {
+					editFieldsLoaded.value = true;
+					return;
+				}
+				applyEditFieldsToForm(fieldsRaw as UTSJSONObject);
+				editFieldsLoaded.value = true;
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "回填失败"), icon: "none" });
+			})
+			.finally(() => {
+				editFieldsLoading.value = false;
+			});
+	}
+
+	function isFieldVisible(vo: TaskRawFormField): boolean {
+		return vo.is_hide != 0;
+	}
+
+	function refreshFormGroups() {
+		const groups = formGroups.value;
+		const next: TaskRawFormField[][] = [];
+		for (let gi = 0; gi < groups.length; gi++) {
+			const group = groups[gi];
+			const nextGroup: TaskRawFormField[] = [];
+			for (let i = 0; i < group.length; i++) {
+				nextGroup.push(group[i]);
+			}
+			next.push(nextGroup);
+		}
+		formGroups.value = next;
+	}
+
+	function getGroupTypeFatherValue(group: TaskRawFormField[], self: TaskRawFormField | null = null): string {
+		for (let i = 0; i < group.length; i++) {
+			const item = group[i];
+			if (normalizeFieldType(item.type) != 4) {
+				continue;
+			}
+			if (self != null && item.field == self.field && item.id == self.id) {
+				continue;
+			}
+			const val = getFieldFilledValue(item);
+			if (val != "") {
+				return val;
+			}
+		}
+		return "";
+	}
+
+	function isFieldActive(group: TaskRawFormField[], vo: TaskRawFormField): boolean {
+		if (!isFieldVisible(vo)) {
+			return false;
+		}
+		if (vo.relation_value.length == 0) {
+			return true;
+		}
+		const father = getGroupTypeFatherValue(group, vo);
+		return includesRelationValue(vo.relation_value, father);
+	}
+
+	function isRadioOptionSelected(group: TaskRawFormField[], k: number, opt: string): boolean {
+		if (k < 0 || k >= group.length) {
+			return false;
+		}
+		return getFieldFilledValue(group[k]) == opt.trim();
+	}
+
+	function includesRelationValue(relationValue: string[], fatherName: string): boolean {
+		if (relationValue.length == 0) {
+			return true;
+		}
+		const father = fatherName.trim();
+		if (father == "") {
+			return false;
+		}
+		for (let i = 0; i < relationValue.length; i++) {
+			if (relationValue[i] == father) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function getField(gIndex: number, k: number): TaskRawFormField | null {
+		const groups = formGroups.value;
+		if (gIndex < 0 || gIndex >= groups.length) {
+			return null;
+		}
+		const group = groups[gIndex];
+		if (k < 0 || k >= group.length) {
+			return null;
+		}
+		return group[k];
+	}
+
+	function getSinglePreview(vo: TaskRawFormField): string {
+		const preview = vo.previewUrl.trim();
+		if (preview != "") {
+			return preview;
+		}
+		return vo.value.trim();
+	}
+
+	function getAccountDisplay(accountId: string): string {
+		const id = accountId.trim();
+		for (let i = 0; i < accountList.value.length; i++) {
+			const item = accountList.value[i];
+			if (item.account_id == id) {
+				return `【${item.platform_name}】${item.account_title}`;
+			}
+		}
+		return id;
+	}
+
+	function isAccountSelected(accountId: string): boolean {
+		const vo = getField(curGroupIndex.value, curFieldIndex.value);
+		if (vo == null) {
+			return false;
+		}
+		return vo.value == accountId;
+	}
+
+	function resetLinkArrays(count: number) {
+		const emptyRows: string[] = [];
+		for (let i = 0; i < count; i++) {
+			emptyRows.push("");
+		}
+		capcutLinks.value = emptyRows.slice(0);
+		tiktokLinks.value = emptyRows.slice(0);
+		capcutParsedUrls.value = emptyRows.slice(0);
+		tiktokParsedUrls.value = emptyRows.slice(0);
+	}
+
+	function appendLinkArrays() {
+		capcutLinks.value.push("");
+		tiktokLinks.value.push("");
+		capcutParsedUrls.value.push("");
+		tiktokParsedUrls.value.push("");
+	}
+
+	function removeLinkArrays(index: number) {
+		if (index < 0) {
+			return;
+		}
+		if (index < capcutLinks.value.length) {
+			capcutLinks.value.splice(index, 1);
+		}
+		if (index < tiktokLinks.value.length) {
+			tiktokLinks.value.splice(index, 1);
+		}
+		if (index < capcutParsedUrls.value.length) {
+			capcutParsedUrls.value.splice(index, 1);
+		}
+		if (index < tiktokParsedUrls.value.length) {
+			tiktokParsedUrls.value.splice(index, 1);
+		}
+	}
+
+	function getCapcutLink(index: number): string {
+		if (index < 0 || index >= capcutLinks.value.length) {
+			return "";
+		}
+		return capcutLinks.value[index];
+	}
+
+	function getTiktokLink(index: number): string {
+		if (index < 0 || index >= tiktokLinks.value.length) {
+			return "";
+		}
+		return tiktokLinks.value[index];
+	}
+
+	function readInputEventValue(e: UniInputEvent, trimValue: boolean = true): string {
+		const raw = `${e.detail.value ?? ""}`;
+		return trimValue ? raw.trim() : raw;
+	}
+
+	function setCapcutLink(index: number, value: string) {
+		while (capcutLinks.value.length <= index) {
+			capcutLinks.value.push("");
+		}
+		capcutLinks.value[index] = value;
+	}
+
+	function setTiktokLink(index: number, value: string) {
+		while (tiktokLinks.value.length <= index) {
+			tiktokLinks.value.push("");
+		}
+		tiktokLinks.value[index] = value;
+	}
+
+	function hasFieldValue(val: string | null | undefined): boolean {
+		return `${val ?? ""}`.trim() != "";
+	}
+
+	function isCapcutLinkField(name: string): boolean {
+		return (
+			/capcut/i.test(name) &&
+			(/uid/i.test(name) || /昵称/i.test(name) || (/id/i.test(name) && !/uid/i.test(name)))
+		);
+	}
+
+	function isTiktokLinkField(name: string): boolean {
+		return /tiktok/i.test(name) && (/昵称/i.test(name) || (/id/i.test(name) && !/uid/i.test(name)));
+	}
+
+	function clearLinkFields(formIndex: number, source: string) {
+		const group = formGroups.value[formIndex];
+		if (group == null) {
+			return;
+		}
+		for (let k = 0; k < group.length; k++) {
+			if (group[k].linkFilledBy == source) {
+				group[k].value = "";
+				group[k].linkFilledBy = "";
+			}
+		}
+		refreshFormGroups();
+	}
+
+	function fillLinkField(formIndex: number, fieldIndex: number, value: any | null, source: string) {
+		const group = formGroups.value[formIndex];
+		if (group == null || fieldIndex < 0 || fieldIndex >= group.length) {
+			return;
+		}
+		const val = value == null ? "" : `${value}`.trim();
+		if (val != "") {
+			group[fieldIndex].value = val;
+			group[fieldIndex].linkFilledBy = source;
+		} else if (group[fieldIndex].linkFilledBy == source) {
+			group[fieldIndex].value = "";
+			group[fieldIndex].linkFilledBy = "";
+		}
+		refreshFormGroups();
+	}
+
+	function resetUnfilledLinkFields(formIndex: number, source: string, matcher: (name: string) => boolean) {
+		const group = formGroups.value[formIndex];
+		if (group == null) {
+			return;
+		}
+		for (let k = 0; k < group.length; k++) {
+			const name = group[k].name;
+			if (!matcher(name)) {
+				continue;
+			}
+			if (!hasFieldValue(group[k].value)) {
+				group[k].linkFilledBy = "";
+			}
+		}
+		refreshFormGroups();
+	}
+
+	function isLinkFieldLocked(gIndex: number, k: number): boolean {
+		const vo = getField(gIndex, k);
+		if (vo == null) {
+			return false;
+		}
+		const by = `${vo.linkFilledBy ?? ""}`.trim();
+		if (by == "") {
+			return false;
+		}
+		return hasFieldValue(vo.value);
+	}
+
+	function onCapcutLinkInput(gIndex: number, e: UniInputEvent) {
+		setCapcutLink(gIndex, readInputEventValue(e, false));
+		if (gIndex < capcutParsedUrls.value.length && capcutParsedUrls.value[gIndex] != "") {
+			clearLinkFields(gIndex, "capcut");
+			capcutParsedUrls.value[gIndex] = "";
+		}
+	}
+
+	function onCapcutLinkBlur(gIndex: number) {
+		const url = getCapcutLink(gIndex).trim();
+		setCapcutLink(gIndex, url);
+		if (url == "") {
+			clearLinkFields(gIndex, "capcut");
+			if (gIndex < capcutParsedUrls.value.length) {
+				capcutParsedUrls.value[gIndex] = "";
+			}
+			return;
+		}
+		if (gIndex < capcutParsedUrls.value.length && url == capcutParsedUrls.value[gIndex]) {
+			return;
+		}
+		uni.showLoading({ title: "解析中", mask: true });
+		getCapcutLinkInfo(url)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					return;
+				}
+				const data = (envelope["data"] ?? null) as UTSJSONObject | null;
+				if (data == null) {
+					return;
+				}
+				const group = formGroups.value[gIndex];
+				if (group == null) {
+					return;
+				}
+				for (let k = 0; k < group.length; k++) {
+					const name = group[k].name;
+					if (/capcut/i.test(name) && /uid/i.test(name)) {
+						fillLinkField(gIndex, k, data["uid"], "capcut");
+					} else if (/capcut/i.test(name) && /昵称/i.test(name)) {
+						fillLinkField(gIndex, k, data["username"], "capcut");
+					} else if (/capcut/i.test(name) && /id/i.test(name) && !/uid/i.test(name)) {
+						fillLinkField(gIndex, k, data["capcut_id"], "capcut");
+					}
+				}
+				resetUnfilledLinkFields(gIndex, "capcut", isCapcutLinkField);
+				while (capcutParsedUrls.value.length <= gIndex) {
+					capcutParsedUrls.value.push("");
+				}
+				capcutParsedUrls.value[gIndex] = url;
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "解析失败"), icon: "none" });
+			})
+			.finally(() => {
+				uni.hideLoading();
+			});
+	}
+
+	function onTiktokLinkInput(gIndex: number, e: UniInputEvent) {
+		setTiktokLink(gIndex, readInputEventValue(e, false));
+		if (gIndex < tiktokParsedUrls.value.length && tiktokParsedUrls.value[gIndex] != "") {
+			clearLinkFields(gIndex, "tiktok");
+			tiktokParsedUrls.value[gIndex] = "";
+		}
+	}
+
+	function onTiktokLinkBlur(gIndex: number) {
+		const url = getTiktokLink(gIndex).trim();
+		setTiktokLink(gIndex, url);
+		if (url == "") {
+			clearLinkFields(gIndex, "tiktok");
+			if (gIndex < tiktokParsedUrls.value.length) {
+				tiktokParsedUrls.value[gIndex] = "";
+			}
+			return;
+		}
+		if (gIndex < tiktokParsedUrls.value.length && url == tiktokParsedUrls.value[gIndex]) {
+			return;
+		}
+		uni.showLoading({ title: "解析中", mask: true });
+		getTiktokLinkInfo(url)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					return;
+				}
+				const data = (envelope["data"] ?? null) as UTSJSONObject | null;
+				if (data == null) {
+					return;
+				}
+				const group = formGroups.value[gIndex];
+				if (group == null) {
+					return;
+				}
+				for (let k = 0; k < group.length; k++) {
+					const name = group[k].name;
+					if (/tiktok/i.test(name) && /昵称/i.test(name)) {
+						fillLinkField(gIndex, k, data["nickname"], "tiktok");
+					} else if (/tiktok/i.test(name) && /id/i.test(name) && !/uid/i.test(name)) {
+						fillLinkField(gIndex, k, data["tk_id"], "tiktok");
+					}
+				}
+				resetUnfilledLinkFields(gIndex, "tiktok", isTiktokLinkField);
+				while (tiktokParsedUrls.value.length <= gIndex) {
+					tiktokParsedUrls.value.push("");
+				}
+				tiktokParsedUrls.value[gIndex] = url;
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "解析失败"), icon: "none" });
+			})
+			.finally(() => {
+				uni.hideLoading();
+			});
+	}
+
+	function addItem() {
+		const template = fieldTemplate.value;
+		if (template.length == 0) {
+			return;
+		}
+		const groups = formGroups.value;
+		const source = groups.length == 0 ? template : groups[groups.length - 1];
+		const resetValue = groups.length > 0;
+		groups.push(cloneFormGroup(source, resetValue));
+        console.log(groups, '===================915');
+		attachRelationTemplate();
+		appendLinkArrays();
+	}
+
+	function delItem(index: number) {
+		const groups = formGroups.value;
+		if (index < 0 || index >= groups.length) {
+			return;
+		}
+		groups.splice(index, 1);
+		removeLinkArrays(index);
+	}
+
+	function setFieldValue(gIndex: number, k: number, value: string) {
+		const groups = formGroups.value;
+		if (gIndex < 0 || gIndex >= groups.length) {
+			return;
+		}
+		const group = groups[gIndex];
+		if (k < 0 || k >= group.length) {
+			return;
+		}
+		group[k].value = value.trim();
+		refreshFormGroups();
+	}
+
+	function applySiteTypeSideEffect(gIndex: number, k: number) {
+		if (projectId.value != 53) {
+			return;
+		}
+		const vo = getField(gIndex, k);
+		if (vo == null || vo.field != "site_type") {
+			return;
+		}
+		const group = formGroups.value[gIndex];
+		if (k + 1 < group.length) {
+			group[k + 1].is_hide = 1;
+			group[k + 1].value = "";
+			refreshFormGroups();
+		}
+	}
+
+	function onRadioChange(gIndex: number, k: number, value: string) {
+		setFieldValue(gIndex, k, value);
+		applySiteTypeSideEffect(gIndex, k);
+	}
+
+	function onInputBlur(gIndex: number, k: number) {
+		const vo = getField(gIndex, k);
+		if (vo == null || vo.field != "article_url") {
+			return;
+		}
+		const text = vo.value.trim();
+		const reg = /(https?|ftp|file):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]/g;
+		const matched = text.match(reg);
+		if (matched != null && matched.length > 0) {
+			vo.value = matched[0];
+		}
+	}
+
+	function onBookNamePicker(gIndex: number, k: number) {
+		curGroupIndex.value = gIndex;
+		curFieldIndex.value = k;
+		const group = formGroups.value[gIndex];
+		let mediaType = "";
+		for (let i = 0; i < group.length; i++) {
+			const item = group[i];
+			if (item.type == 4 && item.value != "") {
+				mediaType = item.value;
+				break;
+			}
+		}
+		mediaSelectedName.value = group[k].value;
+		if (mediaType == "动漫") {
+			mediaSelectTitle.value = group[k].name;
+			mediaSelectList.value = animeLists.value;
+		} else if (mediaType == "电视剧") {
+			mediaSelectTitle.value = group[k].name;
+			mediaSelectList.value = tvLists.value;
+		} else {
+			mediaSelectTitle.value = group[k].name;
+			mediaSelectList.value = videoLists.value;
+		}
+		mediaPopupVisible.value = true;
+	}
+
+	function chooseMediaItem(name: string) {
+		const vo = getField(curGroupIndex.value, curFieldIndex.value);
+		if (vo != null) {
+			vo.value = name;
+		}
+		mediaPopupVisible.value = false;
+	}
+
+	function showAccountPicker(gIndex: number, k: number) {
+		curGroupIndex.value = gIndex;
+		curFieldIndex.value = k;
+		selectMode.value = "account";
+		accountPopupVisible.value = true;
+	}
+
+	function isPlatformAccountField(vo: TaskRawFormField): boolean {
+		return vo.optionsProvider.trim() == "platform_account";
+	}
+
+	function showSelectPicker(gIndex: number, k: number) {
+		const vo = getField(gIndex, k);
+		if (vo == null) {
+			return;
+		}
+		const platformAccount = isPlatformAccountField(vo);
+		if (vo.typeList.length == 0 && !platformAccount) {
+			uni.showToast({ title: "暂无可选项", icon: "none" });
+			return;
+		}
+		curGroupIndex.value = gIndex;
+		curFieldIndex.value = k;
+		selectMode.value = "main";
+		selectList.value = vo.typeList;
+		selectPlatformAccount.value = platformAccount;
+		selectPopupVisible.value = true;
+	}
+
+	function showRelationSelect(gIndex: number, k: number, rk: number) {
+		const vo = getField(gIndex, k);
+		if (vo == null || rk < 0 || rk >= vo.relation_field.length) {
+			return;
+		}
+		const rel = vo.relation_field[rk];
+		const platformAccount = isPlatformAccountField(rel);
+		if (rel.typeList.length == 0 && !platformAccount) {
+			uni.showToast({ title: "暂无可选项", icon: "none" });
+			return;
+		}
+		curGroupIndex.value = gIndex;
+		curFieldIndex.value = k;
+		curRelationIndex.value = rk;
+		selectMode.value = "relation";
+		selectList.value = rel.typeList;
+		selectPlatformAccount.value = platformAccount;
+		selectPopupVisible.value = true;
+	}
+
+	function onAddPlatformAccount() {
+		selectPopupVisible.value = false;
+		router.push({
+			path: "/pages/account/add"
+		});
+	}
+
+	function getCurrentSelectValue(): string {
+		if (selectMode.value == "relation") {
+			const vo = getField(curGroupIndex.value, curFieldIndex.value);
+			if (vo == null || curRelationIndex.value < 0 || curRelationIndex.value >= vo.relation_field.length) {
+				return "";
+			}
+			return `${vo.relation_field[curRelationIndex.value].value ?? ""}`.trim();
+		}
+		const vo = getField(curGroupIndex.value, curFieldIndex.value);
+		if (vo == null) {
+			return "";
+		}
+		return `${vo.value ?? ""}`.trim();
+	}
+
+	function isSelectOptionSelected(opt: string): boolean {
+		const current = getCurrentSelectValue();
+		if (current == "") {
+			return false;
+		}
+		return current == `${opt}`.trim();
+	}
+
+	function chooseSelect(opt: string) {
+		if (selectMode.value == "main") {
+			setFieldValue(curGroupIndex.value, curFieldIndex.value, opt);
+		} else if (selectMode.value == "relation") {
+			const vo = getField(curGroupIndex.value, curFieldIndex.value);
+			if (vo != null && curRelationIndex.value < vo.relation_field.length) {
+				vo.relation_field[curRelationIndex.value].value = opt;
+				refreshFormGroups();
+			}
+		}
+		selectPopupVisible.value = false;
+	}
+
+	function chooseAccount(acc: TaskFormAccountItem) {
+		setFieldValue(curGroupIndex.value, curFieldIndex.value, acc.account_id);
+		accountPopupVisible.value = false;
+	}
+
+	function copyUrlText(url: string) {
+		const text = url.trim();
+		if (text == "") {
+			return;
+		}
+		uni.setClipboardData({
+			data: text,
+			success: () => {
+				uni.showToast({ title: "复制成功", icon: "none" });
+			}
+		});
+	}
+
+	function doUpload(path: string): Promise<string> {
+		return uploadImage(path);
+	}
+
+	function onUploadSingle(gIndex: number, k: number) {
+		if (submitting.value || imageUploading.value) {
+			return;
+		}
+		const vo = getField(gIndex, k);
+		if (vo == null) {
+			return;
+		}
+		uni.chooseImage({
+			count: 1,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				if (res.tempFilePaths.length == 0) {
+					return;
+				}
+				const tempPath = res.tempFilePaths[0];
+				vo.previewUrl = tempPath;
+				normalizePickDisplayPath(tempPath).then((p) => {
+					if (p != "") {
+						vo.previewUrl = p;
+					}
+				});
+				imageUploading.value = true;
+				uni.showLoading({ title: "上传中..." });
+				doUpload(tempPath)
+					.then((url) => {
+						vo.value = url;
+						vo.previewUrl = url;
+					})
+					.catch((err) => {
+						vo.value = "";
+						vo.previewUrl = "";
+						uni.showToast({ title: getApiMessage(err, "图片上传失败"), icon: "none" });
+					})
+					.finally(() => {
+						imageUploading.value = false;
+						uni.hideLoading();
+					});
+			}
+		});
+	}
+
+	function onUploadMulti(gIndex: number, k: number) {
+		if (submitting.value || imageUploading.value) {
+			return;
+		}
+		const vo = getField(gIndex, k);
+		if (vo == null) {
+			return;
+		}
+		const remain = vo.max_len - vo.multiUrls.length;
+		if (remain <= 0) {
+			return;
+		}
+		uni.chooseImage({
+			count: remain,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				imageUploading.value = true;
+				uni.showLoading({ title: "上传中..." });
+				const paths = res.tempFilePaths;
+				let done = 0;
+				const uploadNext = () => {
+					if (done >= paths.length) {
+						vo.value = vo.multiUrls.join(",");
+						imageUploading.value = false;
+						uni.hideLoading();
+						return;
+					}
+					doUpload(paths[done])
+						.then((url) => {
+							vo.multiUrls.push(url);
+						})
+						.catch(() => {})
+						.finally(() => {
+							done++;
+							uploadNext();
+						});
+				};
+				uploadNext();
+			}
+		});
+	}
+
+	function onRemoveMulti(gIndex: number, k: number, mi: number) {
+		const vo = getField(gIndex, k);
+		if (vo == null || mi < 0 || mi >= vo.multiUrls.length) {
+			return;
+		}
+		vo.multiUrls.splice(mi, 1);
+		vo.value = vo.multiUrls.join(",");
+	}
+
+	function onUploadRelation(gIndex: number, k: number, rk: number) {
+		const vo = getField(gIndex, k);
+		if (vo == null || rk < 0 || rk >= vo.relation_field.length) {
+			return;
+		}
+		const rel = vo.relation_field[rk];
+		if (submitting.value || imageUploading.value) {
+			return;
+		}
+		uni.chooseImage({
+			count: 1,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				if (res.tempFilePaths.length == 0) {
+					return;
+				}
+				const tempPath = res.tempFilePaths[0];
+				rel.previewUrl = tempPath;
+				imageUploading.value = true;
+				uni.showLoading({ title: "上传中..." });
+				doUpload(tempPath)
+					.then((url) => {
+						rel.value = url;
+						rel.previewUrl = url;
+					})
+					.finally(() => {
+						imageUploading.value = false;
+						uni.hideLoading();
+					});
+			}
+		});
+	}
+
+	function isValidName(name: string): boolean {
+		return name.trim() != "";
+	}
+
+	function isFieldRequired(vo: TaskRawFormField): boolean {
+		return toNumber(vo.is_empty) == 1;
+	}
+
+	function getFieldFilledValue(vo: TaskRawFormField): string {
+		return `${vo.value ?? ""}`.trim();
+	}
+
+	function isFieldFilled(vo: TaskRawFormField): boolean {
+		return getFieldFilledValue(vo) != "";
+	}
+
+	function validateNames(): boolean {
+		const groups = formGroups.value;
+		for (let gi = 0; gi < groups.length; gi++) {
+			const group = groups[gi];
+			for (let fi = 0; fi < group.length; fi++) {
+				const item = group[fi];
+				if (!isFieldActive(group, item)) {
+					continue;
+				}
+
+				if (isFieldRequired(item) && !isFieldFilled(item)) {
+					uni.showToast({ title: `序号${gi + 1}. ${item.name} 必填`, icon: "none" });
+					return true;
+				}
+				if (item.type == 6 && isFieldRequired(item) && item.multiUrls.length == 0) {
+					uni.showToast({ title: `序号${gi + 1}. ${item.name} 必填`, icon: "none" });
+					return true;
+				}
+				for (let ri = 0; ri < item.relation_field.length; ri++) {
+					const sub = item.relation_field[ri];
+					if (
+						isFieldRequired(sub) &&
+						includesRelationValue(sub.relation_value, item.value) &&
+						!isFieldFilled(sub)
+					) {
+						uni.showToast({ title: `序号${gi + 1}. ${sub.name} 必填`, icon: "none" });
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	function hasSeenId(seenIds: string[], id: string): boolean {
+		for (let i = 0; i < seenIds.length; i++) {
+			if (seenIds[i] == id) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function flattenGroup(group: TaskRawFormField[]): TaskFormSubmitField[] {
+		const result: TaskFormSubmitField[] = [];
+		const seenIds: string[] = [];
+		for (let i = group.length - 1; i >= 0; i--) {
+			const item = group[i];
+			const row: TaskFormSubmitField = {
+				id: item.id,
+				field: item.submitField != "" ? item.submitField : item.field,
+				name: item.name,
+				value: item.type == 6 ? item.multiUrls.join(",") : item.value,
+				type: item.type
+			};
+			result.push(row);
+			seenIds.push(item.id);
+			for (let ri = 0; ri < item.relation_field.length; ri++) {
+				const sub = item.relation_field[ri];
+				if (isValidName(sub.value) && !hasSeenId(seenIds, sub.id)) {
+					result.push({
+						id: sub.id,
+						field: sub.submitField != "" ? sub.submitField : sub.field,
+						name: sub.name,
+						value: sub.value,
+						type: sub.type
+					});
+					seenIds.push(sub.id);
+				}
+			}
+		}
+		return result;
+	}
+
+	function flattenFormForSubmit(): TaskFormSubmitField[][] {
+		const output: TaskFormSubmitField[][] = [];
+		const groups = formGroups.value;
+		for (let i = 0; i < groups.length; i++) {
+			output.push(flattenGroup(groups[i]));
+		}
+		return output;
+	}
+
+	function buildKeywordFormBatches(): KeywordSubmitFormItem[][] {
+		const batches = flattenFormForSubmit();
+		const result: KeywordSubmitFormItem[][] = [];
+		for (let i = 0; i < batches.length; i++) {
+			const batch = batches[i];
+			const rows: KeywordSubmitFormItem[] = [];
+			for (let j = 0; j < batch.length; j++) {
+				const item = batch[j];
+				rows.push({
+					name: item.name,
+					field: item.field,
+					value: item.value
+				});
+			}
+			if (rows.length > 0) {
+				result.push(rows);
+			}
+		}
+		return result;
+	}
+
+	function isKeywordSubmitOk(res: any | null): boolean {
+		if (res == null) {
+			uni.showToast({ title: "提交失败", icon: "none" });
+			return false;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			uni.showToast({ title: getApiMessage(res, "提交失败"), icon: "none" });
+			return false;
+		}
+		return true;
+	}
+
+	function finishKeywordSubmitSuccess() {
+		submitting.value = false;
+		uni.hideLoading();
+		uni.showToast({ title: "提交成功", icon: "success" });
+		setTimeout(() => {
+			router.back();
+		}, 1200);
+	}
+
+	function finishKeywordSubmitFail(err: any | null) {
+		submitting.value = false;
+		uni.hideLoading();
+		uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+	}
+
+	function onSubmit() {
+		if (submitting.value || imageUploading.value) {
+			return;
+		}
+		if (validateNames()) {
+			return;
+		}
+		const pid = resolveSubmitProjectId();
+		if (pid <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		const batches = buildKeywordFormBatches();
+		if (batches.length == 0) {
+			uni.showToast({ title: "请填写表单", icon: "none" });
+			return;
+		}
+		if (keywordId.value > 0) {
+			submitting.value = true;
+			uni.showLoading({ title: "提交中..." });
+			editRejectedKeyword({
+				project_id: pid,
+				id: keywordId.value,
+				form_info: batches
+			})
+				.then((res) => {
+					if (!isKeywordSubmitOk(res)) {
+						submitting.value = false;
+						uni.hideLoading();
+						return;
+					}
+					finishKeywordSubmitSuccess();
+				})
+				.catch((err) => {
+					finishKeywordSubmitFail(err);
+				});
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		submitKeyword({
+			project_id: pid,
+			form_info: batches
+		})
+			.then((res) => {
+				if (!isKeywordSubmitOk(res)) {
+					submitting.value = false;
+					uni.hideLoading();
+					return;
+				}
+				finishKeywordSubmitSuccess();
+			})
+			.catch((err) => {
+				finishKeywordSubmitFail(err);
+			});
+	}
+
+	function isRecommendationField(vo: TaskRawFormField, keys: string[], names: string[]): boolean {
+		const field = vo.field.trim().toLowerCase();
+		const submitField = vo.submitField.trim().toLowerCase();
+		for (let i = 0; i < keys.length; i++) {
+			if (field == keys[i] || submitField == keys[i]) {
+				return true;
+			}
+		}
+		const name = vo.name.trim();
+		for (let i = 0; i < names.length; i++) {
+			if (name == names[i]) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function applySelectedBook() {
+		if (selectedBookApplied.value || selectedBookId.value <= 0 || formGroups.value.length == 0) {
+			return;
+		}
+		const group = formGroups.value[0];
+		for (let i = 0; i < group.length; i++) {
+			const vo = group[i];
+			if (isRecommendationField(vo, ["book_name", "book_title"], ["书籍名称", "书名", "推荐内容"])) {
+				applyValueToField(vo, selectedBookName.value);
+			} else if (isRecommendationField(vo, ["book_id", "content_id"], ["书籍ID", "内容ID"])) {
+				applyValueToField(vo, `${selectedBookId.value}`);
+			} else if (isRecommendationField(vo, ["book_tags", "tags"], ["书籍标签", "标签"])) {
+				applyValueToField(vo, selectedBookTags.value);
+			} else if (isRecommendationField(vo, ["topic", "subject", "category", "genre"], ["题材", "题材选项", "书籍题材"])) {
+				applyValueToField(vo, selectedBookTopic.value);
+			} else if (isRecommendationField(vo, ["content", "prompt", "keyword", "copywriting"], ["提词内容", "关键词", "推广文案"])) {
+				applyValueToField(vo, selectedBookKeyword.value);
+			}
+		}
+		selectedBookApplied.value = true;
+		refreshFormGroups();
+	}
+
+	onLoad((options) => {
+		const idVal = options["id"] as string | null;
+		const taskIdVal = options["task_id"] as string | null;
+		const projectIdVal = options["project_id"] as string | null;
+		const keywordIdVal = options["keyword_id"] as string | null;
+		const selectedBookIdVal = options["selected_book_id"] as string | null;
+		const selectedBookNameVal = options["selected_book_name"] as string | null;
+		const selectedBookTagsVal = options["selected_book_tags"] as string | null;
+		const selectedBookKeywordVal = options["selected_book_keyword"] as string | null;
+		const selectedBookTopicVal = options["selected_book_topic"] as string | null;
+		if (idVal != null) {
+			const lid = parseInt(`${idVal}`);
+			linkId.value = isNaN(lid) ? 0 : lid;
+		}
+		if (taskIdVal != null) {
+			const tid = parseInt(`${taskIdVal}`);
+			taskId.value = isNaN(tid) ? 0 : tid;
+		}
+		if (projectIdVal != null) {
+			const pid = parseInt(`${projectIdVal}`);
+			projectId.value = isNaN(pid) ? 0 : pid;
+		}
+		if (keywordIdVal != null) {
+			const kid = parseInt(`${keywordIdVal}`);
+			keywordId.value = isNaN(kid) ? 0 : kid;
+		}
+		if (selectedBookIdVal != null) {
+			const bookId = parseInt(`${selectedBookIdVal}`);
+			selectedBookId.value = isNaN(bookId) ? 0 : bookId;
+		}
+		if (selectedBookNameVal != null) {
+			selectedBookName.value = `${selectedBookNameVal}`.trim();
+		}
+		if (selectedBookTagsVal != null) {
+			selectedBookTags.value = `${selectedBookTagsVal}`.trim();
+		}
+		if (selectedBookKeywordVal != null) {
+			selectedBookKeyword.value = `${selectedBookKeywordVal}`.trim();
+		}
+		if (selectedBookTopicVal != null) {
+			selectedBookTopic.value = `${selectedBookTopicVal}`.trim();
+		}
+		uni.setNavigationBarTitle({
+			title: keywordId.value > 0 ? "编辑提词" : "立即参与"
+		});
+	});
+
+	onShow(() => {
+		loadFormConfig({
+			silent: formInitialized.value,
+			preserveValues: formInitialized.value
+		});
+	});
+</script>
+
+<style lang="scss" scoped>
+	.tf-page {
+		width: 100%;
+		height: 100vh;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		box-sizing: border-box;
+	}
+
+	.tf-loading {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tf-loading-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.tf-body {
+		flex: 1;
+		width: 100%;
+		height: 0;
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+	}
+
+	.tf-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.tf-box {
+		padding: 24rpx 30rpx calc(160rpx + env(safe-area-inset-bottom));
+		box-sizing: border-box;
+
+		&--empty {
+			min-height: 100%;
+			padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+		}
+	}
+
+	.tf-empty {
+		min-height: calc(100vh - 200rpx);
+		padding: 120rpx 30rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+
+		&-icon-wrap {
+			width: 160rpx;
+			height: 160rpx;
+			border-radius: 80rpx;
+			background-color: #f3f5f8;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		&-title {
+			margin-top: 32rpx;
+			font-size: 32rpx;
+			font-weight: 600;
+			color:  #999999;
+			line-height: 44rpx;
+		}
+	}
+
+	.tf-form-list {
+		width: 100%;
+	}
+
+	.tf-group {
+		width: 100%;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 24rpx;
+		overflow: hidden;
+		box-sizing: border-box;
+	}
+
+	.tf-group-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 88rpx;
+		padding: 20rpx 28rpx;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: #f0f1f5;
+		box-sizing: border-box;
+	}
+
+	.tf-group-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #141b36;
+		line-height: 42rpx;
+	}
+
+	.tf-group-del {
+		min-width: 110rpx;
+		height: 54rpx;
+		padding: 0 20rpx;
+		background-color: #0651f8;
+		border-radius: 14rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tf-group-del-text {
+		font-size: 24rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 34rpx;
+	}
+
+	.tf-group-body {
+		padding: 8rpx 28rpx 28rpx;
+		box-sizing: border-box;
+	}
+
+	.tf-field-item {
+		padding-top: 24rpx;
+	}
+
+	.tf-row {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+	}
+
+	.tf-row--relation {
+		margin-top: 16rpx;
+	}
+
+	.tf-relation-wrap {
+		margin-top: 8rpx;
+		padding: 16rpx 20rpx;
+		border-radius: 12rpx;
+		background-color: #f9fafc;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eef0f4;
+		box-sizing: border-box;
+	}
+
+	.tf-label-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 12rpx;
+	}
+
+	.tf-label {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+		font-weight: 500;
+	}
+
+	.tf-required {
+		margin-left: 4rpx;
+		font-size: 26rpx;
+		color: #ef4444;
+		line-height: 36rpx;
+	}
+
+	.tf-input-wrap {
+		width: 100%;
+		min-height: 88rpx;
+		padding: 0 20rpx;
+		border-radius: 12rpx;
+		background-color: #f7f8fa;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		box-sizing: border-box;
+	}
+
+	.tf-input-wrap--picker {
+		justify-content: space-between;
+	}
+
+	.tf-input {
+		width: 100%;
+		height: 88rpx;
+		padding: 0 20rpx;
+		border-radius: 12rpx;
+		background-color: #f7f8fa;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		font-size: 28rpx;
+		color: #303030;
+		box-sizing: border-box;
+	}
+
+	.tf-input-wrap .tf-input {
+		width: auto;
+		flex: 1;
+		min-width: 0;
+		height: 88rpx;
+		padding: 0;
+		border-width: 0;
+		background-color: transparent;
+	}
+
+	.tf-placeholder {
+		color: #999999;
+		font-size: 28rpx;
+	}
+
+	.tf-select-wrap {
+		width: 100%;
+		min-height: 88rpx;
+		padding: 0 20rpx;
+		border-radius: 12rpx;
+		background-color: #f7f8fa;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		box-sizing: border-box;
+	}
+
+	.tf-select-text {
+		flex: 1;
+		min-width: 0;
+		font-size: 28rpx;
+		line-height: 40rpx;
+		color: #999999;
+		text-align: left;
+	}
+
+	.tf-select-text--active {
+		color: #303030;
+	}
+
+	.tf-radio-group {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding-top: 4rpx;
+	}
+
+	.tf-radio-label {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-right: 24rpx;
+		margin-bottom: 12rpx;
+	}
+
+	.tf-radio-icon {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 16rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		margin-right: 8rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+
+		&--checked {
+			border-color: #0651f8;
+			background-color: #0651f8;
+		}
+	}
+
+	.tf-radio-mark {
+		font-size: 20rpx;
+		color: #ffffff;
+		line-height: 28rpx;
+	}
+
+	.tf-radio-text {
+		font-size: 26rpx;
+		color: #303030;
+		line-height: 36rpx;
+	}
+
+	.tf-upload-box {
+		width: 150rpx;
+		height: 150rpx;
+		background-color: #f7f8fa;
+		border-radius: 12rpx;
+		border-width: 1rpx;
+		border-style: dashed;
+		border-color: #d8dce6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.tf-upload-box--small {
+		margin-right: 16rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.tf-upload-img {
+		width: 150rpx;
+		height: 150rpx;
+	}
+
+	.tf-upload-remove {
+		position: absolute;
+		top: 6rpx;
+		right: 6rpx;
+		width: 36rpx;
+		height: 36rpx;
+		border-radius: 50%;
+		background-color: rgba(0, 0, 0, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tf-multi-upload {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding-top: 12rpx;
+	}
+
+	.tf-tip {
+		width: 100%;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		padding-top: 12rpx;
+	}
+
+	.tf-add-btn {
+		width: 100%;
+		height: 88rpx;
+		margin: 8rpx 0 24rpx;
+		background-color: #0651f8;
+		border-radius: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.tf-add-btn-text {
+		margin-left: 8rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 40rpx;
+	}
+
+	.tf-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 30;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #eeeeee;
+		box-sizing: border-box;
+	}
+
+	.tf-submit-btn {
+		width: 100%;
+		height: 96rpx;
+		background-color: #0651f8;
+		border-radius: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.tf-submit-btn--disabled {
+		opacity: 0.55;
+	}
+
+	.tf-submit-btn-text {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 44rpx;
+	}
+
+	.tf-popup-account {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		background-color: #ffffff;
+	}
+
+	.tf-popup-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 24rpx 30rpx;
+		box-sizing: border-box;
+	}
+
+	.tf-popup-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #141b36;
+		flex-shrink: 0;
+	}
+
+	.tf-popup-search {
+		flex: 1;
+		min-width: 0;
+		margin: 0 20rpx;
+		height: 64rpx;
+		padding: 0 20rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		border-radius: 8rpx;
+		font-size: 24rpx;
+	}
+
+	.tf-platform-scroll {
+		width: 100%;
+		flex-shrink: 0;
+	}
+
+	.tf-platform-row {
+		display: flex;
+		flex-direction: row;
+		padding: 0 20rpx 16rpx;
+	}
+
+	.tf-platform-chip {
+		flex-shrink: 0;
+		padding: 12rpx 24rpx;
+		margin-right: 12rpx;
+		background-color: #f2f2f2;
+		border-radius: 11rpx;
+	}
+
+	.tf-platform-chip--active {
+		background-color: #0651f8;
+	}
+
+	.tf-platform-chip-text {
+		font-size: 24rpx;
+		color: #333333;
+	}
+
+	.tf-platform-chip--active .tf-platform-chip-text {
+		color: #ffffff;
+	}
+
+	.tf-account-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.tf-account-item {
+		padding: 28rpx 30rpx;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f2f2f2;
+	}
+
+	.tf-account-item--checked {
+		color: #ef4222;
+	}
+
+	.tf-account-item-text {
+		font-size: 25rpx;
+		color: #333333;
+		line-height: 36rpx;
+	}
+
+	.tf-account-item--checked .tf-account-item-text {
+		color: #ef4222;
+	}
+
+	.tf-account-empty {
+		padding: 60rpx 0;
+		display: flex;
+		justify-content: center;
+	}
+
+	.tf-account-empty-text {
+		font-size: 26rpx;
+		color: #999999;
+	}
+
+	.tf-select-popup {
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+	}
+
+	.tf-select-scroll {
+		flex: 1;
+		height: 0;
+		background-color: #ffffff;
+	}
+
+	.tf-select-empty {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tf-select-empty-text {
+		font-size: 28rpx;
+		color: #999999;
+	}
+
+	.tf-select-add-wrap {
+		flex-shrink: 0;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #eeeeee;
+		box-sizing: border-box;
+	}
+
+	.tf-select-add-btn {
+		width: 100%;
+		height: 88rpx;
+		background-color: #0651f8;
+		border-radius: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.tf-select-add-btn-text {
+		margin-left: 8rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 40rpx;
+	}
+
+	.tf-select-option {
+		min-height: 100rpx;
+		padding: 0 56rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f2f2f2;
+		box-sizing: border-box;
+		position: relative;
+	}
+
+	.tf-select-option--checked {
+		background-color: rgba(6, 81, 248, 0.06);
+	}
+
+	.tf-select-option-text {
+		font-size: 32rpx;
+		color: #141b36;
+		text-align: center;
+		line-height: 44rpx;
+	}
+
+	.tf-select-option-text--checked {
+		color: #0651f8;
+		font-weight: 600;
+	}
+
+	.tf-select-option-check {
+		position: absolute;
+		right: 30rpx;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 36rpx;
+		height: 36rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tf-media-popup {
+		background-color: #ffffff;
+		padding-bottom: 30rpx;
+	}
+
+	.tf-media-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding: 32rpx 30rpx;
+	}
+
+	.tf-media-title {
+		font-size: 36rpx;
+		font-weight: 700;
+		color: #141b36;
+	}
+
+	.tf-media-scroll {
+		max-height: 60vh;
+	}
+
+	.tf-media-grid {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding: 0 20rpx 30rpx;
+	}
+
+	.tf-media-chip {
+		margin-left: 20rpx;
+		margin-bottom: 15rpx;
+		padding: 0 24rpx;
+		height: 74rpx;
+		background-color: #f6f7fb;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tf-media-chip--active {
+		background-color: #0651f8;
+	}
+
+	.tf-media-chip-text {
+		font-size: 26rpx;
+		color: #141b36;
+	}
+
+	.tf-media-chip--active .tf-media-chip-text {
+		color: #ffffff;
+	}
+</style>

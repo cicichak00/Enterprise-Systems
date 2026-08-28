@@ -1,0 +1,1163 @@
+<!-- 提词记录列表 · 搜索/管理/平台审核状态卡片 -->
+<template>
+	<cl-page :pt="{ className: 'cbf-page' }" :back-top="false">
+		<view class="cbf-page">
+			<view class="cbf-header">
+				<view class="cbf-toolbar">
+					<view class="cbf-search">
+						<cl-icon name="search-line" :size="16"></cl-icon>
+						<input
+							class="cbf-search-input"
+							v-model="keyword"
+							placeholder="输入关键词/书籍ID/作者/书名等"
+							placeholder-class="cbf-search-ph"
+							confirm-type="search"
+							@confirm="onSearch"
+						/>
+					</view>
+					<view class="cbf-add" @tap="onAdd">
+						<text class="cbf-add-text">新增</text>
+					</view>
+					<view
+						class="cbf-manage"
+						:class="{ 'cbf-manage--active': manageMode }"
+						@tap="onManage"
+					>
+						<view v-if="!manageMode" class="cbf-manage-icon">
+							<view class="cbf-manage-dot"></view>
+							<view class="cbf-manage-dot" style="border-color: #999;"></view>
+							<view class="cbf-manage-dot"></view>
+							<view class="cbf-manage-dot"></view>
+						</view>
+						<text class="cbf-manage-text">{{ manageMode ? "取消" : "管理" }}</text>
+					</view>
+				</view>
+			</view>
+
+			<scroll-view
+				class="cbf-scroll"
+				:class="{ 'cbf-scroll--manage': manageMode }"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="cbf-list">
+					<view v-if="loading && list.length == 0" class="cbf-state">
+						<cl-loading :loading="true" :size="28"></cl-loading>
+						<text class="cbf-state-text">加载中...</text>
+					</view>
+					<view v-else-if="list.length == 0" class="cbf-state">
+						<text class="cbf-state-text">暂无数据</text>
+					</view>
+					<template v-else>
+						<view
+							class="cbf-card"
+							:class="{ 'cbf-card--selected': manageMode && isRowSelected(item, index) }"
+							v-for="(item, index) in list"
+							:key="getRowKey(item, index)"
+							@tap="onCardTap(item, index)"
+						>
+							<view
+								v-if="manageMode"
+								class="cbf-card-check"
+								:class="{ 'cbf-card-check--checked': isRowSelected(item, index) }"
+							>
+								<cl-icon
+									v-if="isRowSelected(item, index)"
+									name="check-line"
+									:size="14"
+									color="#ffffff"
+								></cl-icon>
+							</view>
+							<view class="cbf-card-main">
+								<view class="cbf-card-head">
+									<view class="cbf-card-head-row">
+										<text class="cbf-card-title">{{ item.keyword }}</text>
+										<view
+											v-if="!manageMode && canComboBackfill(item)"
+											class="cbf-action-btn"
+											@tap.stop="onBackfill(item)"
+										>
+											<text class="cbf-action-btn-text">组合回填</text>
+										</view>
+									</view>
+									<text class="cbf-card-time">创建时间：{{ item.create_time }}</text>
+								</view>
+
+								<view class="cbf-status-box">
+									<view class="cbf-status-grid">
+										<view
+											class="cbf-status-item"
+											v-for="(st, si) in getKeywordList(item)"
+											:key="si"
+										>
+											<view class="cbf-status-line">
+												<view class="cbf-status-name">
+													<text class="cbf-status-name-text">{{ st.project_name }}</text>
+												</view>
+												<view
+													class="cbf-status-val"
+													:class="getPlatformStatusClass(st)"
+												>
+													<text class="cbf-status-val-text">{{ st.status_text }}</text>
+												</view>
+											</view>
+											<text
+												v-if="getPlatformRejectMsg(st) != ''"
+												class="cbf-status-msg"
+											>{{ getPlatformRejectMsg(st) }}</text>
+										</view>
+									</view>
+								</view>
+
+								<view class="cbf-card-foot" @tap.stop="onFootTap(item, index)">
+									<view class="cbf-foot-main">
+										<text class="cbf-book-name">{{ item.book_name }}</text>
+										<text class="cbf-book-meta">{{ getBookMeta(item) }}</text>
+									</view>
+									<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+								</view>
+							</view>
+						</view>
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</template>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+
+			<view v-if="manageMode" class="cbf-manage-footer">
+				<view class="cbf-manage-select" @tap="onToggleSelectAll">
+					<view
+						class="cbf-card-check cbf-manage-select-check"
+						:class="{ 'cbf-card-check--checked': isAllSelected }"
+					>
+						<cl-icon
+							v-if="isAllSelected"
+							name="check-line"
+							:size="14"
+							color="#ffffff"
+						></cl-icon>
+					</view>
+					<text class="cbf-manage-select-text">全选</text>
+					<text class="cbf-manage-select-sub">已选</text>
+					<text class="cbf-manage-select-count">{{ selectedCount }}/{{ list.length }}</text>
+				</view>
+				<view
+					class="cbf-manage-delete-btn"
+					:class="{ 'cbf-manage-delete-btn--disabled': deleting }"
+					@tap="onDeleteSelected"
+				>
+					<text class="cbf-manage-delete-text">{{ deleting ? "删除中..." : "删除" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	/** 提词记录列表页 · 直接使用 myListLog 返回字段 */
+	import { computed, ref } from "vue";
+	import { deleteComposeKeywords, getComposeMyListLog } from "@/.cool/api/compose";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { ComposeListLogItem, ComposeListLogPlatformItem } from "@/.cool";
+
+	const composeId = ref(0);
+	const keyword = ref("");
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const hasMore = ref(true);
+	const pageNo = ref(1);
+	const pageSize = 15;
+	const fetchSeq = ref(0);
+	const list = ref<ComposeListLogItem[]>([]);
+	const manageMode = ref(false);
+	const selectedKeys = ref<string[]>([]);
+	const deleting = ref(false);
+
+	const selectedCount = computed((): number => selectedKeys.value.length);
+	const isAllSelected = computed((): boolean => {
+		if (list.value.length == 0) {
+			return false;
+		}
+		return selectedKeys.value.length == list.value.length;
+	});
+
+	function getRowKey(item: ComposeListLogItem, index: number): string {
+		const id = item.id;
+		if (id != null) {
+			const n = typeof id == "number" ? (id as number) : parseInt(`${id}`);
+			if (!isNaN(n) && n > 0) {
+				return `id:${n}`;
+			}
+		}
+		const kw = `${item.keyword ?? ""}`.trim();
+		return `kw:${kw}:${index}`;
+	}
+
+	function getItemKeyword(item: ComposeListLogItem): string {
+		return `${item.keyword ?? ""}`.trim();
+	}
+
+	function isRowSelected(item: ComposeListLogItem, index: number): boolean {
+		return selectedKeys.value.indexOf(getRowKey(item, index)) >= 0;
+	}
+
+	function getKeywordList(item: ComposeListLogItem): ComposeListLogPlatformItem[] {
+		const rows = item.keywordList;
+		if (rows != null && Array.isArray(rows)) {
+			return rows;
+		}
+		return [];
+	}
+
+	/** 平台状态文案颜色：优先 status_text（与展示一致），再兜底 status */
+	function getPlatformStatusClass(st: ComposeListLogPlatformItem): string {
+		const text = `${st.status_text ?? ""}`.trim();
+		if (text == "审核中" || text == "待审核") {
+			return "cbf-status-val--reviewing";
+		}
+		if (text == "已发布" || text == "发布中") {
+			return "cbf-status-val--published";
+		}
+		if (text == "已通过" || text == "审核通过") {
+			return "cbf-status-val--pass";
+		}
+		if (text == "已驳回" || text == "审核驳回") {
+			return "cbf-status-val--reject";
+		}
+		if (text == "已失效" || text == "即将过期") {
+			return "cbf-status-val--expire";
+		}
+		const status = st.status;
+		if (status != null) {
+			const n = typeof status == "number" ? (status as number) : parseInt(`${status}`);
+			if (!isNaN(n)) {
+				if (n == 0) {
+					return "cbf-status-val--reviewing";
+				}
+				if (n == 1) {
+					return "cbf-status-val--pass";
+				}
+				if (n == 2) {
+					return "cbf-status-val--reject";
+				}
+				if (n == 3) {
+					return "cbf-status-val--expire";
+				}
+				if (n == 4) {
+					return "cbf-status-val--published";
+				}
+			}
+		}
+		return "";
+	}
+
+	/** status=2（已驳回）时展示接口 msg */
+	function getPlatformRejectMsg(st: ComposeListLogPlatformItem): string {
+		const status = st.status;
+		if (status == null) {
+			return "";
+		}
+		const n = typeof status == "number" ? (status as number) : parseInt(`${status}`);
+		if (isNaN(n) || n != 2) {
+			return "";
+		}
+		return `${st.msg ?? ""}`.trim();
+	}
+
+	/** keywordList 中任一 status=1（审核通过）时显示组合回填 */
+	function canComboBackfill(item: ComposeListLogItem): boolean {
+		const rows = getKeywordList(item);
+		for (let i = 0; i < rows.length; i++) {
+			const status = rows[i].status;
+			if (status == null) {
+				continue;
+			}
+			const n = typeof status == "number" ? (status as number) : parseInt(`${status}`);
+			if (!isNaN(n) && n == 1 || !isNaN(n) && n == 3) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function getBookMeta(item: ComposeListLogItem): string {
+		const author = `${item.author ?? ""}`;
+		const bookId = `${item.book_id ?? ""}`;
+		if (author != "" && bookId != "") {
+			return `${author}·${bookId}`;
+		}
+		if (author != "") {
+			return author;
+		}
+		return bookId;
+	}
+
+	function extractLists(data: UTSJSONObject): ComposeListLogItem[] {
+		const raw = data["lists"];
+		if (raw != null && Array.isArray(raw)) {
+			return raw as ComposeListLogItem[];
+		}
+		return [];
+	}
+
+	function syncSelectedKeys() {
+		const validKeys: string[] = [];
+		for (let i = 0; i < list.value.length; i++) {
+			const key = getRowKey(list.value[i], i);
+			if (selectedKeys.value.indexOf(key) >= 0) {
+				validKeys.push(key);
+			}
+		}
+		selectedKeys.value = validKeys;
+	}
+
+	function exitManageMode() {
+		manageMode.value = false;
+		selectedKeys.value = [];
+	}
+
+	function fetchList(reset: boolean) {
+		if (composeId.value <= 0) {
+			if (reset) {
+				list.value = [];
+				hasMore.value = false;
+			}
+			return;
+		}
+		if (reset) {
+			fetchSeq.value += 1;
+			list.value = [];
+			loading.value = true;
+			pageNo.value = 1;
+			hasMore.value = true;
+			if (manageMode.value) {
+				selectedKeys.value = [];
+			}
+		} else {
+			if (loadingMore.value || !hasMore.value || loading.value) {
+				return;
+			}
+			loadingMore.value = true;
+		}
+		const reqPage = reset ? 1 : pageNo.value;
+		const seq = reset ? fetchSeq.value : 0;
+		const kw = keyword.value.trim();
+		getComposeMyListLog({
+			id: composeId.value,
+			page_no: reqPage,
+			page_size: pageSize,
+			keyword: kw != "" ? kw : undefined
+		})
+			.then((res) => {
+				if (reset && seq != fetchSeq.value) {
+					return;
+				}
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const rows = extractLists(data);
+				if (reset) {
+					list.value = rows;
+				} else {
+					list.value = list.value.concat(rows);
+				}
+				const totalVal = data["total"] ?? data["count"];
+				if (totalVal != null) {
+					const n = parseInt(`${totalVal}`);
+					const total = isNaN(n) ? list.value.length : n;
+					hasMore.value = list.value.length < total;
+				} else {
+					hasMore.value = rows.length >= pageSize;
+				}
+				if (hasMore.value) {
+					pageNo.value = reqPage + 1;
+				}
+				if (manageMode.value) {
+					syncSelectedKeys();
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				if (reset) {
+					if (seq == fetchSeq.value) {
+						loading.value = false;
+					}
+				} else {
+					loadingMore.value = false;
+				}
+			});
+	}
+
+	function reload() {
+		fetchList(true);
+	}
+
+	function onSearch() {
+		reload();
+	}
+
+	function onAdd() {
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		router.push({
+			path: "/pages/task/combo-prompt",
+			query: {
+				id: composeId.value
+			}
+		});
+	}
+
+	function onManage() {
+		if (manageMode.value) {
+			exitManageMode();
+			return;
+		}
+		manageMode.value = true;
+		selectedKeys.value = [];
+	}
+
+	function onCardTap(item: ComposeListLogItem, index: number) {
+		if (!manageMode.value) {
+			return;
+		}
+		const key = getRowKey(item, index);
+		const nextKeys = selectedKeys.value.slice();
+		const pos = nextKeys.indexOf(key);
+		if (pos < 0) {
+			nextKeys.push(key);
+		} else {
+			nextKeys.splice(pos, 1);
+		}
+		selectedKeys.value = nextKeys;
+	}
+
+	function onToggleSelectAll() {
+		if (list.value.length == 0) {
+			return;
+		}
+		if (isAllSelected.value) {
+			selectedKeys.value = [];
+			return;
+		}
+		const nextKeys: string[] = [];
+		for (let i = 0; i < list.value.length; i++) {
+			nextKeys.push(getRowKey(list.value[i], i));
+		}
+		selectedKeys.value = nextKeys;
+	}
+
+	function collectSelectedKeywords(): string[] {
+		const keywords: string[] = [];
+		for (let i = 0; i < list.value.length; i++) {
+			const item = list.value[i];
+			if (!isRowSelected(item, i)) {
+				continue;
+			}
+			const text = getItemKeyword(item);
+			if (text == "") {
+				continue;
+			}
+			if (keywords.indexOf(text) < 0) {
+				keywords.push(text);
+			}
+		}
+		return keywords;
+	}
+
+	function doDeleteSelected() {
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		const arrKeyword = collectSelectedKeywords();
+		if (arrKeyword.length == 0) {
+			uni.showToast({ title: "请先选择要删除的记录", icon: "none" });
+			return;
+		}
+		deleting.value = true;
+		uni.showLoading({ title: "删除中...", mask: true });
+		deleteComposeKeywords({
+			id: composeId.value,
+			arrKeyword: arrKeyword
+		})
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "删除失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(res, "删除成功"), icon: "success" });
+				exitManageMode();
+				reload();
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "删除失败"), icon: "none" });
+			})
+			.finally(() => {
+				deleting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function onDeleteSelected() {
+		if (deleting.value) {
+			return;
+		}
+		if (selectedKeys.value.length == 0) {
+			uni.showToast({ title: "请先选择要删除的记录", icon: "none" });
+			return;
+		}
+		uni.showModal({
+			title: "删除记录",
+			content: `确定删除已选的 ${selectedKeys.value.length} 条提词吗？删除后不可恢复。`,
+			confirmText: "删除",
+			confirmColor: "#ef4444",
+			success(res) {
+				if (res.confirm) {
+					doDeleteSelected();
+				}
+			}
+		});
+	}
+
+	/** 进入组合回填页 */
+	function goComboBackfill(item: ComposeListLogItem) {
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		const keywordRows = getKeywordList(item);
+		const platforms = keywordRows
+			.map((st) => `${st.project_name ?? ""}`)
+			.filter((name) => name != "")
+			.join("·");
+		const projectIds: number[] = [];
+		for (let i = 0; i < keywordRows.length; i++) {
+			const pid = keywordRows[i].project_id;
+			if (pid == null) {
+				continue;
+			}
+			const n = typeof pid == "number" ? (pid as number) : parseInt(`${pid}`);
+			if (!isNaN(n) && n > 0 && projectIds.indexOf(n) < 0) {
+				projectIds.push(n);
+			}
+		}
+		const query: UTSJSONObject = {
+			id: composeId.value,
+			log_id: item.id ?? 0,
+			keyword: item.keyword ?? "",
+			create_time: item.create_time ?? ""
+		};
+		if (platforms != "") {
+			query.platforms = platforms;
+		}
+		if (projectIds.length > 0) {
+			query.project_ids = projectIds.join(",");
+		}
+		router.push({
+			path: "/pages/task/combo-backfill",
+			query: query
+		});
+	}
+
+	function onBackfill(item: ComposeListLogItem) {
+		if (manageMode.value) {
+			return;
+		}
+		goComboBackfill(item);
+	}
+
+	function pickExpandValue(item: ComposeListLogItem, field: string): string {
+		const rows = item.expand;
+		if (rows != null && Array.isArray(rows)) {
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i];
+				if (`${row.field ?? ""}` == field) {
+					return `${row.value ?? ""}`;
+				}
+			}
+		}
+		const raw = (item as UTSJSONObject)[field];
+		if (raw == null) {
+			return "";
+		}
+		return `${raw}`;
+	}
+
+	function onDetail(item: ComposeListLogItem) {
+		if (manageMode.value) {
+			return;
+		}
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		const projectIds: number[] = [];
+		const keywordRows = getKeywordList(item);
+		for (let i = 0; i < keywordRows.length; i++) {
+			const pid = keywordRows[i].project_id;
+			if (pid == null) {
+				continue;
+			}
+			const n = typeof pid == "number" ? (pid as number) : parseInt(`${pid}`);
+			if (!isNaN(n) && projectIds.indexOf(n) < 0) {
+				projectIds.push(n);
+			}
+		}
+		const draft = {
+			keyword: pickExpandValue(item, "keyword"),
+			book_id: pickExpandValue(item, "book_id"),
+			book_name: pickExpandValue(item, "book_name"),
+			author: pickExpandValue(item, "author"),
+			type: pickExpandValue(item, "type"),
+			project_ids: projectIds
+		};
+		uni.setStorageSync("compose_prompt_draft", JSON.stringify(draft));
+		router.push({
+			path: "/pages/task/combo-prompt",
+			query: {
+				id: composeId.value,
+				log_id: item.id ?? 0
+			}
+		});
+	}
+
+	function onFootTap(item: ComposeListLogItem, index: number) {
+		if (manageMode.value) {
+			onCardTap(item, index);
+			return;
+		}
+		onDetail(item);
+	}
+
+	function onScrollToLower() {
+		fetchList(false);
+	}
+
+	function initPageOptions(options: OnLoadOptions) {
+		const idVal = options["id"] as string | null;
+		if (idVal != null) {
+			const n = parseInt(`${idVal}`);
+			composeId.value = isNaN(n) ? 0 : n;
+		}
+	}
+
+	onLoad((options) => {
+		initPageOptions(options);
+		uni.setNavigationBarTitle({
+			title: "提词记录"
+		});
+	});
+
+	onShow(() => {
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		reload();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.cbf-page {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		background-color: #F6F7FB;
+
+		// --- 顶栏 ---
+		.cbf-header {
+			flex-shrink: 0;
+			background-color: #ffffff;
+			padding: 16rpx 24rpx 12rpx;
+			box-sizing: border-box;
+
+			.cbf-toolbar {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+
+				.cbf-search {
+					flex: 1;
+					min-width: 0;
+					height: 72rpx;
+					padding: 0 24rpx;
+					border-radius: 16rpx;
+					background-color: #f5f5f5;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					box-sizing: border-box;
+
+					.cbf-search-input {
+						flex: 1;
+						min-width: 0;
+						margin-left: 12rpx;
+						font-size: 26rpx;
+						color: #333333;
+						line-height: 36rpx;
+					}
+				}
+
+				.cbf-add {
+					flex-shrink: 0;
+					margin-left: 16rpx;
+					height: 72rpx;
+					padding: 0 20rpx;
+					border-radius: 16rpx;
+					background-color: #ffffff;
+					border-width: 2rpx;
+					border-style: solid;
+					border-color: #eeeeee;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					justify-content: center;
+					box-sizing: border-box;
+
+					.cbf-add-text {
+						font-size: 26rpx;
+						color: #333333;
+						line-height: 36rpx;
+					}
+				}
+
+				.cbf-manage {
+					flex-shrink: 0;
+					margin-left: 16rpx;
+					height: 72rpx;
+					padding: 0 20rpx;
+					border-radius: 16rpx;
+					background-color: #ffffff;
+					border-width: 2rpx;
+					border-style: solid;
+					border-color: #eeeeee;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					justify-content: center;
+					box-sizing: border-box;
+
+					&--active {
+						border-color: #0651f8;
+						background-color: #f0f5ff;
+					}
+
+					.cbf-manage-icon {
+						width: 22rpx;
+						height: 22rpx;
+						display: flex;
+						flex-direction: row;
+						flex-wrap: wrap;
+						justify-content: space-between;
+						align-content: space-between;
+
+						.cbf-manage-dot {
+							width: 9rpx;
+							height: 9rpx;
+							border-radius: 8rpx;
+							border: 4rpx solid #333333;
+						}
+					}
+
+					.cbf-manage-text {
+						margin-left: 8rpx;
+						font-size: 26rpx;
+						color: #333333;
+						line-height: 36rpx;
+					}
+
+					&--active .cbf-manage-text {
+						margin-left: 0;
+						color: #0651f8;
+					}
+				}
+			}
+		}
+
+		.cbf-search-ph {
+			color: #b0b0b0;
+			font-size: 26rpx;
+		}
+
+		// --- 列表 ---
+		.cbf-scroll {
+			flex: 1;
+			height: 0;
+
+			&--manage {
+				padding-bottom: 140rpx;
+				box-sizing: border-box;
+			}
+		}
+
+		.cbf-list {
+			padding: 20rpx 24rpx 24rpx;
+			box-sizing: border-box;
+		}
+
+		.cbf-state {
+			padding: 120rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+
+			.cbf-state-text {
+				margin-top: 16rpx;
+				font-size: 26rpx;
+				color: #999999;
+				line-height: 36rpx;
+			}
+		}
+
+		// --- 卡片 ---
+		.cbf-card {
+			margin-bottom: 20rpx;
+			padding: 28rpx 24rpx 24rpx;
+			background-color: #ffffff;
+			border-radius: 20rpx;
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: transparent;
+
+			&:last-child {
+				margin-bottom: 0;
+			}
+
+			&--selected {
+				background-color: #eef3ff;
+				border-color: #0651f8;
+			}
+
+			.cbf-card-check {
+				width: 40rpx;
+				height: 40rpx;
+				border-radius: 20rpx;
+				border-width: 2rpx;
+				border-style: solid;
+				border-color: #c8c8c8;
+				margin-right: 16rpx;
+				margin-top: 6rpx;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+				flex-shrink: 0;
+				background-color: #ffffff;
+
+				&--checked {
+					border-color: #0651f8;
+					background-color: #0651f8;
+				}
+			}
+
+			.cbf-card-main {
+				flex: 1;
+				min-width: 0;
+			}
+
+			.cbf-card-head {
+				margin-bottom: 20rpx;
+
+				.cbf-card-head-row {
+					display: flex;
+					flex-direction: row;
+					align-items: flex-start;
+					justify-content: space-between;
+				}
+
+				.cbf-card-title {
+					flex: 1;
+					min-width: 0;
+					font-size: 32rpx;
+					font-weight: 700;
+					color: #1a1a1a;
+					line-height: 44rpx;
+					margin-right: 16rpx;
+				}
+
+				.cbf-action-btn {
+					flex-shrink: 0;
+					height: 48rpx;
+					padding: 0 12rpx;
+					border-radius: 8rpx;
+					border-width: 2rpx;
+					border-style: solid;
+					border-color: #0651f8;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					justify-content: center;
+					box-sizing: border-box;
+					background-color: #ffffff;
+
+					.cbf-action-btn-text {
+						font-size: 20rpx;
+						color: #0651f8;
+						line-height: 28rpx;
+					}
+				}
+
+				.cbf-card-time {
+					display: block;
+					margin-top: 8rpx;
+					font-size: 24rpx;
+					color: #999999;
+					line-height: 34rpx;
+				}
+			}
+
+			.cbf-status-box {
+				padding: 20rpx;
+				border-radius: 12rpx;
+				background-color: #f9fafc;
+				box-sizing: border-box;
+				margin-bottom: 16rpx;
+
+				.cbf-status-grid {
+					display: flex;
+					flex-direction: row;
+					flex-wrap: wrap;
+
+					.cbf-status-item {
+						flex-basis: 50%;
+						width: 50%;
+						max-width: 50%;
+						flex-grow: 0;
+						flex-shrink: 0;
+						display: flex;
+						flex-direction: column;
+						align-items: flex-start;
+						margin-bottom: 12rpx;
+						padding-right: 12rpx;
+						box-sizing: border-box;
+
+						&:nth-last-child(-n + 2) {
+							margin-bottom: 0;
+						}
+
+						.cbf-status-line {
+							display: flex;
+							flex-direction: row;
+							align-items: center;
+							width: 100%;
+						}
+
+						.cbf-status-name {
+							flex-shrink: 1;
+							min-width: 0;
+							margin-right: 10rpx;
+
+							.cbf-status-name-text {
+								font-size: 22rpx;
+								color: #666666;
+								line-height: 34rpx;
+							}
+						}
+
+						.cbf-status-val {
+							flex-shrink: 0;
+
+							.cbf-status-val-text {
+								font-size: 22rpx;
+								color: #333333;
+								line-height: 34rpx;
+							}
+
+							&--reviewing {
+								.cbf-status-val-text {
+									color: #ff7600;
+								}
+							}
+
+							&--pass {
+								.cbf-status-val-text {
+									color: #1aad19;
+								}
+							}
+
+							&--published {
+								.cbf-status-val-text {
+									color: #0651f8;
+								}
+							}
+
+							&--reject {
+								.cbf-status-val-text {
+									color: #e54d42;
+								}
+							}
+
+							&--expire {
+								.cbf-status-val-text {
+									color: #999999;
+								}
+							}
+						}
+
+						.cbf-status-msg {
+							margin-top: 4rpx;
+							width: 100%;
+							font-size: 20rpx;
+							color: #e54d42;
+							line-height: 28rpx;
+						}
+					}
+				}
+			}
+
+			.cbf-card-foot {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				padding: 20rpx 24rpx;
+				border-radius: 12rpx;
+				background-color: #F9FAFC;
+				box-sizing: border-box;
+
+				.cbf-foot-main {
+					flex: 1;
+					min-width: 0;
+
+					.cbf-book-name {
+						display: block;
+						font-size: 28rpx;
+						font-weight: 600;
+						color: #1a1a1a;
+						line-height: 40rpx;
+						margin-bottom: 4rpx;
+					}
+
+					.cbf-book-meta {
+						display: block;
+						font-size: 24rpx;
+						color: #999999;
+						line-height: 34rpx;
+					}
+				}
+			}
+		}
+
+		// --- 管理底栏 ---
+		.cbf-manage-footer {
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			z-index: 30;
+			padding: 16rpx 30rpx;
+			background-color: #ffffff;
+			border-top-width: 1rpx;
+			border-top-style: solid;
+			border-top-color: #eeeeee;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			box-sizing: border-box;
+
+			.cbf-manage-select {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				flex: 1;
+				min-width: 0;
+
+				.cbf-manage-select-check {
+					margin-right: 12rpx;
+					margin-top: 0;
+				}
+
+				.cbf-manage-select-text {
+					font-size: 28rpx;
+					color: #333333;
+					line-height: 40rpx;
+				}
+
+				.cbf-manage-select-sub {
+					margin-left: 12rpx;
+					font-size: 24rpx;
+					color: #999999;
+					line-height: 34rpx;
+				}
+
+				.cbf-manage-select-count {
+					margin-left: 6rpx;
+					font-size: 24rpx;
+					color: #ff6033;
+					line-height: 34rpx;
+				}
+			}
+
+			.cbf-manage-delete-btn {
+				flex-shrink: 0;
+				width: 160rpx;
+				height: 72rpx;
+				border-radius: 36rpx;
+				background-color: #ff3333;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+
+				&--disabled {
+					opacity: 0.6;
+				}
+
+				.cbf-manage-delete-text {
+					font-size: 28rpx;
+					font-weight: 600;
+					color: #ffffff;
+					line-height: 40rpx;
+				}
+			}
+
+			.cbf-card-check {
+				width: 36rpx;
+				height: 36rpx;
+				border-radius: 18rpx;
+				border-width: 2rpx;
+				border-style: solid;
+				border-color: #cccccc;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+				flex-shrink: 0;
+
+				&--checked {
+					border-color: #0651f8;
+					background-color: #0651f8;
+				}
+			}
+		}
+	}
+</style>

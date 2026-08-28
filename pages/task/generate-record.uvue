@@ -1,0 +1,411 @@
+<template>
+	<cl-page :pt="{ className: 'gr-page' }" :back-top="false">
+		<view class="gr-page">
+			<view class="gr-head">
+				<image
+					v-if="logoUrl != ''"
+					class="gr-head-logo"
+					:src="logoUrl"
+					mode="aspectFill"
+				></image>
+				<view v-else class="gr-head-logo gr-head-logo--text">
+					<text class="gr-head-logo-text">{{ logoText }}</text>
+				</view>
+				<text class="gr-head-title">{{ projectTitle }}</text>
+			</view>
+
+			<scroll-view
+				class="gr-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="gr-inner">
+					<view v-if="loading" class="gr-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="gr-state-text">加载中...</text>
+					</view>
+					<view v-else-if="recordList.length == 0" class="gr-state">
+						<text class="gr-state-text">暂无生成记录</text>
+					</view>
+					<view v-else class="gr-cards">
+						<view
+							class="gr-card"
+							v-for="(item, index) in recordList"
+							:key="getRowKey(item, index)"
+						>
+							<view class="gr-card-head">
+								<text class="gr-card-keyword">{{ getKeywordText(item) }}</text>
+								<view
+									v-if="hasText(item.keyword)"
+									class="gr-card-copy"
+									@tap="copyText(`${item.keyword}`)"
+								>
+									<text class="gr-card-copy-text">复制</text>
+								</view>
+							</view>
+							<text v-if="hasText(getExpandStoryName(item))" class="gr-card-line">名称：{{ getExpandStoryName(item) }}</text>
+							<text v-if="hasText(item.create_time)" class="gr-card-line">生成时间：{{ item.create_time }}</text>
+						</view>
+					</view>
+					<view v-if="recordList.length > 0 && !loading" class="gr-loadmore">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getKeywordList } from "@/.cool/api/keyword";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { KeywordListItem } from "@/.cool";
+
+	const projectId = ref(0);
+	const projectTitle = ref("生成记录");
+	const logoUrl = ref("");
+	const logoText = ref("生");
+	const recordList = ref<KeywordListItem[]>([]);
+	const page = ref(1);
+	const limit = 20;
+	const hasMore = ref(true);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const fetchSeq = ref(0);
+
+	function getLogoText(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "生";
+		}
+		return text.substring(0, 1);
+	}
+
+	function hasText(val: string | number | null | undefined): boolean {
+		return `${val ?? ""}`.trim() != "";
+	}
+
+	function getKeywordText(item: KeywordListItem): string {
+		const text = `${item.keyword ?? ""}`.trim();
+		return text != "" ? text : "-";
+	}
+
+	function getExpandStoryName(item: KeywordListItem): string {
+		const row = item as UTSJSONObject;
+		const expandRaw = row["expand"];
+		if (expandRaw == null || typeof expandRaw != "object" || Array.isArray(expandRaw)) {
+			return "";
+		}
+		const expand = expandRaw as UTSJSONObject;
+		const name = expand["story_name"];
+		if (name == null) {
+			return "";
+		}
+		const text = `${name}`.trim();
+		if (text == "" || text == "null" || text == "undefined") {
+			return "";
+		}
+		return text;
+	}
+
+	function getRowKey(item: KeywordListItem, index: number): string {
+		if (item.id != null) {
+			return `${item.id}`;
+		}
+		return `${index}`;
+	}
+
+	function extractList(data: UTSJSONObject): KeywordListItem[] {
+		const listRaw = data["list"] as KeywordListItem[] | null;
+		if (listRaw != null) {
+			return listRaw;
+		}
+		const records = data["records"] as KeywordListItem[] | null;
+		if (records != null) {
+			return records;
+		}
+		return [];
+	}
+
+	function parseListTotal(data: UTSJSONObject): number {
+		const totalVal = data["total"] ?? data["count"];
+		if (totalVal == null) {
+			return 0;
+		}
+		const n = parseInt(`${totalVal}`);
+		return isNaN(n) ? 0 : n;
+	}
+
+	function updateHasMore(rowsLength: number, total: number, currentPage: number) {
+		if (total > 0) {
+			hasMore.value = currentPage * limit < total;
+			return;
+		}
+		hasMore.value = rowsLength >= limit;
+	}
+
+	function copyText(text: string) {
+		const val = text.trim();
+		if (val == "") {
+			uni.showToast({ title: "暂无可复制内容", icon: "none" });
+			return;
+		}
+		uni.setClipboardData({
+			data: val,
+			success: () => {
+				uni.showToast({ title: "复制成功", icon: "none" });
+			}
+		});
+	}
+
+	function fetchList(reset: boolean) {
+		if (projectId.value <= 0) {
+			if (reset) {
+				recordList.value = [];
+				hasMore.value = false;
+			}
+			return;
+		}
+		if (reset) {
+			fetchSeq.value += 1;
+			recordList.value = [];
+			loading.value = true;
+			page.value = 1;
+			hasMore.value = true;
+		} else {
+			if (loadingMore.value || !hasMore.value || loading.value) {
+				return;
+			}
+			loadingMore.value = true;
+		}
+		const requestPage = reset ? 1 : page.value + 1;
+		const seq = reset ? fetchSeq.value : 0;
+		getKeywordList({
+			project_id: projectId.value,
+			page: requestPage,
+			limit: limit
+		})
+			.then((res) => {
+				if (reset && seq != fetchSeq.value) {
+					return;
+				}
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const rows = extractList(data);
+				if (reset) {
+					recordList.value = rows;
+				} else {
+					recordList.value = recordList.value.concat(rows);
+				}
+				page.value = requestPage;
+				const total = parseListTotal(data);
+				updateHasMore(rows.length, total, requestPage);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				if (reset) {
+					if (seq == fetchSeq.value) {
+						loading.value = false;
+					}
+				} else {
+					loadingMore.value = false;
+				}
+			});
+	}
+
+	function reload() {
+		fetchList(true);
+	}
+
+	function onScrollToLower() {
+		fetchList(false);
+	}
+
+	function initPageOptions(options: OnLoadOptions) {
+		const idVal = options["id"] as string | null;
+		const titleVal = options["title"] as string | null;
+		const logoVal = (options["logo"] ?? options["logo_url"]) as string | null;
+
+		if (idVal != null) {
+			const pid = parseInt(`${idVal}`);
+			projectId.value = isNaN(pid) ? 0 : pid;
+		}
+		if (titleVal != null && `${titleVal}`.trim() != "") {
+			projectTitle.value = `${titleVal}`.trim();
+			logoText.value = getLogoText(projectTitle.value);
+		}
+		if (logoVal != null && `${logoVal}`.trim() != "") {
+			logoUrl.value = `${logoVal}`.trim();
+		}
+	}
+
+	onLoad((options) => {
+		initPageOptions(options);
+		uni.setNavigationBarTitle({
+			title: "生成记录"
+		});
+	});
+
+	onShow(() => {
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		reload();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.gr-page {
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		background-color: #f7f8fa;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.gr-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 20rpx 30rpx 12rpx;
+		box-sizing: border-box;
+	}
+
+	.gr-head-logo {
+		width: 48rpx;
+		height: 48rpx;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.gr-head-logo--text {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: #eef3fc;
+	}
+
+	.gr-head-logo-text {
+		font-size: 22rpx;
+		font-weight: 600;
+		color: #2b59c3;
+		line-height: 30rpx;
+	}
+
+	.gr-head-title {
+		flex: 1;
+		min-width: 0;
+		margin-left: 12rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #1a1a1a;
+		line-height: 40rpx;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.gr-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.gr-inner {
+		padding: 16rpx 30rpx 24rpx;
+		box-sizing: border-box;
+	}
+
+	.gr-state {
+		padding: 120rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.gr-state-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.gr-cards {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.gr-card {
+		margin-bottom: 20rpx;
+		padding: 28rpx;
+		background-color: #ffffff;
+		border-radius: 20rpx;
+		border: 1rpx solid #eeeeee;
+		box-sizing: border-box;
+	}
+
+	.gr-card-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 12rpx;
+	}
+
+	.gr-card-keyword {
+		flex: 1;
+		min-width: 0;
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 44rpx;
+		margin-right: 16rpx;
+	}
+
+	.gr-card-copy {
+		flex-shrink: 0;
+		padding: 8rpx 20rpx;
+		border-radius: 24rpx;
+		background-color: #eef3fc;
+	}
+
+	.gr-card-copy-text {
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 34rpx;
+	}
+
+	.gr-card-line {
+		display: block;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+		margin-top: 4rpx;
+	}
+
+	.gr-loadmore {
+		padding: 8rpx 0 16rpx;
+	}
+</style>

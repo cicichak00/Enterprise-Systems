@@ -1,0 +1,148 @@
+<template>
+	<cl-page :pt="{ className: 'drr-page' }" :back-top="false">
+		<view class="drr-page">
+			<view class="drr-nav">
+				<cl-safe-area type="top"></cl-safe-area>
+				<view class="drr-nav-main">
+					<view class="drr-back" @tap="goBack"><cl-icon name="arrow-left-s-line" :size="24" color="#20283a"></cl-icon></view>
+					<text class="drr-nav-title">离职回收明细</text>
+					<view class="drr-nav-space"></view>
+				</view>
+			</view>
+
+			<view class="drr-summary">
+				<view class="drr-summary-label"><view class="drr-summary-dot"></view><text>离职回收金额</text></view>
+				<view class="drr-summary-amount"><text class="drr-summary-plus">+</text><text>¥{{ totalAmount }}</text></view>
+				<view class="drr-summary-meta"><text>已离职员工 {{ staffCount }} 人</text><view></view><text>回收记录 {{ totalCount }} 笔</text></view>
+			</view>
+
+			<view class="drr-list-head"><text class="drr-list-title">回收记录</text></view>
+			<scroll-view class="drr-scroll" scroll-y="true" :show-scrollbar="false" :refresher-enabled="true" :refresher-triggered="refreshing" @refresherrefresh="refresh" @scrolltolower="loadMore">
+				<view class="drr-list">
+					<view v-if="loading && rows.length == 0" class="drr-state"><cl-loading :loading="true" color="#2b59c3"></cl-loading><text>正在加载回收记录</text></view>
+					<view v-else-if="rows.length == 0" class="drr-state drr-state--empty"><view class="drr-state-icon"><cl-icon name="wallet-line" :size="28" color="#8b96a8"></cl-icon></view><text class="drr-state-title">暂无离职回收记录</text><text>员工离职并完成余额回收后将在此展示</text></view>
+					<view v-for="(item, index) in rows" :key="rowKey(item, index)" class="drr-card">
+						<view class="drr-card-head">
+							<view class="drr-avatar"><image v-if="avatarOf(item) != ''" :src="avatarOf(item)" mode="aspectFill"></image><text v-else>{{ avatarText(item) }}</text></view>
+							<view class="drr-person"><view class="drr-person-row"><text class="drr-name">{{ nameOf(item) }}</text><text class="drr-status">已离职</text></view><text class="drr-source">员工待提现余额回收</text></view>
+							<view class="drr-income"><text class="drr-income-value">+¥{{ amountOf(item) }}</text></view>
+						</view>
+						<view class="drr-card-divider"></view>
+						<view class="drr-card-foot"><view><text class="drr-foot-label">回收时间</text><text class="drr-foot-value">{{ timeOf(item) }}</text></view><view><text class="drr-foot-label">流水编号</text><text class="drr-foot-value">{{ flowNoOf(item) }}</text></view></view>
+					</view>
+					<view v-if="loadingMore" class="drr-more"><cl-loading :loading="true" :size="18"></cl-loading><text>加载中...</text></view>
+					<view v-else-if="rows.length > 0 && !hasMore" class="drr-more"><text>没有更多记录了</text></view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getDepartureRecoveryList } from "@/.cool/api/mine";
+	import type { DepartureRecoveryRecordItem, Response } from "@/.cool";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import { isLocalUiPreview } from "@/.cool/utils/local-preview";
+
+	const rows = ref<DepartureRecoveryRecordItem[]>([]);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const refreshing = ref(false);
+	const page = ref(1);
+	const totalCount = ref(0);
+	const serverTotalAmount = ref<number | null>(null);
+	const hasMore = ref(true);
+	const limit = 20;
+
+	const staffCount = computed(() => {
+		const ids: string[] = [];
+		for (let i = 0; i < rows.value.length; i++) {
+			const key = `${rows.value[i].staff_id ?? rows.value[i].user_id ?? nameOf(rows.value[i])}`;
+			if (ids.indexOf(key) < 0) ids.push(key);
+		}
+		return ids.length;
+	});
+	const totalAmount = computed(() => {
+		if (serverTotalAmount.value != null) return serverTotalAmount.value.toFixed(2);
+		let total = 0;
+		for (let i = 0; i < rows.value.length; i++) total += amountValueOf(rows.value[i]);
+		return total.toFixed(2);
+	});
+
+	function text(raw: any | null): string { return raw == null ? "" : `${raw}`.trim(); }
+	function amountValueOf(item: DepartureRecoveryRecordItem): number { const n = parseFloat(`${item.recovery_amount ?? item.amount ?? 0}`); return isNaN(n) ? 0 : Math.abs(n); }
+	function amountOf(item: DepartureRecoveryRecordItem): string { return amountValueOf(item).toFixed(2); }
+	function nameOf(item: DepartureRecoveryRecordItem): string { return text(item.staff_name ?? item.employee_name ?? item.nickname) || "已离职员工"; }
+	function avatarOf(item: DepartureRecoveryRecordItem): string { return text(item.avatar); }
+	function avatarText(item: DepartureRecoveryRecordItem): string { return nameOf(item).slice(0, 1) || "员"; }
+	function timeOf(item: DepartureRecoveryRecordItem): string { return text(item.recovered_at ?? item.create_time ?? item.departure_time) || "—"; }
+	function flowNoOf(item: DepartureRecoveryRecordItem): string { return text(item.flow_no ?? item.recovery_pair_no) || "—"; }
+	function rowKey(item: DepartureRecoveryRecordItem, index: number): string { return `${item.id ?? item.flow_no ?? item.recovery_pair_no ?? index}`; }
+
+	function previewRows(): DepartureRecoveryRecordItem[] {
+		return [
+			{ id: 1, staff_id: 91004, staff_name: "赵雨桐", recovery_amount: 65, flow_no: "LZHS20260824001", recovered_at: "2026-08-24 10:26" },
+			{ id: 2, staff_id: 91005, staff_name: "孙嘉禾", recovery_amount: 39, flow_no: "LZHS20260821002", recovered_at: "2026-08-21 16:42" }
+		];
+	}
+
+	function parsePayload(res: any | null): { list: DepartureRecoveryRecordItem[]; count: number; total: number | null } {
+		if (res == null) return { list: [], count: 0, total: null };
+		const envelope = res as UTSJSONObject;
+		const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+		const raw = data["list"] ?? data["records"] ?? data["rows"];
+		const list = raw != null && Array.isArray(raw) ? raw as DepartureRecoveryRecordItem[] : [];
+		const countRaw = data["count"] ?? data["total_count"] ?? list.length;
+		const count = parseInt(`${countRaw}`);
+		const totalRaw = data["total_amount"] ?? data["recovery_amount"] ?? data["resigned_staff_recovery_amount"];
+		const total = totalRaw == null ? null : parseFloat(`${totalRaw}`);
+		return { list, count: isNaN(count) ? list.length : count, total: total == null || isNaN(total) ? null : Math.abs(total) };
+	}
+
+	function load(more: boolean = false) {
+		if ((more && (loadingMore.value || !hasMore.value)) || (!more && loading.value)) return;
+		if (isLocalUiPreview()) {
+			const list = previewRows();
+			rows.value = list;
+			totalCount.value = list.length;
+			serverTotalAmount.value = 104;
+			hasMore.value = false;
+			loading.value = false;
+			loadingMore.value = false;
+			refreshing.value = false;
+			return;
+		}
+		if (more) loadingMore.value = true; else loading.value = true;
+		const targetPage = more ? page.value + 1 : 1;
+		getDepartureRecoveryList({ page: targetPage, limit })
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) { uni.showToast({ title: getApiMessage(envelope, "回收记录加载失败"), icon: "none" }); return; }
+				const payload = parsePayload(res);
+				rows.value = more ? rows.value.concat(payload.list) : payload.list;
+				page.value = targetPage;
+				totalCount.value = payload.count;
+				serverTotalAmount.value = payload.total;
+				hasMore.value = rows.value.length < payload.count && payload.list.length >= limit;
+			})
+			.catch((err) => uni.showToast({ title: getApiMessage(err, "回收记录加载失败"), icon: "none" }))
+			.finally(() => { loading.value = false; loadingMore.value = false; refreshing.value = false; });
+	}
+
+	function refresh() { refreshing.value = true; hasMore.value = true; load(false); }
+	function loadMore() { load(true); }
+	function goBack() { uni.navigateBack(); }
+
+	onShow(() => load(false));
+</script>
+
+<style lang="scss" scoped>
+	.drr-page { width: 100%; height: 100vh; background-color: #f4f6fa; display: flex; flex-direction: column; overflow: hidden; }
+	.drr-nav { flex-shrink: 0; background-color: #ffffff; }.drr-nav-main { height: 88rpx; padding: 0 24rpx; display: flex; flex-direction: row; align-items: center; }.drr-back,.drr-nav-space { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; }.drr-nav-title { flex: 1; text-align: center; font-size: 31rpx; font-weight: 700; color: #20283a; }
+	.drr-summary { margin: 20rpx 24rpx 14rpx; padding: 28rpx; border-radius: 24rpx; background: radial-gradient(circle at 88% 10%,rgba(88,79,163,.4),transparent 45%),linear-gradient(150deg,#1a1f3a,#0d101b); box-shadow: 0 12rpx 28rpx rgba(17,24,39,.14); }.drr-summary-label { display: flex; flex-direction: row; align-items: center; }.drr-summary-label text { font-size: 21rpx; color: rgba(255,255,255,.7); }.drr-summary-dot { width: 8rpx; height: 8rpx; margin-right: 10rpx; border-radius: 50%; background-color: #4ade80; box-shadow: 0 0 10rpx rgba(74,222,128,.8); }.drr-summary-amount { margin-top: 14rpx; display: flex; flex-direction: row; align-items: baseline; color: #86efac; }.drr-summary-plus { margin-right: 4rpx; font-size: 36rpx; }.drr-summary-amount > text:last-child { font-size: 58rpx; font-weight: 800; }.drr-summary-meta { margin-top: 22rpx; padding-top: 18rpx; border-top: 1rpx solid rgba(255,255,255,.1); display: flex; flex-direction: row; align-items: center; }.drr-summary-meta text { font-size: 20rpx; color: rgba(255,255,255,.72); }.drr-summary-meta view { width: 1rpx; height: 22rpx; margin: 0 18rpx; background-color: rgba(255,255,255,.16); }
+	.drr-list-head { padding: 14rpx 28rpx 12rpx; display: flex; flex-direction: row; align-items: center; }.drr-list-title { font-size: 28rpx; font-weight: 700; color: #253047; }
+	.drr-scroll { flex: 1; height: 0; }.drr-list { padding: 0 24rpx 28rpx; }.drr-card { margin-bottom: 14rpx; padding: 22rpx; border-radius: 20rpx; background-color: #ffffff; border: 1rpx solid #e9edf3; box-shadow: 0 5rpx 16rpx rgba(35,53,84,.04); }.drr-card-head { display: flex; flex-direction: row; align-items: center; }.drr-avatar { width: 66rpx; height: 66rpx; border-radius: 20rpx; background: linear-gradient(135deg,#315fae,#5f7fc2); overflow: hidden; display: flex; align-items: center; justify-content: center; }.drr-avatar image { width: 100%; height: 100%; }.drr-avatar text { font-size: 25rpx; font-weight: 700; color: #ffffff; }.drr-person { flex: 1; min-width: 0; margin-left: 15rpx; display: flex; flex-direction: column; }.drr-person-row { display: flex; flex-direction: row; align-items: center; }.drr-name { max-width: 210rpx; font-size: 26rpx; font-weight: 700; color: #253047; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.drr-status { margin-left: 10rpx; padding: 4rpx 10rpx; border-radius: 999rpx; background-color: #f1f3f6; font-size: 17rpx; color: #7b8494; }.drr-source { margin-top: 6rpx; font-size: 19rpx; color: #929bab; }.drr-income { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }.drr-income-value { font-size: 30rpx; font-weight: 800; color: #15945a; }.drr-card-divider { margin: 18rpx 0 14rpx; height: 1rpx; background-color: #edf0f4; }.drr-card-foot { display: flex; flex-direction: column; gap: 8rpx; }.drr-card-foot > view { display: flex; flex-direction: row; align-items: center; }.drr-foot-label { width: 112rpx; font-size: 19rpx; color: #9aa2b0; }.drr-foot-value { flex: 1; font-size: 20rpx; color: #596477; }
+	.drr-state { padding: 80rpx 20rpx; display: flex; flex-direction: column; align-items: center; gap: 10rpx; font-size: 21rpx; color: #929baa; }.drr-state--empty { margin-top: 10rpx; border-radius: 20rpx; background-color: #ffffff; border: 1rpx solid #e8edf4; }.drr-state-icon { width: 78rpx; height: 78rpx; border-radius: 22rpx; background-color: #eef1f5; display: flex; align-items: center; justify-content: center; }.drr-state-title { font-size: 26rpx; font-weight: 700; color: #465166; }.drr-more { padding: 22rpx; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10rpx; }.drr-more text { font-size: 20rpx; color: #99a2b0; }
+</style>

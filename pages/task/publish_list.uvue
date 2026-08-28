@@ -1,0 +1,466 @@
+<template>
+	<cl-page :pt="{ className: 'ppl-page' }" :back-top="false">
+		<view class="ppl-page">
+			<view class="ppl-head">
+				<text class="ppl-head-title">{{ headTitle }}</text>
+				<text v-if="keywordText != ''" class="ppl-head-sub">关键词：{{ keywordText }}</text>
+			</view>
+
+			<scroll-view
+				class="ppl-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="ppl-inner">
+					<view v-if="loading && publishList.length == 0" class="ppl-state">
+						<cl-loading :loading="true" :size="28" color="#0651f8"></cl-loading>
+						<text class="ppl-state-text">加载中...</text>
+					</view>
+					<view v-else-if="publishList.length == 0" class="ppl-state">
+						<text class="ppl-state-text">暂无回填作品</text>
+					</view>
+					<view v-else class="ppl-cards">
+						<view
+							class="ppl-card"
+							v-for="(item, index) in publishList"
+							:key="getRowKey(item, index)"
+						>
+							<text v-if="hasText(item.title)" class="ppl-card-title">{{ item.title }}</text>
+							<text v-else-if="hasText(item.keyword)" class="ppl-card-title">{{ item.keyword }}</text>
+							<view v-if="hasText(item.publish_platform) || hasText(item.account_name)">
+								<text class="ppl-card-line">
+									发布账号：【{{ item.publish_platform ?? "" }}】{{ item.account_name ?? "" }}
+								</text>
+							</view>
+							<text v-if="hasText(item.account_id)" class="ppl-card-line">发布账号ID：{{ item.account_id }}</text>
+							<text v-if="hasText(item.create_time)" class="ppl-card-line">回填时间：{{ item.create_time }}</text>
+							<view v-if="hasText(item.video_url)" class="ppl-card-link-row">
+								<text class="ppl-card-line ppl-card-line--link">回填链接：{{ item.video_url }}</text>
+								<view class="ppl-copy-btn" @tap="onCopyUrl(item.video_url)">
+									<text class="ppl-copy-btn-text">复制</text>
+								</view>
+							</view>
+							<view v-if="item.expand != null">
+								<view
+									v-for="(cell, cellIndex) in item.expand"
+									:key="`${getRowKey(item, index)}-expand-${cellIndex}`"
+								>
+									<text
+										v-if="hasText(cell['name']) || hasText(cell['field_value']) || hasText(cell['value'])"
+										class="ppl-card-line"
+									>{{ cell["name"] }}：{{ hasText(cell["field_value"]) ? cell["field_value"] : cell["value"] }}</text>
+								</view>
+							</view>
+							<text
+								v-if="hasText(getPublishStatusText(item))"
+								class="ppl-card-line"
+							>状态：{{ getPublishStatusText(item) }}</text>
+							<!-- <text
+								v-if="shouldShowPublishFeedback(item)"
+								class="ppl-card-line ppl-card-line--warn"
+							>审核反馈：{{ item.remark || item.feedback_msg }}</text> -->
+						</view>
+					</view>
+					<view
+						v-if="publishList.length > 0"
+						class="ppl-loadmore"
+						@tap="onLoadMoreTap"
+					>
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+						<text
+							v-if="hasMore && !loadingMore"
+							class="ppl-loadmore-hint"
+						>上拉或点击加载更多</text>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getPublishList } from "@/.cool/api/task";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { PublishListItem } from "@/.cool/types/task";
+
+	const projectId = ref(0);
+	const keywordId = ref(0);
+	const projectTitle = ref("作品数");
+	const keywordText = ref("");
+	const publishList = ref<PublishListItem[]>([]);
+	const page = ref(1);
+	const limit = 10;
+	const hasMore = ref(true);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+
+	const headTitle = computed(() => {
+		const title = projectTitle.value.trim();
+		if (title != "" && title != "作品数") {
+			return title;
+		}
+		return "回填列表";
+	});
+
+	function hasText(val: string | number | null | undefined): boolean {
+		return `${val ?? ""}`.trim() != "";
+	}
+
+	function getRowKey(item: PublishListItem, index: number): string {
+		if (item.id != null) {
+			return `${item.id}`;
+		}
+		return `${index}`;
+	}
+
+	function getPublishStatusText(item: PublishListItem): string {
+		const statusText = `${item.status_text ?? ""}`.trim();
+		if (statusText != "") {
+			return statusText;
+		}
+		const statusRaw = item.status;
+		if (statusRaw == null || `${statusRaw}`.trim() == "") {
+			return "";
+		}
+		const status = parseInt(`${statusRaw}`);
+		if (isNaN(status)) {
+			return "";
+		}
+		if (status == 1) {
+			return "待审核";
+		}
+		if (status == 2) {
+			return "审核通过";
+		}
+		if (status == 3) {
+			return "审核驳回";
+		}
+		return "";
+	}
+
+	function getPublishStatusClass(item: PublishListItem): string {
+		const statusRaw = item.status;
+		if (statusRaw == null || `${statusRaw}`.trim() == "") {
+			return "";
+		}
+		const status = parseInt(`${statusRaw}`);
+		if (status == 2) {
+			return "ppl-card-line--success";
+		}
+		if (status == 3) {
+			return "ppl-card-line--warn";
+		}
+		return "ppl-card-line--pending";
+	}
+
+	function shouldShowPublishFeedback(item: PublishListItem): boolean {
+		const statusRaw = item.status;
+		const status = parseInt(`${statusRaw ?? ""}`);
+		if (isNaN(status) || status != 3) {
+			return false;
+		}
+		return hasText(item.remark || item.feedback_msg);
+	}
+
+	function extractList(data: UTSJSONObject): PublishListItem[] {
+		const listRaw = data["list"] as PublishListItem[] | null;
+		if (listRaw != null) {
+			return listRaw;
+		}
+		const records = data["records"] as PublishListItem[] | null;
+		if (records != null) {
+			return records;
+		}
+		const rows = data["data"] as PublishListItem[] | null;
+		if (rows != null && rows instanceof Array) {
+			return rows;
+		}
+		if (data instanceof Array) {
+			return data as PublishListItem[];
+		}
+		return [];
+	}
+
+	function parseListTotal(data: UTSJSONObject): number {
+		const totalVal = data["total"] ?? data["count"];
+		if (totalVal == null) {
+			return 0;
+		}
+		const n = parseInt(`${totalVal}`);
+		return isNaN(n) ? 0 : n;
+	}
+
+	function updateHasMore(data: UTSJSONObject, rowsLength: number, listLength: number) {
+		const total = parseListTotal(data);
+		if (total > 0) {
+			hasMore.value = listLength < total;
+			return;
+		}
+		hasMore.value = rowsLength >= limit;
+	}
+
+	function fetchList(reset: boolean) {
+		if (projectId.value <= 0) {
+			if (reset) {
+				publishList.value = [];
+				hasMore.value = false;
+			}
+			return;
+		}
+		if (reset) {
+			if (loading.value) {
+				return;
+			}
+			loading.value = true;
+			page.value = 1;
+			hasMore.value = true;
+		} else {
+			if (loadingMore.value || !hasMore.value || loading.value) {
+				return;
+			}
+			loadingMore.value = true;
+		}
+		const reqPage = reset ? 1 : page.value;
+		getPublishList({
+			project_id: projectId.value,
+			page: reqPage,
+			limit: limit,
+			keyword_id: keywordId.value > 0 ? keywordId.value : undefined
+		})
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const rows = extractList(data);
+				if (reset) {
+					publishList.value = rows;
+				} else {
+					publishList.value = publishList.value.concat(rows);
+				}
+				updateHasMore(data, rows.length, publishList.value.length);
+				if (hasMore.value) {
+					page.value = reqPage + 1;
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loading.value = false;
+				loadingMore.value = false;
+			});
+	}
+
+	function reload() {
+		fetchList(true);
+	}
+
+	function onScrollToLower() {
+		fetchList(false);
+	}
+
+	function onLoadMoreTap() {
+		if (!hasMore.value || loadingMore.value || loading.value) {
+			return;
+		}
+		fetchList(false);
+	}
+
+	function onCopyUrl(url: string | null | undefined) {
+		const text = `${url ?? ""}`.trim();
+		if (text == "") {
+			return;
+		}
+		uni.setClipboardData({
+			data: text,
+			success: () => {
+				uni.showToast({ title: "复制成功", icon: "none" });
+			}
+		});
+	}
+
+	onLoad((options) => {
+		const projectIdVal = options["project_id"] as string | null;
+		const keywordIdVal = options["keyword_id"] as string | null;
+		const titleVal = options["title"] as string | null;
+		const keywordVal = options["keyword"] as string | null;
+
+		if (projectIdVal != null) {
+			const pid = parseInt(`${projectIdVal}`);
+			projectId.value = isNaN(pid) ? 0 : pid;
+		}
+		if (keywordIdVal != null) {
+			const kid = parseInt(`${keywordIdVal}`);
+			keywordId.value = isNaN(kid) ? 0 : kid;
+		}
+		if (titleVal != null && `${titleVal}`.trim() != "") {
+			projectTitle.value = `${titleVal}`.trim();
+		}
+		if (keywordVal != null && `${keywordVal}`.trim() != "") {
+			keywordText.value = `${keywordVal}`.trim();
+		}
+
+		uni.setNavigationBarTitle({ title: "作品数" });
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		reload();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ppl-page {
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		background-color: #f7f8fa;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ppl-head {
+		flex-shrink: 0;
+		padding: 24rpx 30rpx 16rpx;
+		background-color: #ffffff;
+	}
+
+	.ppl-head-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 44rpx;
+	}
+
+	.ppl-head-sub {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ppl-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.ppl-inner {
+		padding: 16rpx 30rpx 24rpx;
+		box-sizing: border-box;
+	}
+
+	.ppl-state {
+		padding: 120rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ppl-state-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.ppl-cards {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ppl-card {
+		margin-bottom: 20rpx;
+		padding: 28rpx;
+		background-color: #ffffff;
+		border-radius: 20rpx;
+		border: 1rpx solid #eeeeee;
+	}
+
+	.ppl-card-title {
+		display: block;
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 42rpx;
+		margin-bottom: 12rpx;
+	}
+
+	.ppl-card-line {
+		display: block;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+		margin-top: 4rpx;
+	}
+
+	.ppl-card-line--link {
+		flex: 1;
+		min-width: 0;
+		word-break: break-all;
+	}
+
+	.ppl-card-line--warn {
+		color: #ff6033;
+	}
+
+	.ppl-card-line--success {
+		color: #16a34a;
+	}
+
+	.ppl-card-line--pending {
+		color: #f59e0b;
+	}
+
+	.ppl-card-link-row {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		margin-top: 4rpx;
+	}
+
+	.ppl-copy-btn {
+		flex-shrink: 0;
+		margin-left: 12rpx;
+		padding: 4rpx 16rpx;
+		border-radius: 8rpx;
+		background-color: #eef3fc;
+	}
+
+	.ppl-copy-btn-text {
+		font-size: 22rpx;
+		color: #0651f8;
+		line-height: 32rpx;
+	}
+
+	.ppl-loadmore {
+		padding: 8rpx 0 16rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.ppl-loadmore-hint {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+</style>

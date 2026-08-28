@@ -1,0 +1,21 @@
+---
+description: uni-appx 页面生命周期禁止从 vue 导入 onShow/onLoad
+globs: "**/*.uvue"
+alwaysApply: true
+---
+
+# 页面生命周期
+
+- **禁止** `import { onShow, onLoad, onHide, onMounted } from "vue"` 用于页面生命周期（会导致编译/运行错误）。
+- 页面内直接使用 **`onShow(() => {})`、`onLoad`、`onMounted`** 等 uni-appx 提供的全局 API。
+- 组件（非页面）内若用组合式 API，仅在该文件确认为普通 Vue 组件且文档允许时再 import。
+
+```typescript
+// ✅ 页面 script setup
+onShow(() => {
+  user.hydrateLocalProfile();
+});
+
+// ❌
+import { onShow } from "vue";
+```

@@ -1,0 +1,27 @@
+---
+description: pages 下 UI/样式：375px 对稿 + scoped SCSS 嵌套，读取 youbao-design-fidelity skill
+globs: "pages/**/*.{uvue,vue}"
+alwaysApply: false
+---
+
+# 设计稿高保真（pages）
+
+编辑 **`pages/**`** 下页面且涉及 **布局、样式、对稿、还原 UI** 时：
+
+1. 读取 **`.cursor/skills/youbao-design-fidelity/SKILL.md`**（全文，含「SCSS 写法」）
+2. 画布默认 **375px**，`rpx = 设计 px × 2`（750 宽稿不再 ×2）
+3. 先建标注表再写样式；与同模块页面对齐 `#ifdef` 与组件用法
+
+## SCSS（与视觉同为硬约束）
+
+- 使用 `<style lang="scss" scoped>`，按 **父子 DOM 嵌套**；修饰符/伪类用 `&--on`、`&:last-child`
+- **禁止** 将同一 UI 块写成大量顶层平铺（`.block`、`.block--on`、`.block-title` 并列）
+- 完稿对照 skill **输出前自检**（含「scoped 样式嵌套」项）
+- 运行 **`npm run check:scss-nesting`**（见 `.cursor/rules/uniapp-scss-nesting.mdc`）
+
+## 代码简洁（硬约束）
+
+- **编写代码务必极致简洁，剔除冗余代码，精简行数，优先最简实现**（模板/脚本/样式均适用）
+- 简洁 **≠** 样式扁平平铺；见 skill「代码简洁」与「SCSS 写法」边界说明
+
+用户提到 **设计稿、对稿、高保真、蓝湖、Figma、截图复刻** 时，必须额外完成标注表与色值/rpx 核对。

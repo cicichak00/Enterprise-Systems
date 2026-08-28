@@ -1,0 +1,438 @@
+<template>
+	<cl-page :pt="{ className: 'cp-page' }">
+		<view class="cp-page">
+			<view class="cp-body">
+				<view class="cp-banner">
+					<view class="cp-banner-icon">
+						<cl-icon name="megaphone-line" :size="22" color="#2b59c3"></cl-icon>
+					</view>
+					<view class="cp-banner-copy">
+						<text class="cp-banner-title">你的每一份协议都看得见</text>
+						<text class="cp-banner-desc">签了哪些、什么时候签的、哪一版更新了什么，都在这里。版本更新时我们也会在通知中心推送。</text>
+					</view>
+				</view>
+
+				<text class="cp-section-label">我已签署</text>
+				<view class="cp-agreement-list">
+					<view
+						class="cp-agreement-card"
+						v-for="(item, index) in signedItems"
+						:key="index"
+						@tap="onAgreementTap(item)"
+					>
+						<view class="cp-agreement-icon" :style="{ backgroundColor: item.iconBg }">
+							<cl-icon :name="item.iconName" :size="22" :color="item.iconColor"></cl-icon>
+						</view>
+						<view class="cp-agreement-copy">
+							<view class="cp-agreement-title-row">
+								<text class="cp-agreement-title">{{ item.title }}</text>
+								<text v-if="isSignedTag(item)" class="cp-tag-signed">{{ getTagText(item) }}</text>
+								<view v-if="isHighlightTag(item)" class="cp-tag-highlight">
+									<text class="cp-tag-highlight-text">{{ getTagText(item) }}</text>
+								</view>
+							</view>
+							<text class="cp-agreement-desc">{{ item.desc }}</text>
+							<text class="cp-agreement-meta">{{ item.meta }}</text>
+						</view>
+						<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+					</view>
+				</view>
+
+				<text class="cp-section-label">仅展示 · 未签署</text>
+				<view class="cp-agreement-list">
+					<view
+						class="cp-agreement-card"
+						v-for="(item, index) in unsignedItems"
+						:key="index"
+						@tap="onAgreementTap(item)"
+					>
+						<view class="cp-agreement-icon" :style="{ backgroundColor: item.iconBg }">
+							<cl-icon :name="item.iconName" :size="22" :color="item.iconColor"></cl-icon>
+						</view>
+						<view class="cp-agreement-copy">
+							<view class="cp-agreement-title-row">
+								<text class="cp-agreement-title">{{ item.title }}</text>
+								<text v-if="isSignedTag(item)" class="cp-tag-signed">{{ getTagText(item) }}</text>
+								<view v-if="isHighlightTag(item)" class="cp-tag-highlight">
+									<text class="cp-tag-highlight-text">{{ getTagText(item) }}</text>
+								</view>
+							</view>
+							<text class="cp-agreement-desc">{{ item.desc }}</text>
+							<text class="cp-agreement-meta">{{ item.meta }}</text>
+						</view>
+						<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+					</view>
+				</view>
+
+				<text class="cp-section-label">平台资质</text>
+				<view class="cp-qual-card">
+					<view class="cp-qual-lines">
+						<view
+							class="cp-qual-block"
+							v-for="(item, index) in qualificationItems"
+							:key="index"
+						>
+							<text class="cp-qual-item">{{ item.text }}</text>
+							<text v-if="item.sub != null && item.sub != ''" class="cp-qual-sub">{{ item.sub }}</text>
+						</view>
+					</view>
+					<view class="cp-qual-btn" @tap="onViewQualification">
+						<text class="cp-qual-btn-text">查看资质原件</text>
+					</view>
+				</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed } from "vue";
+	import { getCapsuleNavStyle, router } from "@/.cool";
+
+	type AgreementTag = {
+		text: string;
+		type: "signed" | "highlight";
+	};
+
+	type QualificationItem = {
+		text: string;
+		sub: string | null;
+	};
+
+	type AgreementItem = {
+		title: string;
+		desc: string;
+		meta: string;
+		iconName: string;
+		iconBg: string;
+		iconColor: string;
+		tag: AgreementTag | null;
+		path: string | null;
+	};
+
+	const signedItems: AgreementItem[] = [
+		{
+			title: "用户服务协议",
+			tag: { text: "已签", type: "signed" },
+			desc: "使用企业号的基本规则 / 账号使用规范 / 争议解决",
+			meta: "v4.1 · 生效 2025/12/10 · 你的签署时间 2024/08/12",
+			iconName: "file-text-line",
+			iconBg: "#fff7ed",
+			iconColor: "#ea580c",
+			path: "/pages/user/user-agreement"
+		},
+		{
+			title: "导师合作协议",
+			tag: { text: "已签", type: "signed" },
+			desc: "收费分成 / SOP 产权归属 / 团队成员纠纷处理",
+			meta: "v2.0 · 生效 2026/02/14 · 你的签署时间 2026/02/18",
+			iconName: "user-star-line",
+			iconBg: "#ecfdf5",
+			iconColor: "#16a34a",
+			path: null
+		}
+	];
+
+	const unsignedItems: AgreementItem[] = [
+		{
+			title: "隐私政策",
+			tag: { text: "人人必读", type: "highlight" },
+			desc: "我们收集哪些信息、用于什么、可以拒绝什么",
+			meta: "v3.2 · 生效 2025/09/01",
+			iconName: "lock-line",
+			iconBg: "#eff6ff",
+			iconColor: "#2563eb",
+			path: null
+		},
+		{
+			title: "领航投顾签约协议",
+			tag: { text: "签约必签", type: "highlight" },
+			desc: "项目流水分成 / 风控合规 / 终身绑定说明",
+			meta: "v1.4 · 生效 2026/04/18",
+			iconName: "compass-line",
+			iconBg: "#f5f3ff",
+			iconColor: "#7c3aed",
+			path: "/pages/user/advisor-agreement"
+		},
+		{
+			title: "风控与违规处罚规则",
+			tag: null,
+			desc: "刷单 / 薅羊毛 / 假冒 / 引流外站的处罚细则",
+			meta: "v2.5 · 生效 2026/03/01",
+			iconName: "shield-cross-line",
+			iconBg: "#fef2f2",
+			iconColor: "#dc2626",
+			path: "/pages/user/risk-penalty"
+		},
+		{
+			title: "税务与发票说明",
+			tag: null,
+			desc: "个人综合所得 / 劳务报酬 / 代开发票流程",
+			meta: "v1.8 · 生效 2025/11/15",
+			iconName: "article-line",
+			iconBg: "#fefce8",
+			iconColor: "#ca8a04",
+			path: "/pages/user/tax-invoice"
+		}
+	];
+
+	const qualificationItems: QualificationItem[] = [
+		{
+			text: "营业执照 · 杭州企业号网络科技有限公司",
+			sub: "(91330108MA2XXXXXXX)"
+		},
+		{ text: "ICP 备案 · 浙 ICP 备 2022012345 号", sub: null },
+		{ text: "网络文化经营许可证 · 浙网文 (2023) 1234-567", sub: null },
+		{ text: "增值电信业务经营许可证 · 浙 B2-20230456", sub: null },
+		{ text: "个人信息保护认证 · TC260-PG-20241102", sub: null }
+	];
+
+	function isSignedTag(item: AgreementItem): boolean {
+		const tag = item.tag;
+		return tag != null && tag.type == "signed";
+	}
+
+	function isHighlightTag(item: AgreementItem): boolean {
+		const tag = item.tag;
+		return tag != null && tag.type == "highlight";
+	}
+
+	function getTagText(item: AgreementItem): string {
+		const tag = item.tag;
+		return tag != null ? tag.text : "";
+	}
+
+	function onAgreementTap(item: AgreementItem) {
+		if (item.path != null && item.path != "") {
+			router.push({ path: item.path });
+			return;
+		}
+		uni.showToast({ title: item.title, icon: "none" });
+	}
+
+	function onViewQualification() {
+		uni.showToast({ title: "查看资质原件", icon: "none" });
+	}
+</script>
+
+<style lang="scss" scoped>
+	.cp-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.cp-nav {
+		height: 88rpx;
+		padding: 0 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		background-color: #f7f8fa;
+
+		.cp-nav-btn {
+			width: 72rpx;
+			height: 72rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.cp-nav-title {
+			font-size: 34rpx;
+			font-weight: 700;
+			color: #333333;
+		}
+	}
+
+	.cp-body {
+		padding: 40rpx 30rpx 40rpx;
+	}
+
+	.cp-banner {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		padding: 28rpx 24rpx;
+		border-radius: 20rpx;
+		background-color: #eef3fc;
+		margin-bottom: 36rpx;
+	}
+
+	.cp-banner-icon {
+		width: 64rpx;
+		height: 64rpx;
+		border-radius: 32rpx;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.cp-banner-copy {
+		flex: 1;
+		min-width: 0;
+		margin-left: 16rpx;
+	}
+
+	.cp-banner-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.cp-banner-desc {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 38rpx;
+	}
+
+	.cp-section-label {
+		display: flex;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.cp-agreement-list {
+		margin-bottom: 36rpx;
+	}
+
+	.cp-agreement-card {
+		padding: 32rpx 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.cp-agreement-icon {
+		width: 80rpx;
+		height: 80rpx;
+		border-radius: 40rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.cp-agreement-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 16rpx;
+	}
+
+	.cp-agreement-title-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.cp-agreement-title {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 42rpx;
+		margin-right: 10rpx;
+	}
+
+	.cp-tag-signed {
+		font-size: 22rpx;
+		color: #16a34a;
+		line-height: 32rpx;
+	}
+
+	.cp-tag-highlight {
+		padding: 2rpx 12rpx;
+		border-radius: 20rpx;
+		background-color: #fff7ed;
+	}
+
+	.cp-tag-highlight-text {
+		font-size: 20rpx;
+		color: #d97706;
+		line-height: 28rpx;
+	}
+
+	.cp-agreement-desc {
+		margin-top: 10rpx;
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 36rpx;
+	}
+
+	.cp-agreement-meta {
+		margin-top: 10rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.cp-qual-card {
+		padding: 36rpx 32rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 32rpx;
+	}
+
+	.cp-qual-block {
+		margin-bottom: 20rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.cp-qual-item {
+		display: flex;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 44rpx;
+	}
+
+	.cp-qual-sub {
+		display: flex;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 44rpx;
+	}
+
+	.cp-qual-btn {
+		width: 100%;
+		height: 88rpx;
+		margin-top: 32rpx;
+		border-radius: 16rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #dddddd;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.cp-qual-btn-text {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+</style>

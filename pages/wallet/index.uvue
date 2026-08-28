@@ -1,0 +1,1056 @@
+
+<template>
+	<cl-page :pt="{ className: 'wl-page' }">
+		<view class="wl-page">
+			<view v-if="pageLoading" class="wl-loading wl-loading--overlay">
+				<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+				<text class="wl-loading-text">加载中...</text>
+			</view>
+			<scroll-view
+				class="wl-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				:refresher-enabled="true"
+				:refresher-triggered="refresherTriggered"
+				refresher-default-style="black"
+				refresher-background="#f5f5f5"
+				@scrolltolower="onScrollToLower"
+				@refresherrefresh="onRefresherRefresh"
+				@refresherrestore="onRefresherRestore"
+				@refresherabort="onRefresherRestore"
+			>
+				<view class="wl-body">
+					<view class="wl-toolbar">
+						<view class="wl-add-btn" @tap="onAddAccountTap">
+							<text class="wl-add-btn-plus">+</text>
+							<text class="wl-add-btn-text">添加账户</text>
+						</view>
+					</view>
+
+					<text class="wl-status">{{ statusText }}</text>
+
+					<view class="wl-card">
+						<view class="wl-card-top">
+							<view class="wl-balance">
+								<text class="wl-balance-label">可提现金额</text>
+								<text class="wl-balance-value">{{ withdrawableText }}</text>
+							</view>
+							<view class="wl-withdraw-btn" @tap="onWithdrawTap">
+								<text class="wl-withdraw-btn-text">提现</text>
+							</view>
+						</view>
+						<view class="wl-card-line"></view>
+						<view class="wl-card-stats">
+							<view class="wl-stat">
+								<text class="wl-stat-label">累计提现</text>
+								<text class="wl-stat-value">{{ summary.totalWithdraw }}</text>
+							</view>
+							<view class="wl-stat">
+								<text class="wl-stat-label">实际到账</text>
+								<text class="wl-stat-value">{{ summary.actualReceived }}</text>
+							</view>
+							<view class="wl-stat">
+								<text class="wl-stat-label">预扣税额</text>
+								<text class="wl-stat-value">{{ summary.taxAmount }}</text>
+							</view>
+						</view>
+					</view>
+
+					<view class="wl-section-head">
+						<text class="wl-section-title">提现记录</text>
+						<view
+							v-if="isRealNameVerified"
+							class="wl-filter-btn"
+							:class="{ 'wl-filter-btn--active': statusPopupVisible }"
+							@tap="openStatusFilter"
+						>
+							<text class="wl-filter-btn-text">{{ statusFilterLabel }}</text>
+							<cl-icon
+								:name="statusPopupVisible ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+								:size="14"
+								:color="statusPopupVisible ? '#2b59c3' : '#999999'"
+							></cl-icon>
+						</view>
+					</view>
+
+					<view v-if="!isRealNameVerified" class="wl-rec-state wl-rec-state--empty">
+						<text class="wl-rec-state-text">请先完成实名认证</text>
+					</view>
+					<template v-else>
+						<view v-if="recordsLoading && recordList.length == 0" class="wl-rec-state">
+							<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+							<text class="wl-rec-state-text">加载中...</text>
+						</view>
+						<view v-else-if="recordList.length == 0" class="wl-rec-state wl-rec-state--empty">
+							<text class="wl-rec-state-text">暂无提现记录</text>
+						</view>
+						<view v-else class="wl-rec-list">
+							<view
+								class="wl-rec-card"
+								v-for="(item, index) in recordList"
+								:key="item.id != null ? item.id : index"
+							>
+								<view class="wl-rec-card-top">
+									<view class="wl-rec-bank-info">
+										<text class="wl-rec-bank-name">{{ item.title }}</text>
+									</view>
+									<view class="wl-rec-card-right">
+										<text class="wl-rec-card-amount">{{ item.amount }}</text>
+										<view class="wl-rec-card-status-row">
+											<text
+												class="wl-rec-card-status"
+												:class="getStatusClass(item)"
+											>{{ item.status_label ?? item.status_txt }}</text>
+											<view
+												v-if="isRejectedStatus(item)"
+												class="wl-rec-card-status-tip"
+												@tap.stop="onRejectTip(item)"
+											>
+												<cl-icon name="question-line" :size="14" color="#2b59c3"></cl-icon>
+											</view>
+										</view>
+									</view>
+								</view>
+								<view class="wl-rec-card-detail">
+									<view class="wl-rec-row">
+										<text class="wl-rec-label">实际到账</text>
+										<text class="wl-rec-value">{{ item.actual_amount }}</text>
+									</view>
+									<view class="wl-rec-row">
+										<view class="wl-rec-label-wrap">
+											<text class="wl-rec-label">预扣税额</text>
+										</view>
+										<text class="wl-rec-value">{{ item.tax_amount }}</text>
+									</view>
+									<view class="wl-rec-row">
+										<text class="wl-rec-label">提现ID</text>
+										<text class="wl-rec-value">{{ item.withdraw_no }}</text>
+									</view>
+									<view class="wl-rec-row">
+										<text class="wl-rec-label">申请时间</text>
+										<text class="wl-rec-value">{{ item.create_time }}</text>
+									</view>
+									<view v-if="item.pay_time != null && `${item.pay_time}` != ''" class="wl-rec-row">
+										<text class="wl-rec-label">打款时间</text>
+										<text class="wl-rec-value">{{ item.pay_time }}</text>
+									</view>
+									<view v-if="item.reject_time != null && `${item.reject_time}` != ''" class="wl-rec-row">
+										<text class="wl-rec-label">驳回时间</text>
+										<text class="wl-rec-value">{{ item.reject_time }}</text>
+									</view>
+								</view>
+							</view>
+						</view>
+
+						<view v-if="loadingMore" class="wl-loadmore">
+							<cl-loading :loading="true" :size="20" color="#2b59c3"></cl-loading>
+							<text class="wl-loadmore-text">加载更多...</text>
+						</view>
+						<view v-else-if="!hasMore && recordList.length > 0" class="wl-loadmore">
+							<text class="wl-loadmore-text">没有更多了</text>
+						</view>
+					</template>
+
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+
+			<cl-popup
+				v-model="statusPopupVisible"
+				direction="bottom"
+				:show-header="false"
+				:show-close="false"
+				:mask-closable="true"
+				:pt="{ className: 'wl-status-popup-wrap' }"
+			>
+				<view class="wl-status-popup">
+					<view class="wl-status-popup-head">
+						<text class="wl-status-popup-title">选择状态</text>
+						<view class="wl-status-popup-close" @tap="closeStatusFilter">
+							<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
+						</view>
+					</view>
+					<view class="wl-status-popup-list">
+						<view
+							v-for="opt in statusFilterOptions"
+							:key="opt.key"
+							class="wl-status-item"
+							:class="{ 'wl-status-item--active': statusFilterKey == opt.key }"
+							@tap="onPickStatusFilter(opt.key)"
+						>
+							<text
+								class="wl-status-item-text"
+								:class="{ 'wl-status-item-text--active': statusFilterKey == opt.key }"
+							>{{ opt.label }}</text>
+							<cl-icon
+								v-if="statusFilterKey == opt.key"
+								name="checkbox-circle-fill"
+								:size="22"
+								color="#2b59c3"
+							></cl-icon>
+						</view>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</cl-popup>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, reactive, ref } from "vue";
+	import { getUserCertifyTypeInfo } from "@/.cool/api/user-certify";
+	import {
+		getStaffBankLists,
+		getStaffWithdrawRecords,
+		getStaffWithdrawWallet
+	} from "@/.cool/api/wallet";
+	import type { StaffWithdrawRecordItem } from "@/.cool/types/wallet";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+
+	type WithdrawStatusType = "rejected" | "success" | "pending";
+
+	type StatusFilterOption = {
+		key: string;
+		label: string;
+		/** 空字符串表示全部，不传 status */
+		value: string;
+	};
+
+	const PAGE_SIZE = 20;
+	const statusFilterOptions: StatusFilterOption[] = [
+		{ key: "all", label: "全部", value: "" },
+		{ key: "pending", label: "审核中", value: "1" },
+		{ key: "paid", label: "已打款", value: "2" },
+		{ key: "failed", label: "已驳回", value: "3" }
+	];
+
+	const pageLoading = ref(true);
+	const pageInited = ref(false);
+	/** 0未认证 1已通过 2审核中 3已驳回 */
+	const personalIsCertify = ref(0);
+	const bankCount = ref(0);
+	const withdrawableText = ref("0.00");
+
+	const recordsLoading = ref(false);
+	const loadingMore = ref(false);
+	const refresherTriggered = ref(false);
+	const hasMore = ref(true);
+	const pageNo = ref(1);
+	const recordList = ref<StaffWithdrawRecordItem[]>([]);
+	const statusFilterKey = ref("all");
+	const statusPopupVisible = ref(false);
+	const summary = reactive({
+		totalWithdraw: "0.00",
+		actualReceived: "0.00",
+		taxAmount: "0.00"
+	});
+
+	const statusFilterLabel = computed((): string => {
+		for (let i = 0; i < statusFilterOptions.length; i++) {
+			if (statusFilterOptions[i].key == statusFilterKey.value) {
+				return statusFilterOptions[i].label;
+			}
+		}
+		return "全部状态";
+	});
+
+	const statusFilterValue = computed((): string => {
+		for (let i = 0; i < statusFilterOptions.length; i++) {
+			if (statusFilterOptions[i].key == statusFilterKey.value) {
+				return statusFilterOptions[i].value;
+			}
+		}
+		return "";
+	});
+
+	const isRealNameVerified = computed((): boolean => {
+		return personalIsCertify.value == 1;
+	});
+
+	const statusText = computed((): string => {
+		if (personalIsCertify.value == 1) {
+			if (bankCount.value > 0) {
+				return "您已完成实名认证，可进行提现操作。";
+			}
+			return "您已完成实名认证，可添加个人银行收款账户信息。";
+		}
+		if (personalIsCertify.value == 2) {
+			return "实名认证审核中，通过后可添加收款账户并提现。";
+		}
+		if (personalIsCertify.value == 3) {
+			return "实名认证已驳回，请重新完成实名认证后再操作。";
+		}
+		return "请先完成实名认证后才可以添加个人银行收款账户信息。";
+	});
+
+	function formatMoney(raw: any | null): string {
+		if (raw == null || `${raw}` == "") {
+			return "0.00";
+		}
+		const n = parseFloat(`${raw}`);
+		if (isNaN(n)) {
+			return "0.00";
+		}
+		return n.toFixed(2);
+	}
+
+	function unwrapData(res: any): UTSJSONObject | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code as number | string)) {
+			return null;
+		}
+		return (envelope["data"] ?? envelope) as UTSJSONObject;
+	}
+
+	function isRejectedStatus(row: StaffWithdrawRecordItem): boolean {
+		const status = row.status;
+		if (status != null && parseInt(`${status}`) == 3) {
+			return true;
+		}
+		const label = `${row.status_label ?? row.status_txt ?? ""}`;
+		return label.indexOf("失败") >= 0 || label.indexOf("驳回") >= 0 || label.indexOf("拒绝") >= 0;
+	}
+
+	function resolveStatusType(row: StaffWithdrawRecordItem): WithdrawStatusType {
+		if (isRejectedStatus(row)) {
+			return "rejected";
+		}
+		const label = `${row.status_label ?? row.status_txt ?? ""}`;
+		if (
+			label.indexOf("打款") >= 0 ||
+			label.indexOf("成功") >= 0 ||
+			label.indexOf("完成") >= 0
+		) {
+			return "success";
+		}
+		return "pending";
+	}
+
+	function getStatusClass(row: StaffWithdrawRecordItem): string {
+		const statusType = resolveStatusType(row);
+		if (statusType == "rejected") {
+			return "wl-rec-card-status--rejected";
+		}
+		if (statusType == "success") {
+			return "wl-rec-card-status--success";
+		}
+		return "wl-rec-card-status--pending";
+	}
+
+	function extractList(data: UTSJSONObject): StaffWithdrawRecordItem[] {
+		const raw = data["list"] ?? data["lists"] ?? data["records"] ?? data["items"];
+		if (raw == null || !Array.isArray(raw)) {
+			return [];
+		}
+		return raw as StaffWithdrawRecordItem[];
+	}
+
+	function extractTotal(data: UTSJSONObject): number {
+		const raw = data["total"] ?? data["count"] ?? data["total_count"];
+		if (raw == null) {
+			return -1;
+		}
+		const n = parseInt(`${raw}`);
+		return isNaN(n) ? -1 : n;
+	}
+
+	function applySummary(data: UTSJSONObject) {
+		summary.totalWithdraw = formatMoney(data["total_money"] ?? data["total_withdraw"]);
+		summary.actualReceived = formatMoney(data["total_amount"] ?? data["total_actual"]);
+		summary.taxAmount = formatMoney(data["total_tax"] ?? data["total_tax_amount"]);
+	}
+
+	function loadCertifyStatus(): Promise<void> {
+		return getUserCertifyTypeInfo({ type: -1, bind_scope: 1 })
+			.then((res) => {
+				const data = unwrapData(res);
+				if (data == null) {
+					personalIsCertify.value = 0;
+					return;
+				}
+				const flag = data["personal_is_certify"];
+				let n = flag != null ? parseInt(`${flag}`) : 0;
+				if (isNaN(n)) {
+					n = 0;
+				}
+				personalIsCertify.value = n;
+			})
+			.catch(() => {
+				personalIsCertify.value = 0;
+			});
+	}
+
+	function loadWallet(): Promise<void> {
+		return getStaffWithdrawWallet()
+			.then((res) => {
+				const data = unwrapData(res);
+				if (data == null) {
+					withdrawableText.value = "0.00";
+					return;
+				}
+				const wallet = (data["wallet"] ?? data) as UTSJSONObject;
+				const withdrawable = data["wallet_withdrawable"] ?? "0";
+				withdrawableText.value = formatMoney(withdrawable);
+			})
+			.catch(() => {
+				withdrawableText.value = "0.00";
+			});
+	}
+
+	function loadBankCount(): Promise<void> {
+		return getStaffBankLists({ page_no: 1, page_size: 1 })
+			.then((res) => {
+				const data = unwrapData(res);
+				if (data == null) {
+					bankCount.value = 0;
+					return;
+				}
+				const total = extractTotal(data);
+				if (total >= 0) {
+					bankCount.value = total;
+					return;
+				}
+				bankCount.value = extractList(data).length;
+			})
+			.catch(() => {
+				bankCount.value = 0;
+			});
+	}
+
+	function loadRecords(more: boolean = false) {
+		if (personalIsCertify.value != 1) {
+			recordList.value = [];
+			hasMore.value = false;
+			recordsLoading.value = false;
+			loadingMore.value = false;
+			refresherTriggered.value = false;
+			return;
+		}
+		if (more) {
+			if (!hasMore.value || loadingMore.value || recordsLoading.value || refresherTriggered.value) {
+				return;
+			}
+			loadingMore.value = true;
+		} else {
+			if (recordList.value.length == 0) {
+				recordsLoading.value = true;
+			}
+			pageNo.value = 1;
+			hasMore.value = true;
+		}
+		const nextPage = more ? pageNo.value + 1 : 1;
+		const status = statusFilterValue.value;
+		const req =
+			status != ""
+				? { page: nextPage, limit: PAGE_SIZE, status: status }
+				: { page: nextPage, limit: PAGE_SIZE };
+		getStaffWithdrawRecords(req)
+			.then((res) => {
+				const data = unwrapData(res);
+				if (data == null) {
+					if (!more) {
+						recordList.value = [];
+					}
+					hasMore.value = false;
+					return;
+				}
+				if (!more) {
+					applySummary(data);
+				}
+				const rows = extractList(data);
+				const total = extractTotal(data);
+				if (more) {
+					recordList.value = recordList.value.concat(rows);
+					pageNo.value = nextPage;
+				} else {
+					recordList.value = rows;
+					pageNo.value = 1;
+				}
+				if (total >= 0) {
+					hasMore.value = recordList.value.length < total;
+				} else {
+					hasMore.value = rows.length >= PAGE_SIZE;
+				}
+			})
+			.catch(() => {
+				if (!more) {
+					recordList.value = [];
+				}
+				hasMore.value = false;
+			})
+			.finally(() => {
+				recordsLoading.value = false;
+				loadingMore.value = false;
+				refresherTriggered.value = false;
+			});
+	}
+
+	function loadPage() {
+		if (!pageInited.value) {
+			pageLoading.value = true;
+		}
+		Promise.all([loadCertifyStatus(), loadWallet(), loadBankCount()])
+			.then(() => {
+				loadRecords(false);
+			})
+			.finally(() => {
+				pageLoading.value = false;
+				pageInited.value = true;
+			});
+	}
+
+	function onAddAccountTap() {
+		if (personalIsCertify.value != 1) {
+			uni.showToast({ title: "请先完成实名认证", icon: "none" });
+			return;
+		}
+		router.push({ path: "/pages/wallet/bank-cards" });
+	}
+
+	function onWithdrawTap() {
+		if (personalIsCertify.value != 1) {
+			uni.showToast({ title: "请先完成实名认证", icon: "none" });
+			return;
+		}
+		if (bankCount.value <= 0) {
+            uni.showToast({ title: "请先添加提现账户", icon: "none" });
+			return;
+		}
+		router.push({ path: "/pages/wallet/withdraw-apply" });
+	}
+
+	function onScrollToLower() {
+		if (!isRealNameVerified.value) {
+			return;
+		}
+		loadRecords(true);
+	}
+
+	function openStatusFilter() {
+		if (!isRealNameVerified.value) {
+			return;
+		}
+		statusPopupVisible.value = true;
+	}
+
+	function closeStatusFilter() {
+		statusPopupVisible.value = false;
+	}
+
+	function onPickStatusFilter(key: string) {
+		statusPopupVisible.value = false;
+		if (statusFilterKey.value == key) {
+			return;
+		}
+		statusFilterKey.value = key;
+		recordList.value = [];
+		loadRecords(false);
+	}
+
+	function onRefresherRefresh() {
+		if (pageLoading.value || recordsLoading.value || loadingMore.value) {
+			refresherTriggered.value = false;
+			return;
+		}
+		refresherTriggered.value = true;
+		Promise.all([loadCertifyStatus(), loadWallet(), loadBankCount()]).then(() => {
+			loadRecords(false);
+		});
+	}
+
+	function onRefresherRestore() {
+		refresherTriggered.value = false;
+	}
+
+	function onRejectTip(item: StaffWithdrawRecordItem) {
+		const reason = `${item.fail_reason ?? item.reject_reason ?? item.remarks ?? ""}`.trim();
+		uni.showToast({
+			title: reason != "" ? reason : "提现申请未通过",
+			icon: "none"
+		});
+	}
+
+	function onTaxTip() {
+		uni.showToast({ title: "预扣税额为平台代扣代缴金额", icon: "none" });
+	}
+
+	onShow(() => {
+		uni.setNavigationBarColor({
+			frontColor: "#000000",
+			backgroundColor: "#ffffff"
+		});
+		loadPage();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.wl-page {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		background-color: #f5f5f5;
+
+		.wl-loading {
+			padding-top: 240rpx;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			&--overlay {
+				position: absolute;
+				left: 0;
+				top: 0;
+				right: 0;
+				bottom: 0;
+				z-index: 20;
+				background-color: #f5f5f5;
+				box-sizing: border-box;
+			}
+		}
+
+		.wl-loading-text {
+			margin-top: 16rpx;
+			font-size: 26rpx;
+			color: #999999;
+		}
+
+		.wl-scroll {
+			height: 100%;
+		}
+
+		.wl-body {
+			padding: 24rpx 30rpx 40rpx;
+			box-sizing: border-box;
+		}
+
+		.wl-toolbar {
+			display: flex;
+			flex-direction: row;
+			justify-content: flex-end;
+			margin-bottom: 20rpx;
+		}
+
+		.wl-add-btn {
+			padding: 10rpx 20rpx;
+			border-radius: 12rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.wl-add-btn-plus {
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #2b59c3;
+			line-height: 32rpx;
+		}
+
+		.wl-add-btn-text {
+			margin-left: 4rpx;
+			font-size: 26rpx;
+			color: #2b59c3;
+			line-height: 36rpx;
+		}
+
+		.wl-status {
+			display: block;
+			margin-bottom: 20rpx;
+			padding: 0 4rpx;
+			font-size: 26rpx;
+			color: #666666;
+			line-height: 40rpx;
+		}
+
+		.wl-card {
+			margin-bottom: 28rpx;
+			padding: 32rpx 28rpx 28rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+		}
+
+		.wl-card-top {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.wl-balance {
+			flex: 1;
+			min-width: 0;
+			padding-right: 24rpx;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wl-balance-label {
+			font-size: 26rpx;
+			color: #999999;
+			line-height: 36rpx;
+		}
+
+		.wl-balance-value {
+			margin-top: 12rpx;
+			font-size: 48rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 64rpx;
+		}
+
+		.wl-withdraw-btn {
+			flex-shrink: 0;
+			min-width: 144rpx;
+			padding: 16rpx 36rpx;
+			border-radius: 40rpx;
+			background-color: #2b59c3;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.wl-withdraw-btn-text {
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #ffffff;
+			line-height: 40rpx;
+		}
+
+		.wl-card-line {
+			margin: 28rpx 0 24rpx;
+			height: 1rpx;
+			background-color: #eeeeee;
+		}
+
+		.wl-card-stats {
+			display: flex;
+			flex-direction: row;
+		}
+
+		.wl-stat {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.wl-stat-label {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.wl-stat-value {
+			margin-top: 10rpx;
+			font-size: 30rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 42rpx;
+		}
+
+		.wl-section-head {
+			margin-bottom: 16rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.wl-section-title {
+			padding-left: 4rpx;
+			font-size: 30rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 42rpx;
+		}
+
+		.wl-filter-btn {
+			padding: 10rpx 16rpx;
+			border-radius: 8rpx;
+			background-color: #ffffff;
+			border-width: 1rpx;
+			border-style: solid;
+			border-color: transparent;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+
+			&--active {
+				border-color: rgba(43, 89, 195, 0.35);
+				background-color: #eef3fb;
+
+				.wl-filter-btn-text {
+					color: #2b59c3;
+				}
+			}
+		}
+
+		.wl-filter-btn-text {
+			margin-right: 6rpx;
+			font-size: 24rpx;
+			color: #666666;
+			line-height: 34rpx;
+		}
+
+		.wl-rec-state {
+			padding: 80rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			&--empty {
+				border-radius: 20rpx;
+				background-color: #ffffff;
+			}
+		}
+
+		.wl-rec-state-text {
+			margin-top: 16rpx;
+			font-size: 26rpx;
+			color: #999999;
+		}
+
+		.wl-rec-list {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wl-rec-card {
+			margin-bottom: 16rpx;
+			padding: 28rpx 24rpx 20rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+		}
+
+		.wl-rec-card-top {
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			justify-content: space-between;
+			margin-bottom: 20rpx;
+		}
+
+		.wl-rec-bank-info {
+			flex: 1;
+			min-width: 0;
+			padding-right: 16rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.wl-rec-bank-name {
+			flex-shrink: 0;
+			max-width: 60%;
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #1a1a1a;
+			line-height: 40rpx;
+			lines: 1;
+			text-overflow: ellipsis;
+		}
+
+		.wl-rec-card-right {
+			flex-shrink: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+		}
+
+		.wl-rec-card-amount {
+			font-size: 32rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 40rpx;
+		}
+
+		.wl-rec-card-status-row {
+			margin-top: 8rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.wl-rec-card-status {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+
+			&--rejected {
+				color: #2b59c3;
+			}
+
+			&--success {
+				color: #52c41a;
+			}
+
+			&--pending {
+				color: #999999;
+			}
+		}
+
+		.wl-rec-card-status-tip {
+			margin-left: 4rpx;
+			display: flex;
+			align-items: center;
+		}
+
+		.wl-rec-card-detail {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wl-rec-row {
+			padding: 6rpx 0;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.wl-rec-label-wrap {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.wl-rec-label {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 36rpx;
+		}
+
+		.wl-rec-value {
+			flex: 1;
+			min-width: 0;
+			margin-left: 24rpx;
+			font-size: 24rpx;
+			color: #666666;
+			line-height: 36rpx;
+			text-align: right;
+			lines: 1;
+			text-overflow: ellipsis;
+		}
+
+		.wl-rec-card-tax-tip {
+			margin-left: 6rpx;
+			display: flex;
+			align-items: center;
+		}
+
+		.wl-loadmore {
+			padding: 24rpx 0 8rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.wl-loadmore-text {
+			margin-left: 10rpx;
+			font-size: 24rpx;
+			color: #999999;
+		}
+	}
+</style>
+
+<style lang="scss" scoped>
+	.wl-status-popup {
+		width: 100%;
+		padding: 32rpx 32rpx 16rpx;
+		background-color: #ffffff;
+		border-top-left-radius: 24rpx;
+		border-top-right-radius: 24rpx;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.wl-status-popup-head {
+		width: 100%;
+		margin-bottom: 8rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		flex-shrink: 0;
+	}
+
+	.wl-status-popup-title {
+		flex: 1;
+		min-width: 0;
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 48rpx;
+	}
+
+	.wl-status-popup-close {
+		width: 56rpx;
+		height: 56rpx;
+		margin-left: 16rpx;
+		border-radius: 50%;
+		background-color: #f0f0f0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.wl-status-popup-list {
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.wl-status-item {
+		width: 100%;
+		min-height: 96rpx;
+		padding: 28rpx 4rpx;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: #f5f5f5;
+
+		&:last-child {
+			border-bottom-width: 0;
+		}
+	}
+
+	.wl-status-item-text {
+		flex: 1;
+		min-width: 0;
+		padding-right: 24rpx;
+		font-size: 30rpx;
+		color: #333333;
+		line-height: 42rpx;
+
+		&--active {
+			color: #2b59c3;
+			font-weight: 600;
+		}
+	}
+</style>
+
+<style lang="scss">
+	.wl-status-popup-wrap {
+		.cl-popup__inner {
+			border-top-left-radius: 24rpx;
+			border-top-right-radius: 24rpx;
+			background-color: #ffffff;
+			overflow: hidden;
+		}
+	}
+</style>

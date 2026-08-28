@@ -1,0 +1,340 @@
+<template>
+	<view class="ea-auth">
+		<view class="ea-auth-spacer"></view>
+		<view class="ea-auth-body">
+			<view class="ea-auth-logo" :class="{ 'ea-auth-logo--image': logoUrl != '' }">
+				<image
+					v-if="logoUrl != ''"
+					class="ea-auth-logo-img"
+					:src="logoUrl"
+					mode="aspectFit"
+				></image>
+				<text v-else class="ea-auth-logo-text">{{ logoText }}</text>
+			</view>
+
+			<text class="ea-auth-title">{{ appName }}</text>
+			<text class="ea-auth-title">申请获得以下权限</text>
+			<text class="ea-auth-desc">获得您的公开信息（昵称、头像、手机号码等）</text>
+		</view>
+		<view class="ea-auth-spacer ea-auth-spacer--tail"></view>
+
+		<view class="ea-auth-footer">
+			<view
+				v-if="displayProtocols.length > 0"
+				class="ea-auth-agreement"
+				@tap="toggleAgreement"
+			>
+				<view class="ea-auth-checkbox" :class="{ 'is-checked': agreed }">
+					<text v-if="agreed" class="ea-auth-checkbox-mark">✓</text>
+				</view>
+				<view class="ea-auth-agreement-copy">
+					<text class="ea-auth-agreement-text">我已阅读并同意</text>
+					<template v-for="(item, index) in displayProtocols" :key="getProtocolKey(item, index)">
+						<text v-if="index > 0" class="ea-auth-agreement-text">和</text>
+						<text class="ea-auth-link" @tap.stop="openProtocol(item)">{{ formatProtocolTitle(item.title ?? "") }}</text>
+					</template>
+				</view>
+			</view>
+
+			<view class="ea-auth-btn ea-auth-btn--primary" @tap="onAuthorize">
+				<text class="ea-auth-btn-text ea-auth-btn-text--primary">授权登录</text>
+			</view>
+			<view class="ea-auth-btn ea-auth-btn--ghost" @tap="onDeny">
+				<text class="ea-auth-btn-text ea-auth-btn-text--ghost">暂不授权</text>
+			</view>
+			<cl-safe-area type="bottom"></cl-safe-area>
+		</view>
+	</view>
+</template>
+
+<script lang="uts" setup>
+	import { computed, ref, type PropType } from "vue";
+	import { router, type OAuthAuthorizeProtocolItem } from "@/.cool";
+
+	const props = defineProps({
+		appName: {
+			type: String,
+			default: "企业号"
+		},
+		logoUrl: {
+			type: String,
+			default: ""
+		},
+		protocols: {
+			type: Array as PropType<OAuthAuthorizeProtocolItem[]>,
+			default: (): OAuthAuthorizeProtocolItem[] => {
+				return [] as OAuthAuthorizeProtocolItem[];
+			}
+		}
+	});
+
+	const emit = defineEmits(["authorize", "deny"]);
+
+	const agreed = ref(true);
+
+	const logoText = computed(() => {
+		const name = props.appName.trim();
+		return name.length > 0 ? name.charAt(0) : "企";
+	});
+
+	const displayProtocols = computed((): OAuthAuthorizeProtocolItem[] => {
+		const list = props.protocols;
+		if (list == null || list.length == 0) {
+			return [] as OAuthAuthorizeProtocolItem[];
+		}
+		const result: OAuthAuthorizeProtocolItem[] = [];
+		for (let i = 0; i < list.length; i++) {
+			const item = list[i];
+			const title = (item.title ?? "").trim();
+			if (title != "") {
+				result.push(item);
+			}
+		}
+		return result;
+	});
+
+	function formatProtocolTitle(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "";
+		}
+		if (text.indexOf("《") == 0) {
+			return text;
+		}
+		return `《${text}》`;
+	}
+
+	function getProtocolKey(item: OAuthAuthorizeProtocolItem, index: number): string {
+		const idVal = item.id;
+		if (idVal != null) {
+			return `protocol-${idVal}`;
+		}
+		const key = item.key ?? "";
+		return key != "" ? key : `protocol-${index}`;
+	}
+
+	function parseQueryString(query: string): UTSJSONObject {
+		const result = {} as UTSJSONObject;
+		if (query == "") {
+			return result;
+		}
+		const parts = query.split("&");
+		for (let i = 0; i < parts.length; i++) {
+			const part = parts[i];
+			const eq = part.indexOf("=");
+			if (eq < 0) {
+				continue;
+			}
+			const key = part.substring(0, eq);
+			const val = part.substring(eq + 1);
+			if (key != "") {
+				result[key] = val;
+			}
+		}
+		return result;
+	}
+
+	function openProtocol(item: OAuthAuthorizeProtocolItem) {
+		router.push({
+            path: "/pages/protocol/detail",
+            query: {
+                id: item.id
+            }
+        });
+	}
+
+	function toggleAgreement() {
+		agreed.value = !agreed.value;
+	}
+
+	function onAuthorize() {
+		if (displayProtocols.value.length > 0 && !agreed.value) {
+			uni.showToast({ title: "请先阅读并同意相关协议", icon: "none" });
+			return;
+		}
+		emit("authorize");
+	}
+
+	function onDeny() {
+		emit("deny");
+	}
+</script>
+
+<style lang="scss" scoped>
+	.ea-auth {
+		height: 100%;
+		min-height: 0;
+		max-height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		box-sizing: border-box;
+		background-color: #ffffff;
+	}
+
+	.ea-auth-spacer {
+		flex: 1;
+		min-height: 80rpx;
+		max-height: 150rpx;
+	}
+
+	.ea-auth-spacer--tail {
+		max-height: 160rpx;
+	}
+
+	.ea-auth-body {
+		flex-shrink: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 8rpx 48rpx 16rpx;
+		overflow: hidden;
+	}
+
+	.ea-auth-logo {
+		width: 360rpx;
+		height: 360rpx;
+		border-radius: 50%;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		margin-bottom: 40rpx;
+		flex-shrink: 0;
+
+		&--image {
+			background-color: #ffffff;
+			border-width: 1rpx;
+			border-style: solid;
+			border-color: #f0f0f0;
+		}
+	}
+
+	.ea-auth-logo-img {
+		width: 360rpx;
+		height: 360rpx;
+	}
+
+	.ea-auth-logo-text {
+		font-size: 56rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 1;
+	}
+
+	.ea-auth-title {
+		font-size: 36rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 50rpx;
+		text-align: center;
+		margin-bottom: 24rpx;
+		flex-shrink: 0;
+	}
+
+	.ea-auth-desc {
+		font-size: 28rpx;
+		color: #666666;
+		line-height: 42rpx;
+		text-align: center;
+		margin-bottom: 20rpx;
+		flex-shrink: 0;
+	}
+
+	.ea-auth-footer {
+		flex-shrink: 0;
+		padding: 0 48rpx 16rpx;
+	}
+
+	.ea-auth-agreement {
+		margin-bottom: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+	}
+
+	.ea-auth-checkbox {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 16rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		margin-top: 4rpx;
+
+		&.is-checked {
+			background-color: #2b59c3;
+			border-color: #2b59c3;
+		}
+	}
+
+	.ea-auth-checkbox-mark {
+		font-size: 20rpx;
+		color: #ffffff;
+		line-height: 28rpx;
+	}
+
+	.ea-auth-agreement-copy {
+		margin-left: 12rpx;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.ea-auth-agreement-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.ea-auth-link {
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 36rpx;
+	}
+
+	.ea-auth-btn {
+		height: 88rpx;
+		border-radius: 44rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 20rpx;
+		flex-shrink: 0;
+	}
+
+	.ea-auth-btn--primary {
+		background-color: #2b59c3;
+	}
+
+	.ea-auth-btn--ghost {
+		background-color: #ffffff;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #2b59c3;
+	}
+
+	.ea-auth-btn-text {
+		font-size: 32rpx;
+		font-weight: 600;
+		line-height: 1;
+	}
+
+	.ea-auth-btn-text--primary {
+		color: #ffffff;
+	}
+
+	.ea-auth-btn-text--ghost {
+		color: #2b59c3;
+	}
+</style>

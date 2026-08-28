@@ -1,0 +1,1037 @@
+<!-- 组合提词表单 · 多选项目/填写信息/组合提交 -->
+<template>
+	<cl-page :pt="{ className: 'cpr-page' }" :back-top="false">
+		<view class="cpr-page">
+			<scroll-view class="cpr-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="cpr-body">
+					<!-- 选择项目 -->
+					<view class="cpr-section">
+						<!-- projectLists 分组：subtitle + logo，单行横向滚动 -->
+						<view v-if="composeGroups.length > 0" class="cpr-type-scroll">
+							<view class="cpr-type-wrap">
+								<view
+									class="cpr-type-item"
+									:class="{ 'cpr-type-item--on': activeGroupIndex == index }"
+									v-for="(g, index) in composeGroups"
+									:key="g.id"
+									@tap="onGroupTap(index)"
+								>
+									<image
+										v-if="g.logo != ''"
+										class="cpr-type-logo"
+										:src="g.logo"
+										mode="aspectFill"
+									></image>
+									<view v-else class="cpr-type-logo cpr-type-logo--empty"></view>
+									<text
+										class="cpr-type-text"
+										:class="{ 'cpr-type-text--on': activeGroupIndex == index }"
+									>{{ g.subtitle }}</text>
+								</view>
+							</view>
+						</view>
+
+						<view class="cpr-label-row">
+							<text class="cpr-label">选择项目(多选)</text>
+							<text class="cpr-required">*</text>
+						</view>
+						<view v-if="projectLoading && projects.length == 0" class="cpr-project-state">
+							<cl-loading :loading="true" :size="24"></cl-loading>
+							<text class="cpr-project-state-text">加载中...</text>
+						</view>
+						<view v-else-if="projects.length == 0" class="cpr-project-state">
+							<text class="cpr-project-state-text">请联系管理员配置数据</text>
+						</view>
+						<!-- 当前分组 list：title + logo -->
+						<view v-else class="cpr-project-grid">
+							<view
+								class="cpr-project"
+								:class="{ 'cpr-project--on': isProjectSelected(p.id) }"
+								v-for="p in projects"
+								:key="p.id"
+								@tap="toggleProject(p.id)"
+							>
+								<image
+									v-if="p.logo != ''"
+									class="cpr-project-logo"
+									:src="p.logo"
+									mode="aspectFill"
+								></image>
+								<view v-else class="cpr-project-icon" :style="{ backgroundColor: p.color }">
+									<cl-icon name="play-fill" :size="18" color="#ffffff"></cl-icon>
+								</view>
+								<text
+									class="cpr-project-name"
+									:class="{ 'cpr-project-name--on': isProjectSelected(p.id) }"
+								>{{ p.title }}</text>
+							</view>
+						</view>
+					</view>
+
+					<!-- 表单字段 -->
+					<view class="cpr-section">
+						<view class="cpr-field">
+							<view class="cpr-label-row">
+								<text class="cpr-label">关键词</text>
+								<text class="cpr-required">*</text>
+							</view>
+							<input
+								class="cpr-input"
+								v-model="form.keyword"
+								placeholder="请输入关键词1 (4-10个汉字)"
+								placeholder-class="cpr-ph"
+							/>
+						</view>
+
+						<view class="cpr-field">
+							<view class="cpr-label-row">
+								<text class="cpr-label">书籍ID</text>
+								<text class="cpr-required">*</text>
+							</view>
+							<input
+								class="cpr-input"
+								v-model="form.bookId"
+								placeholder="请输入书籍ID"
+								placeholder-class="cpr-ph"
+							/>
+						</view>
+
+						<view class="cpr-field">
+							<view class="cpr-label-row">
+								<text class="cpr-label">书籍名称</text>
+								<text class="cpr-required">*</text>
+							</view>
+							<input
+								class="cpr-input"
+								v-model="form.bookName"
+								placeholder="请输入书籍名称"
+								placeholder-class="cpr-ph"
+							/>
+						</view>
+
+						<view class="cpr-field">
+							<view class="cpr-label-row">
+								<text class="cpr-label">作者名称</text>
+							</view>
+							<input
+								class="cpr-input"
+								v-model="form.author"
+								placeholder="请输入作者名称"
+								placeholder-class="cpr-ph"
+							/>
+						</view>
+
+						<view class="cpr-field">
+							<view class="cpr-label-row">
+								<text class="cpr-label">选择关键词推广类型</text>
+								<text class="cpr-required">*</text>
+							</view>
+							<view class="cpr-select" @tap="onPickPromoteType">
+								<text
+									class="cpr-select-text"
+									:class="{ 'cpr-select-text--on': form.promoteType != '' }"
+								>{{ form.promoteType != "" ? form.promoteType : "请选择推广类型" }}</text>
+								<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+							</view>
+						</view>
+					</view>
+				</view>
+			</scroll-view>
+
+			<view class="cpr-footer">
+				<view class="cpr-footer-side">
+					<view class="cpr-side-item" @tap="goBackfill">
+                        <image
+							class="cpr-side-icon"
+							src="/static/images/list_icon_yjht.png"
+							mode="aspectFit"
+						></image>
+						<text class="cpr-side-text">组合回填</text>
+					</view>
+				</view>
+				<view
+					class="cpr-submit"
+					:class="{ 'cpr-submit--disabled': submitting }"
+					@tap="onSubmit"
+				>
+					<text class="cpr-submit-text">{{ submitting ? "提交中..." : "立即组合提交" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	/** 组合提词表单页 */
+	import { reactive, ref } from "vue";
+	import { getComposeProjectLists, initComposePage, submitComposeAdd } from "@/.cool/api/compose";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type {
+		ComposeAddExpandItem,
+		ComposeAddProjectItem,
+		ComposeProjectGroup,
+		ComposeProjectItem
+	} from "@/.cool";
+
+	const PROJECT_COLORS = ["#ff4d4f", "#ff8c1a", "#e54d42", "#2b6de5", "#f5a623", "#0651f8", "#13c2c2"];
+
+	const composeId = ref(0);
+	const composeGroups = ref<Array<{ id: number; subtitle: string; logo: string; list: ComposeProjectItem[] }>>([]);
+	const activeGroupIndex = ref(0);
+	const projects = ref<Array<{ id: number; title: string; color: string; logo: string; checked: boolean }>>([]);
+	const projectLoading = ref(false);
+	const selectedIds = ref<number[]>([]);
+	const submitting = ref(false);
+	const promoteTypes = [
+		"真人出镜",
+		"图文",
+		"解压TTS",
+		"解说混剪",
+		"meme剪辑",
+		"AIGC",
+		"营销号",
+		"沙雕漫",
+		"AI数字人",
+		"滚屏素材"
+	];
+
+	const form = reactive({
+		keyword: "",
+		bookId: "",
+		bookName: "",
+		author: "",
+		promoteType: ""
+	});
+
+	const DRAFT_KEY = "compose_prompt_draft";
+	const draftProjectIds = ref<number[]>([]);
+	const draftPending = ref(false);
+
+	function pickText(...vals: Array<string | number | null | undefined>): string {
+		for (let i = 0; i < vals.length; i++) {
+			const raw = vals[i];
+			if (raw == null) {
+				continue;
+			}
+			const text = `${raw}`.trim();
+			if (text != "" && text != "null" && text != "undefined") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function parseNumId(raw: number | string | null | undefined, fallback: number): number {
+		if (raw == null) {
+			return fallback;
+		}
+		const n = typeof raw == "number" ? (raw as number) : parseInt(`${raw}`);
+		return isNaN(n) ? fallback : n;
+	}
+
+	function isTruthyFlag(raw: any | null): boolean {
+		if (raw == null) {
+			return false;
+		}
+		if (typeof raw == "boolean") {
+			return raw as boolean;
+		}
+		if (typeof raw == "number") {
+			return (raw as number) != 0;
+		}
+		const text = `${raw}`.trim().toLowerCase();
+		return text == "1" || text == "true";
+	}
+
+	function mapProjectItem(
+		item: ComposeProjectItem,
+		index: number
+	): { id: number; title: string; color: string; logo: string; checked: boolean } {
+		const row = item as UTSJSONObject;
+		const title = pickText(
+			item.title,
+			item.name,
+			item.project_name,
+			row["project_title"] as string | null
+		);
+		const logo = pickText(item.logo_url, item.logo, row["icon"] as string | null);
+		const color = pickText(item.color);
+		return {
+			id: parseNumId(item.id ?? item.project_id, index + 1),
+			title: title != "" ? title : `项目${index + 1}`,
+			color: color != "" ? color : PROJECT_COLORS[index % PROJECT_COLORS.length],
+			logo,
+			checked: isTruthyFlag(row["checked"] ?? row["checkedK"])
+		};
+	}
+
+	function mapGroupItem(
+		item: ComposeProjectGroup,
+		index: number
+	): { id: number; subtitle: string; logo: string; list: ComposeProjectItem[] } {
+		const row = item as UTSJSONObject;
+		const subtitle = pickText(item.subtitle, item.title, item.name);
+		const logo = pickText(item.logo_url, item.logo);
+		const listRaw = row["list"];
+		const list =
+			listRaw != null && Array.isArray(listRaw) ? (listRaw as ComposeProjectItem[]) : ([] as ComposeProjectItem[]);
+		return {
+			id: parseNumId(item.id, index + 1),
+			subtitle: subtitle != "" ? subtitle : `组合${index + 1}`,
+			logo,
+			list
+		};
+	}
+
+	function isGroupedProjectLists(rows: any[]): boolean {
+		if (rows.length == 0) {
+			return false;
+		}
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i] as UTSJSONObject;
+			const list = row["list"];
+			if (list != null && Array.isArray(list)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function extractProjectListsRaw(data: UTSJSONObject): any[] {
+		if (Array.isArray(data)) {
+			return data as any[];
+		}
+		const keys = ["projectLists", "project_list", "projects", "list", "records"];
+		for (let i = 0; i < keys.length; i++) {
+			const raw = data[keys[i]];
+			if (raw != null && Array.isArray(raw)) {
+				return raw as any[];
+			}
+		}
+		return [];
+	}
+
+	function applyProjectRows(
+		rows: Array<{ id: number; title: string; color: string; logo: string; checked: boolean }>
+	) {
+		projects.value = rows;
+		if (draftPending.value && draftProjectIds.value.length > 0) {
+			const matched: number[] = [];
+			for (let i = 0; i < draftProjectIds.value.length; i++) {
+				const id = draftProjectIds.value[i];
+				if (rows.some((p) => p.id == id) && matched.indexOf(id) < 0) {
+					matched.push(id);
+				}
+			}
+			if (matched.length > 0) {
+				selectedIds.value = matched;
+				draftPending.value = false;
+				return;
+			}
+		}
+		const checkedIds: number[] = [];
+		for (let i = 0; i < rows.length; i++) {
+			if (rows[i].checked) {
+				checkedIds.push(rows[i].id);
+			}
+		}
+		if (checkedIds.length > 0) {
+			selectedIds.value = checkedIds;
+			return;
+		}
+		if (rows.length > 0) {
+			selectedIds.value = [rows[0].id];
+			return;
+		}
+		selectedIds.value = [];
+	}
+
+	function applyActiveGroup(index: number) {
+		if (index < 0 || index >= composeGroups.value.length) {
+			projects.value = [];
+			selectedIds.value = [];
+			return;
+		}
+		activeGroupIndex.value = index;
+		const group = composeGroups.value[index];
+		const rows = group.list.map((item, i) => mapProjectItem(item, i));
+		applyProjectRows(rows);
+	}
+
+	function onGroupTap(index: number) {
+		if (index == activeGroupIndex.value) {
+			return;
+		}
+		applyActiveGroup(index);
+	}
+
+	function applyInitProjectLists(raw: any[]) {
+		if (isGroupedProjectLists(raw)) {
+			composeGroups.value = (raw as ComposeProjectGroup[]).map((item, index) => mapGroupItem(item, index));
+			applyActiveGroup(0);
+			return;
+		}
+		// 兼容扁平 projectLists
+		composeGroups.value = [];
+		activeGroupIndex.value = 0;
+		applyProjectRows((raw as ComposeProjectItem[]).map((item, index) => mapProjectItem(item, index)));
+	}
+
+	/** projectLists 是否有可配置项目（分组 list 或扁平项） */
+	function hasConfiguredProjects(raw: any[]): boolean {
+		if (raw.length == 0) {
+			return false;
+		}
+		if (isGroupedProjectLists(raw)) {
+			for (let i = 0; i < raw.length; i++) {
+				const row = raw[i] as UTSJSONObject;
+				const list = row["list"];
+				if (list != null && Array.isArray(list) && list.length > 0) {
+					return true;
+				}
+			}
+			return false;
+		}
+		return true;
+	}
+
+	function showConfigEmptyTip() {
+		composeGroups.value = [];
+		projects.value = [];
+		selectedIds.value = [];
+		uni.showToast({ title: "请联系管理员配置数据", icon: "none", duration: 2500 });
+	}
+
+	function loadProjects() {
+		if (composeId.value <= 0) {
+			composeGroups.value = [];
+			projects.value = [];
+			selectedIds.value = [];
+			return;
+		}
+		if (projectLoading.value) {
+			return;
+		}
+		projectLoading.value = true;
+		getComposeProjectLists({ id: composeId.value })
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载项目失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const raw = extractProjectListsRaw(data);
+				if (!hasConfiguredProjects(raw)) {
+					showConfigEmptyTip();
+					return;
+				}
+				applyInitProjectLists(raw);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载项目失败"), icon: "none" });
+			})
+			.finally(() => {
+				projectLoading.value = false;
+			});
+	}
+
+	/** 进入页：initPage → projectLists[i].subtitle / list[j].title */
+	function loadInitPage() {
+		if (composeId.value <= 0) {
+			return;
+		}
+		if (projectLoading.value) {
+			return;
+		}
+		projectLoading.value = true;
+		initComposePage({ project_id: composeId.value })
+			.then((res) => {
+				if (res == null) {
+					projectLoading.value = false;
+					loadProjects();
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "初始化失败"), icon: "none" });
+					projectLoading.value = false;
+					loadProjects();
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const entryId = parseNumId(
+					(data["id"] as number | string | null) ?? (data["project_id"] as number | string | null),
+					composeId.value
+				);
+				if (entryId > 0) {
+					composeId.value = entryId;
+				}
+				const raw = extractProjectListsRaw(data);
+				if (!hasConfiguredProjects(raw)) {
+					projectLoading.value = false;
+					showConfigEmptyTip();
+					return;
+				}
+				applyInitProjectLists(raw);
+				projectLoading.value = false;
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "初始化失败"), icon: "none" });
+				projectLoading.value = false;
+				loadProjects();
+			});
+	}
+
+	function isProjectSelected(id: number): boolean {
+		return selectedIds.value.indexOf(id) >= 0;
+	}
+
+	function toggleProject(id: number) {
+		const idx = selectedIds.value.indexOf(id);
+		if (idx >= 0) {
+			selectedIds.value.splice(idx, 1);
+		} else {
+			selectedIds.value.push(id);
+		}
+	}
+
+	function onPickPromoteType() {
+		uni.showActionSheet({
+			itemList: promoteTypes,
+			success: (res) => {
+				const i = res.tapIndex;
+				if (i >= 0 && i < promoteTypes.length) {
+					form.promoteType = promoteTypes[i];
+				}
+			}
+		});
+	}
+
+	function goBackfill() {
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		router.push({
+			path: "/pages/task/prompt-record",
+			query: { id: composeId.value }
+		});
+	}
+
+	function validate(): string {
+		if (composeId.value <= 0) {
+			return "缺少组合入口 ID";
+		}
+		if (selectedIds.value.length == 0) {
+			return "请选择项目";
+		}
+		const kw = form.keyword.trim();
+		if (kw == "") {
+			return "请输入关键词";
+		}
+		if (kw.length < 4 || kw.length > 10) {
+			return "关键词需为4-10个汉字";
+		}
+		if (form.bookId.trim() == "") {
+			return "请输入书籍ID";
+		}
+		if (form.bookName.trim() == "") {
+			return "请输入书籍名称";
+		}
+		if (form.promoteType == "") {
+			return "请选择推广类型";
+		}
+		return "";
+	}
+
+	function buildProjectLists(): ComposeAddProjectItem[] {
+		const rows: ComposeAddProjectItem[] = [];
+		for (let i = 0; i < projects.value.length; i++) {
+			const p = projects.value[i];
+			rows.push({
+				id: p.id,
+				checked: selectedIds.value.indexOf(p.id) >= 0
+			});
+		}
+		return rows;
+	}
+
+	function buildExpand(): ComposeAddExpandItem[][] {
+		const row: ComposeAddExpandItem[] = [
+			{ field: "keyword", name: "关键词", value: form.keyword.trim() },
+			{ field: "book_id", name: "书籍ID", value: form.bookId.trim() },
+			{ field: "book_name", name: "书籍名称", value: form.bookName.trim() }
+		];
+		const author = form.author.trim();
+		if (author != "") {
+			row.push({ field: "author", name: "作者名称", value: author });
+		}
+		row.push({ field: "type", name: "类型", value: form.promoteType });
+		return [row];
+	}
+
+	function isSubmitOk(res: any | null): boolean {
+		if (res == null) {
+			uni.showToast({ title: "提交失败", icon: "none" });
+			return false;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			uni.showToast({ title: getApiMessage(res, "提交失败"), icon: "none" });
+			return false;
+		}
+		return true;
+	}
+
+	function onSubmit() {
+		if (submitting.value || projectLoading.value) {
+			return;
+		}
+		const err = validate();
+		if (err != "") {
+			uni.showToast({ title: err, icon: "none" });
+			return;
+		}
+		const projectLists = buildProjectLists();
+		if (projectLists.length == 0) {
+			uni.showToast({ title: "请联系管理员配置数据", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		submitComposeAdd({
+			id: composeId.value,
+			projectLists: projectLists,
+			expand: buildExpand()
+		})
+			.then((res) => {
+				if (!isSubmitOk(res)) {
+					submitting.value = false;
+					uni.hideLoading();
+					return;
+				}
+				submitting.value = false;
+				uni.hideLoading();
+				uni.showToast({ title: getApiMessage(res, "提交成功"), icon: "success" });
+				setTimeout(() => {
+					router.back();
+				}, 1200);
+			})
+			.catch((err) => {
+				submitting.value = false;
+				uni.hideLoading();
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			});
+	}
+
+	function consumePromptDraft() {
+		try {
+			const raw = uni.getStorageSync(DRAFT_KEY) as string | null;
+			if (raw == null || `${raw}`.trim() == "") {
+				return;
+			}
+			uni.removeStorageSync(DRAFT_KEY);
+			const draft = JSON.parse(`${raw}`) as UTSJSONObject;
+			if (draft == null) {
+				return;
+			}
+			const keyword = `${draft["keyword"] ?? ""}`;
+			const bookId = `${draft["book_id"] ?? ""}`;
+			const bookName = `${draft["book_name"] ?? ""}`;
+			const author = `${draft["author"] ?? ""}`;
+			const promoteType = `${draft["type"] ?? ""}`;
+			if (keyword != "" && keyword != "null" && keyword != "undefined") {
+				form.keyword = keyword;
+			}
+			if (bookId != "" && bookId != "null" && bookId != "undefined") {
+				form.bookId = bookId;
+			}
+			if (bookName != "" && bookName != "null" && bookName != "undefined") {
+				form.bookName = bookName;
+			}
+			if (author != "" && author != "null" && author != "undefined") {
+				form.author = author;
+			}
+			if (promoteType != "" && promoteType != "null" && promoteType != "undefined") {
+				form.promoteType = promoteType;
+			}
+			const idsRaw = draft["project_ids"];
+			const ids: number[] = [];
+			if (idsRaw != null && Array.isArray(idsRaw)) {
+				for (let i = 0; i < (idsRaw as any[]).length; i++) {
+					const n = parseNumId((idsRaw as any[])[i] as number | string | null, 0);
+					if (n > 0 && ids.indexOf(n) < 0) {
+						ids.push(n);
+					}
+				}
+			}
+			draftProjectIds.value = ids;
+			draftPending.value = true;
+		} catch (_e) {
+			uni.removeStorageSync(DRAFT_KEY);
+		}
+	}
+
+	function initPageOptions(options: OnLoadOptions) {
+		const idVal = (options["id"] ?? options["project_id"]) as string | null;
+		if (idVal != null) {
+			const n = parseInt(`${idVal}`);
+			composeId.value = isNaN(n) ? 0 : n;
+		}
+		consumePromptDraft();
+	}
+
+	onLoad((options) => {
+		initPageOptions(options);
+	});
+
+	onShow(() => {
+		if (composeId.value <= 0) {
+			uni.showToast({ title: "缺少组合入口 ID", icon: "none" });
+			return;
+		}
+		loadInitPage();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.cpr-page {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		background-color: #f5f6f8;
+
+		.cpr-scroll {
+			flex: 1;
+			height: 0;
+		}
+
+		.cpr-body {
+			padding: 24rpx 24rpx 200rpx;
+			box-sizing: border-box;
+		}
+
+		// --- 表单卡片 ---
+		.cpr-section {
+			margin-bottom: 24rpx;
+			padding: 32rpx 28rpx;
+			background-color: #ffffff;
+			border-radius: 24rpx;
+			box-sizing: border-box;
+
+			&:last-of-type {
+				margin-bottom: 24rpx;
+			}
+
+			// --- projectLists 分组：单行横向滚动，不换行 ---
+			.cpr-type-scroll {
+				width: 100%;
+				max-width: 100%;
+				margin-bottom: 28rpx;
+				overflow-x: auto;
+				overflow-y: hidden;
+				-webkit-overflow-scrolling: touch;
+				touch-action: pan-x;
+				scrollbar-width: none;
+				-ms-overflow-style: none;
+
+				&::-webkit-scrollbar {
+					display: none;
+					width: 0;
+					height: 0;
+				}
+
+				.cpr-type-wrap {
+					display: flex;
+					flex-direction: row;
+					flex-wrap: nowrap;
+					align-items: center;
+					width: max-content;
+					box-sizing: border-box;
+
+					.cpr-type-item {
+						flex-shrink: 0;
+						max-width: 320rpx;
+						height: 72rpx;
+						margin-right: 16rpx;
+						padding: 0 16rpx;
+						border-radius: 12rpx;
+						border-width: 2rpx;
+						border-style: solid;
+						border-color: #e8e8e8;
+						background-color: #ffffff;
+						display: flex;
+						flex-direction: row;
+						align-items: center;
+						justify-content: center;
+						box-sizing: border-box;
+
+						&:last-child {
+							margin-right: 0;
+						}
+
+						&--on {
+							border-color: #0651f8;
+							background-color: #eef0f7;
+						}
+
+						.cpr-type-logo {
+							width: 32rpx;
+							height: 32rpx;
+							border-radius: 6rpx;
+							margin-right: 8rpx;
+							flex-shrink: 0;
+
+							&--empty {
+								background-color: #f0f0f0;
+							}
+						}
+
+						.cpr-type-text {
+							font-size: 24rpx;
+							color: #333333;
+							line-height: 34rpx;
+
+							&--on {
+								color: #0651f8;
+							}
+						}
+					}
+				}
+			}
+
+			.cpr-label-row {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				margin-bottom: 20rpx;
+
+				.cpr-label {
+					font-size: 28rpx;
+					font-weight: 600;
+					color: #333333;
+					line-height: 40rpx;
+				}
+
+				.cpr-required {
+					margin-left: 4rpx;
+					font-size: 28rpx;
+					color: #ff4d4f;
+					line-height: 40rpx;
+				}
+			}
+
+			.cpr-field {
+				margin-bottom: 32rpx;
+
+				&:last-child {
+					margin-bottom: 0;
+				}
+
+				.cpr-label-row {
+					margin-bottom: 16rpx;
+				}
+			}
+
+			.cpr-input {
+				width: 100%;
+				height: 88rpx;
+				padding: 0 24rpx;
+				border-radius: 16rpx;
+				border-width: 0;
+				background-color: #f7f8fa;
+				font-size: 28rpx;
+				color: #333333;
+				box-sizing: border-box;
+			}
+
+			.cpr-select {
+				width: 100%;
+				height: 88rpx;
+				padding: 0 24rpx;
+				border-radius: 16rpx;
+				border-width: 0;
+				background-color: #f7f8fa;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+				box-sizing: border-box;
+
+				.cpr-select-text {
+					flex: 1;
+					min-width: 0;
+					font-size: 28rpx;
+					color: #c0c4cc;
+					line-height: 40rpx;
+
+					&--on {
+						color: #333333;
+					}
+				}
+			}
+		}
+
+		.cpr-ph {
+			color: #c0c4cc;
+			font-size: 28rpx;
+		}
+
+		// --- 项目多选 ---
+		.cpr-project-state {
+			padding: 24rpx 0;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: center;
+
+			.cpr-project-state-text {
+				margin-left: 12rpx;
+				font-size: 26rpx;
+				color: #999999;
+				line-height: 36rpx;
+			}
+		}
+
+		.cpr-project-grid {
+			display: flex;
+			flex-direction: row;
+			flex-wrap: wrap;
+
+			.cpr-project {
+				width: 204rpx;
+				margin-right: 16rpx;
+				margin-bottom: 16rpx;
+				padding: 20rpx 8rpx 16rpx;
+				border-radius: 16rpx;
+				border-width: 2rpx;
+				border-style: solid;
+				border-color: #eeeeee;
+				background-color: #ffffff;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				box-sizing: border-box;
+
+				&:nth-child(3n) {
+					margin-right: 0;
+				}
+
+				&--on {
+					border-color: #0651f8;
+					background-color: #ffffff;
+				}
+
+				.cpr-project-logo {
+					width: 72rpx;
+					height: 72rpx;
+					border-radius: 50%;
+					margin-bottom: 12rpx;
+				}
+
+				.cpr-project-icon {
+					width: 72rpx;
+					height: 72rpx;
+					border-radius: 50%;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					justify-content: center;
+					margin-bottom: 12rpx;
+				}
+
+				.cpr-project-name {
+					font-size: 24rpx;
+					color: #333333;
+					line-height: 34rpx;
+
+					&--on {
+						color: #0651f8;
+					}
+				}
+			}
+		}
+
+		// --- 底栏 ---
+		.cpr-footer {
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			z-index: 30;
+			padding: 16rpx 24rpx 16rpx;
+			background-color: #ffffff;
+			border-top-width: 1rpx;
+			border-top-style: solid;
+			border-top-color: #eeeeee;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			box-sizing: border-box;
+
+			.cpr-footer-side {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				flex-shrink: 0;
+				margin-right: 20rpx;
+
+				.cpr-side-item {
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					justify-content: center;
+					margin-right: 28rpx;
+					min-width: 80rpx;
+
+					&:last-child {
+						margin-right: 0;
+					}
+
+                    .cpr-side-icon {
+						width: 44rpx;
+						height: 44rpx;
+					}
+
+					.cpr-side-text {
+						margin-top: 4rpx;
+						font-size: 20rpx;
+						color: #666666;
+						line-height: 28rpx;
+					}
+				}
+			}
+
+			.cpr-submit {
+				flex: 1;
+				min-width: 0;
+				height: 88rpx;
+				border-radius: 12rpx;
+				background-color: #0651f8;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+
+				&--disabled {
+					opacity: 0.55;
+				}
+
+				.cpr-submit-text {
+					font-size: 30rpx;
+					font-weight: 600;
+					color: #ffffff;
+					line-height: 42rpx;
+				}
+			}
+		}
+	}
+</style>

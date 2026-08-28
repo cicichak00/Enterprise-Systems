@@ -1,0 +1,347 @@
+<!-- 员工端 · 我的（估算对稿 375，待设计确认） -->
+<template>
+	<cl-page :pt="{ className: 'sme-page' }">
+		<view class="sme-page">
+			<view class="sme-profile" @tap="toAccount">
+				<view class="sme-avatar">
+					<image
+						v-if="avatarUrl != ''"
+						class="sme-avatar-img"
+						:src="avatarUrl"
+						mode="aspectFill"
+					></image>
+					<text v-else class="sme-avatar-text">{{ avatarText }}</text>
+				</view>
+				<view class="sme-profile-copy">
+					<view class="sme-name-row">
+						<text class="sme-name">{{ nickname }}</text>
+						<view v-if="roleLabel != ''" class="sme-role">
+							<text class="sme-role-text">{{ roleLabel }}</text>
+						</view>
+					</view>
+					<text v-if="metaLine1 != ''" class="sme-meta">{{ metaLine1 }}</text>
+					<text v-if="metaLine2 != ''" class="sme-meta">{{ metaLine2 }}</text>
+				</view>
+				<view class="sme-settings-btn" @tap.stop="toAccount">
+					<cl-icon name="settings-line" :size="22" color="#333333"></cl-icon>
+				</view>
+			</view>
+
+			<view class="sme-section">
+				<text class="sme-section-label">更多功能</text>
+				<view
+					class="sme-menu-card"
+					v-for="(item, index) in moreItems"
+					:key="index"
+					@tap="onMenuTap(item.path)"
+				>
+					<text class="sme-menu-text">{{ item.title }}</text>
+					<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+				</view>
+			</view>
+
+			<view class="sme-section">
+				<text class="sme-section-label">关于</text>
+				<view class="sme-menu-card" @tap="onMenuTap('/pages/user/about')">
+					<text class="sme-menu-text">关于我们</text>
+					<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+				</view>
+			</view>
+		</view>
+
+		<custom-tabbar></custom-tabbar>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getUserProfile } from "@/.cool/api/login";
+	import { getApiMessage, isApiSuccess, router, user } from "@/.cool";
+	import CustomTabbar from "@/components/tabbar.uvue";
+	import { syncTabbarRoutePath } from "@/.cool/store/tabbar";
+
+	type MenuItem = {
+		title: string;
+		path: string;
+	};
+
+	const nickname = ref("—");
+	const avatarUrl = ref("");
+	const avatarText = ref("我");
+	const roleLabel = ref("");
+	const metaLine1 = ref("");
+	const metaLine2 = ref("");
+	const profileLoading = ref(false);
+
+	const moreItems: MenuItem[] = [
+		{ title: "账号报备", path: "/pages/account/list" },
+		{ title: "我的词库", path: "/pages/task/record-list" }
+	];
+
+	function pickText(...vals: Array<string | number | null | undefined>): string {
+		for (let i = 0; i < vals.length; i++) {
+			const raw = vals[i];
+			if (raw == null) {
+				continue;
+			}
+			const text = `${raw}`.trim();
+			if (text != "" && text != "null" && text != "undefined") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function getAvatarText(name: string): string {
+		const text = name.trim();
+		return text != "" ? text.substring(0, 1) : "我";
+	}
+
+	function resolveRoleLabel(data: UTSJSONObject): string {
+		const staffRole = pickText(data["staff_role"], data["member_role"]);
+		if (staffRole == "staff" || staffRole == "") {
+			return "员工";
+		}
+		return staffRole;
+	}
+
+	function applyProfile(data: UTSJSONObject) {
+		const name = pickText(data["nickname"], data["mobile"]);
+		if (name != "") {
+			nickname.value = name;
+			avatarText.value = getAvatarText(name);
+		}
+		avatarUrl.value = pickText(data["avatar"]);
+
+		const mobileMask = pickText(data["mobile_mask"], data["mobile"]);
+		const sn = pickText(data["sn"], data["user_id"]);
+		if (mobileMask != "" && sn != "") {
+			metaLine1.value = `${mobileMask} · ${sn}`;
+		} else if (mobileMask != "") {
+			metaLine1.value = mobileMask;
+		} else if (sn != "") {
+			metaLine1.value = sn;
+		} else {
+			metaLine1.value = "";
+		}
+
+		const ent = data["enterprise"] as UTSJSONObject | null;
+		const entName = ent != null ? pickText(ent["name"]) : "";
+		const joinTime = pickText(data["join_time"]);
+		if (entName != "" && joinTime != "") {
+			metaLine2.value = `${entName} · 加入 ${joinTime}`;
+		} else if (entName != "") {
+			metaLine2.value = entName;
+		} else if (joinTime != "") {
+			metaLine2.value = `加入 ${joinTime}`;
+		} else {
+			metaLine2.value = "";
+		}
+
+		roleLabel.value = resolveRoleLabel(data);
+	}
+
+	function applyLocalFallback() {
+		user.hydrateLocalProfile();
+		const info = user.info.value;
+		if (info == null) {
+			return;
+		}
+		const name = pickText(info.nickName, info.phone);
+		if (name != "") {
+			nickname.value = name;
+			avatarText.value = getAvatarText(name);
+		}
+		const avatar = pickText(info.avatarUrl);
+		if (avatar != "") {
+			avatarUrl.value = avatar;
+		}
+		const phone = pickText(info.phone);
+		const idPart = pickText(info.id);
+		if (phone != "" && idPart != "") {
+			metaLine1.value = `${phone} · ${idPart}`;
+		} else if (phone != "") {
+			metaLine1.value = phone;
+		} else if (idPart != "") {
+			metaLine1.value = idPart;
+		}
+		if (roleLabel.value == "") {
+			roleLabel.value = "员工";
+		}
+	}
+
+	function loadProfile() {
+		if (profileLoading.value) {
+			return;
+		}
+		profileLoading.value = true;
+		getUserProfile()
+			.then((res) => {
+				if (res == null) {
+					applyLocalFallback();
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					applyLocalFallback();
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				applyProfile(data);
+			})
+			.catch((err) => {
+				applyLocalFallback();
+				uni.showToast({ title: getApiMessage(err, "加载资料失败"), icon: "none" });
+			})
+			.finally(() => {
+				profileLoading.value = false;
+			});
+	}
+
+	function toAccount() {
+		router.push({ path: "/pages/user/account" });
+	}
+
+	function onMenuTap(path: string) {
+		router.push({ path: path });
+	}
+
+	onShow(() => {
+		syncTabbarRoutePath();
+		applyLocalFallback();
+		loadProfile();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.sme-page {
+		width: 100%;
+		min-height: 100%;
+		box-sizing: border-box;
+		background-color: #f7f8fa;
+		padding: 24rpx 30rpx 140rpx;
+
+		.sme-profile {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			padding: 28rpx 24rpx;
+			border-radius: 24rpx;
+			background-color: #ffffff;
+			margin-bottom: 32rpx;
+
+			.sme-settings-btn {
+				width: 64rpx;
+				height: 64rpx;
+				margin-left: 8rpx;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-shrink: 0;
+			}
+
+			.sme-avatar {
+				width: 112rpx;
+				height: 112rpx;
+				border-radius: 50%;
+				background-color: #2b59c3;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin-right: 24rpx;
+				flex-shrink: 0;
+				overflow: hidden;
+			}
+
+			.sme-avatar-img {
+				width: 112rpx;
+				height: 112rpx;
+				border-radius: 50%;
+			}
+
+			.sme-avatar-text {
+				font-size: 44rpx;
+				color: #ffffff;
+				font-weight: 700;
+			}
+
+			.sme-profile-copy {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.sme-name-row {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				flex-wrap: wrap;
+			}
+
+			.sme-name {
+				font-size: 34rpx;
+				font-weight: 700;
+				color: #1a1a1a;
+				line-height: 48rpx;
+				margin-right: 12rpx;
+			}
+
+			.sme-role {
+				padding: 2rpx 12rpx;
+				border-radius: 8rpx;
+				background-color: #ff7a2f;
+			}
+
+			.sme-role-text {
+				font-size: 20rpx;
+				color: #ffffff;
+				line-height: 30rpx;
+			}
+
+			.sme-meta {
+				margin-top: 6rpx;
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+			}
+		}
+
+		.sme-section {
+			margin-bottom: 28rpx;
+
+			.sme-section-label {
+				display: block;
+				padding-left: 8rpx;
+				margin-bottom: 16rpx;
+				font-size: 26rpx;
+				color: #999999;
+				line-height: 36rpx;
+			}
+
+			.sme-menu-card {
+				height: 104rpx;
+				padding: 0 28rpx;
+				margin-bottom: 16rpx;
+				border-radius: 24rpx;
+				background-color: #ffffff;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+				box-sizing: border-box;
+
+				&:last-child {
+					margin-bottom: 0;
+				}
+			}
+
+			.sme-menu-text {
+				font-size: 30rpx;
+				color: #333333;
+				line-height: 42rpx;
+			}
+		}
+	}
+</style>

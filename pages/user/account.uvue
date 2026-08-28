@@ -1,0 +1,1245 @@
+<template>
+	<cl-page :pt="{ className: 'ac-page' }">
+		<view class="ac-page">
+			<view class="ac-body">
+				<view v-if="profileLoading" class="ac-loading">
+					<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+					<text class="ac-loading-text">加载中...</text>
+				</view>
+
+				<block v-else>
+					<view class="ac-profile-card">
+						<view v-if="avatarDisplaySrc != ''" class="ac-avatar ac-avatar--img">
+							<image
+								class="ac-avatar-image"
+								:key="avatarImageKey"
+								:src="avatarDisplaySrc"
+								mode="aspectFill"
+							></image>
+						</view>
+						<view v-else class="ac-avatar">
+							<text class="ac-avatar-text">{{ avatarText }}</text>
+						</view>
+						<view class="ac-profile-copy">
+							<view class="ac-name-row">
+								<text class="ac-name">{{ nickname }}</text>
+								<view v-if="roleLabel != ''" class="ac-level">
+									<text class="ac-level-text">{{ roleLabel }}</text>
+								</view>
+							</view>
+							<text v-if="metaLine1 != ''" class="ac-meta">{{ metaLine1 }}</text>
+							<text v-if="metaLine2 != ''" class="ac-meta">{{ metaLine2 }}</text>
+						</view>
+					</view>
+
+					<view v-if="showAuditSection && auditNoticePath != ''" class="ac-notice-card"
+						@tap="onAuditNoticeTap">
+						<view class="ac-notice-bar"></view>
+						<view class="ac-notice-icon">
+							<text class="ac-notice-icon-text">!</text>
+						</view>
+						<view class="ac-notice-copy">
+							<text class="ac-notice-title">{{ auditNoticeTitle }}</text>
+							<text v-if="auditNoticeSub != ''" class="ac-notice-sub">{{ auditNoticeSub }}</text>
+						</view>
+						<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
+					</view>
+
+					<block v-for="(section, sIndex) in sections" :key="sIndex">
+						<text class="ac-section-label">{{ section.title }}</text>
+						<view class="ac-card">
+							<view class="ac-row" v-for="(row, rIndex) in section.rows" :key="rIndex"
+								@tap="onRowTap(row)">
+								<text class="ac-row-label">{{ row.label }}</text>
+								<view class="ac-row-right">
+									<view v-if="row.showAvatar" class="ac-row-avatar-wrap">
+										<image
+											v-if="avatarDisplaySrc != ''"
+											class="ac-row-avatar-img"
+											:key="'row-' + avatarImageKey"
+											:src="avatarDisplaySrc"
+											mode="aspectFill"
+										></image>
+										<view v-else class="ac-row-avatar">
+											<text class="ac-row-avatar-text">{{ avatarText }}</text>
+										</view>
+									</view>
+									<view v-if="hasBadge(row)" class="ac-badge" :class="getBadgeWrapClass(row)">
+										<text class="ac-badge-text"
+											:class="getBadgeTextClass(row)">{{ getBadgeText(row) }}</text>
+									</view>
+									<text v-if="row.value != null && row.value != ''"
+										class="ac-row-value">{{ row.value }}</text>
+									<cl-icon name="arrow-right-s-line" :size="18"
+										color="#cccccc"></cl-icon>
+								</view>
+								<view v-if="rIndex < section.rows.length - 1" class="ac-row-divider"></view>
+							</view>
+						</view>
+					</block>
+
+					<view class="ac-logout" @tap="onLogout">
+						<text class="ac-logout-text">退出登录</text>
+					</view>
+				</block>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+
+		<cl-popup
+			v-model="nicknamePopupVisible"
+			direction="bottom"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="true"
+		>
+			<view class="ac-nickname-popup">
+				<view class="ac-nickname-header">
+					<text class="ac-nickname-title">修改昵称</text>
+					<view class="ac-nickname-close" @tap="closeNicknamePopup">
+						<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
+					</view>
+				</view>
+				<input
+					class="ac-nickname-input"
+					:value="nicknameInput"
+					maxlength="20"
+					placeholder="请输入昵称"
+					placeholder-class="ac-nickname-placeholder"
+					@input="onNicknameInput"
+				/>
+				<view
+					class="ac-nickname-btn"
+					:class="{ 'ac-nickname-btn--disabled': profileSaving }"
+					@tap="onConfirmNickname"
+				>
+					<text class="ac-nickname-btn-text">{{ profileSaving ? "保存中..." : "确认" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</cl-popup>
+
+		<cl-popup
+			v-model="realnameAgreeVisible"
+			direction="center"
+			size="560rpx"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="true"
+			:swipe-close="false"
+			:pt="{ className: 'ac-agree-popup-wrap' }"
+		>
+			<view class="ac-agree-modal">
+				<text class="ac-agree-modal-title">同意协议</text>
+				<text class="ac-agree-modal-content">
+					您还没有同意<text class="ac-agree-modal-link" @tap.stop="openRealnameProtocol('service')">《实名认证服务协议》</text>和<text class="ac-agree-modal-link" @tap.stop="openRealnameProtocol('face')">《人脸认证协议》</text>，请您阅读并点击“同意并开始”即代表您已阅读并同意上述内容
+				</text>
+				<view class="ac-agree-modal-actions">
+					<view class="ac-agree-modal-btn ac-agree-modal-btn--ghost" @tap="closeRealnameAgreeModal">
+						<text class="ac-agree-modal-btn-text">取消</text>
+					</view>
+					<view class="ac-agree-modal-btn ac-agree-modal-btn--primary" @tap="onAgreeAndStartRealname">
+						<text class="ac-agree-modal-btn-text ac-agree-modal-btn-text--primary">同意并开始</text>
+					</view>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getUserProfile, logoutLogin, updateUserProfile } from "@/.cool/api/login";
+	import { getNotice, parseAppNoticeList } from "@/.cool/api/notice";
+	import { getUserCertifyTypeInfo } from "@/.cool/api/user-certify";
+	import { normalizePickDisplayPath, toDisplayImageSrc, uploadImage } from "@/.cool/api/upload";
+	import { getApiMessage, isApiSuccess, router, useStore } from "@/.cool";
+	import type { AppNoticeItem } from "@/.cool/types/notice";
+
+	const JOIN_APPLY_LIST_REFRESH_KEY = "joinApplyListNeedRefresh";
+
+	const { user } = useStore();
+
+	type BadgeType = "success" | "warning";
+
+	type SettingBadge = {
+		text : string;
+		type : BadgeType;
+	};
+
+	type ProfileAction = "avatar" | "nickname" | "realname";
+
+	type SettingRow = {
+		label : string;
+		value : string | null;
+		badge : SettingBadge | null;
+		showAvatar : boolean;
+		path : string | null;
+		action : ProfileAction | null;
+	};
+
+	type SettingSection = {
+		title : string;
+		rows : SettingRow[];
+	};
+
+	const profileLoading = ref(true);
+	const nickname = ref("—");
+	const avatarRemoteUrl = ref("");
+	const avatarDisplaySrc = ref("");
+	const avatarImageKey = ref(0);
+	const avatarText = ref("");
+	const metaLine1 = ref("");
+	const metaLine2 = ref("");
+	const roleLabel = ref("");
+	const mobileDisplay = ref("");
+	const sections = ref<SettingSection[]>([]);
+	const showAuditSection = ref(false);
+	const showStaffSection = ref(false);
+	const auditNoticeTitle = ref("");
+	const auditNoticeSub = ref("");
+	const auditNoticePath = ref("");
+	const auditLoading = ref(false);
+	const nicknamePopupVisible = ref(false);
+	const nicknameInput = ref("");
+	const profileSaving = ref(false);
+	const realnameAgreeVisible = ref(false);
+	/** 个人实名状态：1 已认证 */
+	const personalIsCertify = ref(0);
+	/** profile.can_withdraw：1 才展示提现密码入口 */
+	const canWithdraw = ref(0);
+
+	function pickNonEmpty(...values : string[]) : string {
+		for (let i = 0; i < values.length; i++) {
+			const text = `${values[i]}`.trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function getLogoText(text : string) : string {
+		const trimmed = text.trim();
+		if (trimmed == "") {
+			return "用";
+		}
+		return trimmed.substring(0, 1);
+	}
+
+	function appendCacheBust(url : string) : string {
+		const trimmed = url.trim();
+		if (trimmed == "") {
+			return "";
+		}
+		const sep = trimmed.indexOf("?") >= 0 ? "&" : "?";
+		return `${trimmed}${sep}t=${Date.now()}`;
+	}
+
+	function refreshAvatarDisplay(remoteUrl : string) {
+		const trimmed = remoteUrl.trim();
+		avatarRemoteUrl.value = trimmed;
+		if (trimmed == "") {
+			avatarDisplaySrc.value = "";
+			return;
+		}
+		const bustUrl = appendCacheBust(trimmed);
+		toDisplayImageSrc(bustUrl).then((path) => {
+			avatarDisplaySrc.value = path != "" ? path : bustUrl;
+			avatarImageKey.value += 1;
+		});
+	}
+
+	function pickBindStatus(data : UTSJSONObject) : number {
+		const direct = data["bind_status"];
+		if (direct != null && `${direct}`.trim() != "") {
+			const n = parseInt(`${direct}`);
+			return isNaN(n) ? 0 : n;
+		}
+		const ent = data["enterprise"] as UTSJSONObject | null;
+		if (ent != null) {
+			const nested = ent["bind_status"];
+			if (nested != null && `${nested}`.trim() != "") {
+				const n = parseInt(`${nested}`);
+				return isNaN(n) ? 0 : n;
+			}
+		}
+		return 0;
+	}
+
+	function resolveIsEnterpriseOwner(data : UTSJSONObject) : boolean {
+		const owner = data["is_enterprise_owner"];
+		if (owner == 1 || owner == "1" || owner == true || owner == "true") {
+			return true;
+		}
+		const bindType = pickNonEmpty(`${data["bind_type"] ?? ""}`);
+		if (bindType == "owner") {
+			return true;
+		}
+		if (pickBindStatus(data) == 1) {
+			return true;
+		}
+		const staffRole = pickNonEmpty(`${data["staff_role"] ?? ""}`, `${data["member_role"] ?? ""}`);
+		if (staffRole == "owner") {
+			return true;
+		}
+		return false;
+	}
+
+	function resolveRoleLabel(data : UTSJSONObject) : string {
+		if (resolveIsEnterpriseOwner(data)) {
+			return "企业负责人";
+		}
+		const staffRole = pickNonEmpty(`${data["staff_role"] ?? ""}`, `${data["member_role"] ?? ""}`);
+		if (staffRole == "staff") {
+			return "员工";
+		}
+		if (staffRole != "") {
+			return staffRole;
+		}
+		return "";
+	}
+
+	function resolveIsStaffUser(data : UTSJSONObject) : boolean {
+		if (resolveIsEnterpriseOwner(data)) {
+			return false;
+		}
+		if (pickBindStatus(data) == 2) {
+			return true;
+		}
+		const staffRole = pickNonEmpty(`${data["staff_role"] ?? ""}`, `${data["member_role"] ?? ""}`);
+		return staffRole == "staff" || staffRole == "admin";
+	}
+
+	function buildSections() {
+		const nextSections : SettingSection[] = [
+			{
+				title: "个人资料",
+				rows: [
+					{ label: "头像", value: null, badge: null, showAvatar: true, path: null, action: "avatar" },
+					{ label: "昵称", value: nickname.value, badge: null, showAvatar: false, path: null, action: "nickname" }
+				]
+			},
+			{
+				title: "账户与安全",
+				rows: [
+					{
+						label: "登录手机",
+						value: mobileDisplay.value != "" ? mobileDisplay.value : null,
+						badge: null,
+						showAvatar: false,
+						path: "/pages/user/change-mobile",
+						action: null
+					},
+					{
+						label: "登录密码",
+						value: "修改",
+						badge: null,
+						showAvatar: false,
+						path: "/pages/user/login-password",
+						action: null
+					},
+					{
+						label: "实名认证",
+						value: null,
+						badge: null,
+						showAvatar: false,
+						path: null,
+						action: "realname"
+					}
+				]
+			}
+		];
+		if (canWithdraw.value == 1) {
+			nextSections[1].rows.push({
+				label: "提现密码",
+				value: null,
+				badge: null,
+				showAvatar: false,
+				path: "/pages/wallet/withdrawal-password",
+				action: null
+			});
+		}
+		nextSections.push({
+			title: "关于",
+			rows: [
+				{ label: "关于我们", value: "", badge: null, showAvatar: false, path: "/pages/user/about", action: null }
+			]
+		});
+		sections.value = nextSections;
+	}
+
+	function applyProfileToView(data : UTSJSONObject) {
+		const name = pickNonEmpty(`${data["nickname"] ?? ""}`);
+		nickname.value = name != "" ? name : "—";
+		refreshAvatarDisplay(pickNonEmpty(`${data["avatar"] ?? ""}`));
+		avatarText.value = getLogoText(name);
+
+		const mobileMask = pickNonEmpty(`${data["mobile_mask"] ?? ""}`, `${data["mobile"] ?? ""}`);
+		mobileDisplay.value = mobileMask;
+		const sn = pickNonEmpty(`${data["sn"] ?? ""}`);
+		const userId = data["user_id"];
+		const idPart = sn != "" ? sn : userId != null ? `${userId}` : "";
+		if (mobileMask != "" && idPart != "") {
+			metaLine1.value = `${mobileMask} · ${idPart}`;
+		} else if (mobileMask != "") {
+			metaLine1.value = mobileMask;
+		} else if (idPart != "") {
+			metaLine1.value = idPart;
+		} else {
+			metaLine1.value = "";
+		}
+
+		const ent = data["enterprise"] as UTSJSONObject | null;
+		const entName = ent != null ? pickNonEmpty(`${ent["name"] ?? ""}`) : "";
+		const joinTime = pickNonEmpty(`${data["join_time"] ?? ""}`);
+		if (entName != "" && joinTime != "") {
+			metaLine2.value = `${entName} · 加入 ${joinTime}`;
+		} else if (entName != "") {
+			metaLine2.value = entName;
+		} else if (joinTime != "") {
+			metaLine2.value = `加入 ${joinTime}`;
+		} else {
+			metaLine2.value = "";
+		}
+
+		roleLabel.value = resolveRoleLabel(data);
+		showAuditSection.value = resolveIsEnterpriseOwner(data);
+		showStaffSection.value = resolveIsStaffUser(data);
+		const withdrawFlag = data["can_withdraw"];
+		if (withdrawFlag == null) {
+			canWithdraw.value = 0;
+		} else {
+			const n = parseInt(`${withdrawFlag}`);
+			canWithdraw.value = isNaN(n) ? 0 : n;
+		}
+		buildSections();
+		if (showAuditSection.value) {
+			loadAppNotice();
+		}
+	}
+
+	function applyLocalFallback() {
+		const info = user.info.value;
+		if (info == null) {
+			showStaffSection.value = false;
+			canWithdraw.value = 0;
+			buildSections();
+			return;
+		}
+		const stored = uni.getStorageSync("userInfo") as UTSJSONObject | null;
+		const fallback = stored != null ? stored : ({} as UTSJSONObject);
+		if (fallback["nickname"] == null) {
+			fallback["nickname"] = info.nickName ?? "";
+		}
+		if (fallback["avatar"] == null) {
+			fallback["avatar"] = info.avatarUrl ?? "";
+		}
+		if (fallback["mobile"] == null) {
+			fallback["mobile"] = info.phone ?? "";
+		}
+		if (fallback["user_id"] == null) {
+			fallback["user_id"] = info.id;
+		}
+		applyProfileToView(fallback);
+	}
+
+	function loadProfile() {
+		profileLoading.value = true;
+		getUserProfile().then((res) => {
+            if (res == null) {
+                applyLocalFallback();
+                return;
+            }
+            const envelope = res as UTSJSONObject;
+            const code = envelope["code"];
+            if (code != null && !isApiSuccess(code)) {
+                uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+                applyLocalFallback();
+                return;
+            }
+            user.applyProfileResponse(res);
+            const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+            applyProfileToView(data);
+        })
+        .catch((err) => {
+            uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+            applyLocalFallback();
+        })
+        .finally(() => {
+            profileLoading.value = false;
+        });
+	}
+
+	function hasBadge(row : SettingRow) : boolean {
+		return row.badge != null;
+	}
+
+	function getBadgeWrapClass(row : SettingRow) : string {
+		const badge = row.badge;
+		if (badge == null) {
+			return "";
+		}
+		return badge.type == "success" ? "ac-badge--success" : "ac-badge--warning";
+	}
+
+	function getBadgeTextClass(row : SettingRow) : string {
+		const badge = row.badge;
+		if (badge == null) {
+			return "";
+		}
+		return badge.type == "success" ? "ac-badge-text--success" : "ac-badge-text--warning";
+	}
+
+	function getBadgeText(row : SettingRow) : string {
+		const badge = row.badge;
+		return badge != null ? badge.text : "";
+	}
+
+	function getActualNickname() : string {
+		const name = nickname.value.trim();
+		return name == "—" ? "" : name;
+	}
+
+	function syncUserProfileCache(nextNickname : string, nextAvatar : string) {
+		const info = user.info.value;
+		if (info != null) {
+			info.nickName = nextNickname;
+			if (nextAvatar != "") {
+				info.avatarUrl = nextAvatar;
+			}
+		}
+		const stored = uni.getStorageSync("userInfo") as UTSJSONObject | null;
+		if (stored != null) {
+			stored["nickname"] = nextNickname;
+			stored["nickName"] = nextNickname;
+			if (nextAvatar != "") {
+				stored["avatar"] = nextAvatar;
+				stored["avatarUrl"] = nextAvatar;
+			}
+			uni.setStorageSync("userInfo", stored);
+		}
+	}
+
+	function applySubmittedProfile(nextNickname : string, nextAvatar : string) {
+		nickname.value = nextNickname != "" ? nextNickname : "—";
+		avatarText.value = getLogoText(nextNickname);
+		refreshAvatarDisplay(nextAvatar);
+		buildSections();
+		syncUserProfileCache(nextNickname, nextAvatar);
+	}
+
+	function applyProfileSaveResult(res : any | null, nextNickname : string, nextAvatar : string) : boolean {
+		if (res == null) {
+			uni.showToast({ title: "保存失败", icon: "none" });
+			return false;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			uni.showToast({ title: getApiMessage(res, "保存失败"), icon: "none" });
+			return false;
+		}
+		user.applyProfileResponse(res);
+		const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+		if (data != null) {
+			applyProfileToView(data);
+		}
+		// 以本次提交结果为准，避免接口未返回最新昵称/头像
+		applySubmittedProfile(nextNickname, nextAvatar);
+		uni.showToast({ title: "保存成功", icon: "success" });
+		return true;
+	}
+
+	function saveProfile(nextNickname : string, nextAvatar : string) : Promise<boolean> {
+		if (profileSaving.value) {
+			return Promise.resolve(false);
+		}
+		profileSaving.value = true;
+		return updateUserProfile(nextNickname, nextAvatar)
+			.then((res) => {
+				return applyProfileSaveResult(res, nextNickname, nextAvatar);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "保存失败"), icon: "none" });
+				return false;
+			})
+			.finally(() => {
+				profileSaving.value = false;
+			});
+	}
+
+	function openNicknamePopup() {
+		if (profileSaving.value) {
+			return;
+		}
+		nicknameInput.value = getActualNickname();
+		nicknamePopupVisible.value = true;
+	}
+
+	function closeNicknamePopup() {
+		nicknamePopupVisible.value = false;
+	}
+
+	function onNicknameInput(e : UniInputEvent) {
+		const detail = e.detail;
+		nicknameInput.value = detail != null ? `${detail.value ?? ""}` : "";
+	}
+
+	function onConfirmNickname() {
+		if (profileSaving.value) {
+			return;
+		}
+		const nextNickname = nicknameInput.value.trim();
+		if (nextNickname == "") {
+			uni.showToast({ title: "请输入昵称", icon: "none" });
+			return;
+		}
+		if (nextNickname == getActualNickname()) {
+			closeNicknamePopup();
+			return;
+		}
+		saveProfile(nextNickname, avatarRemoteUrl.value).then((ok) => {
+			if (ok) {
+				closeNicknamePopup();
+			}
+		});
+	}
+
+	function onChangeAvatar() {
+		if (profileSaving.value || profileLoading.value) {
+			return;
+		}
+		uni.chooseImage({
+			count: 1,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				const paths = res.tempFilePaths;
+				if (paths == null || paths.length == 0) {
+					return;
+				}
+				const tempPath = paths[0];
+				uni.showLoading({ title: "上传中..." });
+				normalizePickDisplayPath(tempPath)
+					.then((displayPath) => {
+						avatarDisplaySrc.value = displayPath;
+						avatarImageKey.value += 1;
+						return uploadImage(tempPath);
+					})
+					.then((url) => {
+						return saveProfile(getActualNickname(), url).then((ok) => {
+							if (ok) {
+								refreshAvatarDisplay(url);
+							}
+							return ok;
+						});
+					})
+					.catch((err) => {
+						const msg =
+							err != null && (err as UTSJSONObject)["message"] != null
+								? `${(err as UTSJSONObject)["message"]}`
+								: "上传失败";
+						uni.showToast({ title: msg, icon: "none" });
+						loadProfile();
+					})
+					.finally(() => {
+						uni.hideLoading();
+					});
+			}
+		});
+	}
+
+	function onRowTap(row : SettingRow) {
+		if (row.action == "realname") {
+			if (personalIsCertify.value == 1) {
+				router.push({ path: "/pages/user/real-name" });
+				return;
+			}
+			openRealnameAgreeModal();
+			return;
+		}
+		if (row.path != null && row.path != "") {
+			router.push({ path: row.path });
+			return;
+		}
+		if (row.action == "avatar") {
+			onChangeAvatar();
+			return;
+		}
+		if (row.action == "nickname") {
+			openNicknamePopup();
+		}
+	}
+
+	function loadCertifyStatus() {
+		getUserCertifyTypeInfo({ type: -1, bind_scope: 1 })
+			.then((res) => {
+				if (res == null) {
+					personalIsCertify.value = 0;
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code as number | string)) {
+					personalIsCertify.value = 0;
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const flag = data["personal_is_certify"];
+				let n = flag != null ? parseInt(`${flag}`) : 0;
+				if (isNaN(n)) {
+					n = 0;
+				}
+				personalIsCertify.value = n;
+			})
+			.catch(() => {
+				personalIsCertify.value = 0;
+			});
+	}
+
+	function openRealnameAgreeModal() {
+		realnameAgreeVisible.value = true;
+	}
+
+	function closeRealnameAgreeModal() {
+		realnameAgreeVisible.value = false;
+	}
+
+	function openRealnameProtocol(type : string) {
+		let pageKey = "";
+		if (type == "service") {
+			pageKey = "studio_realname";
+		} else if (type == "face") {
+			pageKey = "studio_face";
+		} else {
+			return;
+		}
+		realnameAgreeVisible.value = false;
+		router.push({
+			path: "/pages/protocol/detail",
+			query: {
+				page_key: pageKey
+			}
+		});
+	}
+
+	function onAgreeAndStartRealname() {
+		realnameAgreeVisible.value = false;
+		router.push({ path: "/pages/user/real-name" });
+	}
+
+	function onLogout() {
+		logoutLogin().catch(() => { }).finally(() => {
+            user.clear();
+            router.login();
+        });
+	}
+
+	function clearAppNotice() {
+		auditNoticeTitle.value = "";
+		auditNoticeSub.value = "";
+		auditNoticePath.value = "";
+	}
+
+	function applyAppNotice(list : AppNoticeItem[]) {
+		for (let i = 0; i < list.length; i++) {
+			const item = list[i];
+			if (item.path != "") {
+				auditNoticeTitle.value = item.title;
+				auditNoticeSub.value = item.content;
+				auditNoticePath.value = item.path;
+				return;
+			}
+		}
+		clearAppNotice();
+	}
+
+	function loadAppNotice() {
+		if (!showAuditSection.value || auditLoading.value) {
+			return;
+		}
+		auditLoading.value = true;
+		getNotice().then((res) => {
+            applyAppNotice(parseAppNoticeList(res));
+        }).catch(() => {
+            clearAppNotice();
+        }).finally(() => {
+            auditLoading.value = false;
+        });
+	}
+
+	function onAuditNoticeTap() {
+		const path = auditNoticePath.value.trim();
+		if (path == "") {
+			return;
+		}
+		router.push({ path: path.startsWith("/") ? path : `/${path}` });
+	}
+
+	function tryRefreshAuditList() {
+		const need = uni.getStorageSync(JOIN_APPLY_LIST_REFRESH_KEY) as string | null;
+		if (need == "1") {
+			uni.removeStorageSync(JOIN_APPLY_LIST_REFRESH_KEY);
+			loadAppNotice();
+		}
+	}
+
+	onLoad((options) => {
+
+	});
+
+	onShow(() => {
+		if (!user.isLoggedIn()) {
+			return;
+		}
+		loadProfile();
+		loadCertifyStatus();
+		tryRefreshAuditList();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ac-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.ac-body {
+		padding: 30rpx 30rpx 40rpx;
+	}
+
+	.ac-loading {
+		padding: 120rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-loading-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.ac-profile-card {
+		padding: 28rpx 24rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 16rpx;
+	}
+
+	.ac-avatar {
+		width: 112rpx;
+		height: 112rpx;
+		border-radius: 56rpx;
+		background-image: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		overflow: hidden;
+	}
+
+	.ac-avatar--img {
+		background-image: none;
+		background-color: #f0f0f0;
+	}
+
+	.ac-avatar-image {
+		width: 112rpx;
+		height: 112rpx;
+	}
+
+	.ac-avatar-text {
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 56rpx;
+	}
+
+	.ac-profile-copy {
+		flex: 1;
+		min-width: 0;
+		margin-left: 20rpx;
+	}
+
+	.ac-name-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.ac-name {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 44rpx;
+		margin-right: 10rpx;
+	}
+
+	.ac-level {
+		padding: 2rpx 10rpx;
+		border-radius: 8rpx;
+		background-color: #fff7ed;
+	}
+
+	.ac-level-text {
+		font-size: 20rpx;
+		font-weight: 600;
+		color: #d97706;
+		line-height: 28rpx;
+	}
+
+	.ac-meta {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ac-section-label {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		margin-bottom: 8rpx;
+	}
+
+	.ac-notice-card {
+		position: relative;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 28rpx 24rpx 28rpx 20rpx;
+		margin-bottom: 20rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		box-shadow: 0 4rpx 20rpx rgba(15, 23, 42, 0.06);
+		overflow: hidden;
+	}
+
+	.ac-notice-bar {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 6rpx;
+		background-color: #f97316;
+	}
+
+	.ac-notice-icon {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 28rpx;
+		background-color: #fff7ed;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		margin-left: 8rpx;
+		margin-right: 16rpx;
+	}
+
+	.ac-notice-icon-text {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #f97316;
+		line-height: 36rpx;
+	}
+
+	.ac-notice-copy {
+		flex: 1;
+		min-width: 0;
+		margin-right: 12rpx;
+	}
+
+	.ac-notice-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.ac-notice-sub {
+		margin-top: 6rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ac-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 20rpx;
+		overflow: hidden;
+	}
+
+	.ac-row {
+		position: relative;
+		padding: 28rpx 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.ac-row-label {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+		flex-shrink: 0;
+	}
+
+	.ac-row-right {
+		flex: 1;
+		min-width: 0;
+		margin-left: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.ac-row-avatar-wrap {
+		margin-right: 8rpx;
+	}
+
+	.ac-row-avatar {
+		width: 48rpx;
+		height: 48rpx;
+		border-radius: 24rpx;
+		background-image: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-row-avatar-img {
+		width: 48rpx;
+		height: 48rpx;
+		border-radius: 24rpx;
+	}
+
+	.ac-row-avatar-text {
+		font-size: 22rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 28rpx;
+	}
+
+	.ac-badge {
+		padding: 2rpx 12rpx;
+		border-radius: 8rpx;
+		margin-right: 8rpx;
+	}
+
+	.ac-badge--success {
+		background-color: #ecfdf5;
+	}
+
+	.ac-badge--warning {
+		background-color: #fff7ed;
+	}
+
+	.ac-badge-text {
+		font-size: 20rpx;
+		line-height: 28rpx;
+	}
+
+	.ac-badge-text--success {
+		color: #16a34a;
+	}
+
+	.ac-badge-text--warning {
+		color: #d97706;
+	}
+
+	.ac-row-value {
+		max-width: 360rpx;
+		margin-right: 8rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+		text-align: right;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.ac-row-divider {
+		position: absolute;
+		left: 24rpx;
+		right: 24rpx;
+		bottom: 0;
+		height: 1rpx;
+		background-color: #f0f0f0;
+	}
+
+	.ac-logout {
+		padding: 32rpx 0 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-logout-text {
+		font-size: 30rpx;
+		color: #ef4444;
+		line-height: 42rpx;
+	}
+
+	.ac-nickname-popup {
+		padding: 32rpx 30rpx 24rpx;
+		background-color: #ffffff;
+		border-top-left-radius: 24rpx;
+		border-top-right-radius: 24rpx;
+	}
+
+	.ac-nickname-header {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 24rpx;
+	}
+
+	.ac-nickname-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.ac-nickname-close {
+		width: 48rpx;
+		height: 48rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-nickname-input {
+		width: 100%;
+		height: 88rpx;
+		padding: 0 24rpx;
+		border-radius: 16rpx;
+		background-color: #f7f8fa;
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.ac-nickname-placeholder {
+		color: #cccccc;
+		font-size: 28rpx;
+	}
+
+	.ac-nickname-btn {
+		margin-top: 32rpx;
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-nickname-btn--disabled {
+		opacity: 0.6;
+	}
+
+	.ac-nickname-btn-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 42rpx;
+	}
+
+	.ac-agree-modal {
+		width: 100%;
+		padding: 40rpx 32rpx 32rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-agree-modal-title {
+		display: block;
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #333333;
+		text-align: center;
+		line-height: 48rpx;
+		margin-bottom: 24rpx;
+	}
+
+	.ac-agree-modal-content {
+		display: block;
+		width: 100%;
+		margin-bottom: 24rpx;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 44rpx;
+	}
+
+	.ac-agree-modal-link {
+		font-size: 26rpx;
+		color: #2b59c3;
+		line-height: 44rpx;
+	}
+
+	.ac-agree-modal-actions {
+		display: flex;
+		flex-direction: row;
+		width: 100%;
+	}
+
+	.ac-agree-modal-btn {
+		flex: 1;
+		height: 88rpx;
+		border-radius: 12rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-agree-modal-btn--ghost {
+		margin-right: 20rpx;
+		background-color: #f5f5f5;
+	}
+
+	.ac-agree-modal-btn--primary {
+		background-color: #2b59c3;
+	}
+
+	.ac-agree-modal-btn-text {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.ac-agree-modal-btn-text--primary {
+		color: #ffffff;
+	}
+</style>
+
+<style lang="scss">
+	.ac-agree-popup-wrap {
+		.cl-popup__inner {
+			border-radius: 32rpx;
+			background-color: #ffffff;
+			overflow: visible;
+		}
+	}
+</style>

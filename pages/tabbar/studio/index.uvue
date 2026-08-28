@@ -1,0 +1,1091 @@
+<template>
+	<cl-page :pt="{ className: 'st-page' }" :back-top="false">
+		<view class="st-page">
+			<view class="st-top-panel">
+				<view class="st-top-inner">
+					<view class="st-hero-card">
+						<view class="st-hero-top">
+							<view class="st-brand-row">
+								<image
+									v-if="enterpriseLogo != ''"
+									class="st-brand-logo-img"
+									:src="enterpriseLogo"
+									mode="aspectFill"
+								></image>
+								<view v-else class="st-brand-logo">
+									<text class="st-brand-logo-text">{{ enterpriseLogoText }}</text>
+								</view>
+								<view class="st-brand-copy">
+									<text class="st-brand-name">{{ enterpriseName }}</text>
+									<text v-if="enterpriseIntro != ''" class="st-brand-sub">{{ enterpriseIntro }}</text>
+								</view>
+							</view>
+							<view class="st-settings-btn" @tap="onSettingsTap">
+								<cl-icon name="settings-line" :size="22" color="#333333"></cl-icon>
+							</view>
+						</view>
+					</view>
+
+					<view class="st-type-card">
+						<cl-tabs
+							v-model="activeTypeId"
+							:list="typeFilterTabList"
+							height="68rpx"
+							:gutter="0"
+							:show-line="false"
+							scroll-align="previous"
+							color="#2b529f"
+							un-color="#999999"
+							:pt="typeTabsPt"
+							@change="onTypeFilterChange"
+						>
+							<template #item="{ item, active }">
+								<view class="st-type-tab-inner">
+									<text
+										class="st-type-text"
+										:class="{ 'st-type-text--active': active }"
+									>{{ item.label }}</text>
+									<view v-if="active" class="st-type-line"></view>
+								</view>
+							</template>
+						</cl-tabs>
+					</view>
+				</view>
+			</view>
+
+			<scroll-view
+				class="st-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:scroll-top="scrollViewTop"
+				:scroll-with-animation="true"
+				:lower-threshold="120"
+				@scroll="onScroll"
+				@scrolltolower="onTaskScrollToLower"
+			>
+				<view class="st-scroll-inner">
+					<view v-if="taskLoading && taskRows.length == 0" class="st-task-state">
+						<cl-loading :loading="true"></cl-loading>
+					</view>
+					<view v-else-if="!taskLoading && taskRows.length == 0" class="st-task-state">
+						<text class="st-task-state-text">暂无任务</text>
+					</view>
+
+					<view v-else class="st-task-grid">
+						<view
+							class="st-task-card"
+							v-for="(item, index) in taskRows"
+							:key="item.id"
+						>
+							<view class="st-task-head" @tap="onTaskDetail(item)">
+								<view class="st-task-copy">
+									<text class="st-task-title">{{ item.title }}</text>
+									<text class="st-task-date">数据更新: {{ formatTaskUpdateDate(`${item.update_time ?? ""}`) }}</text>
+								</view>
+								<image
+									v-if="getTaskLogoUrl(item) != ''"
+									class="st-task-logo"
+									:src="getTaskLogoUrl(item)"
+									mode="aspectFill"
+								></image>
+								<view v-else class="st-task-icon" :style="{ backgroundColor: getTaskIconPalette(index).bg }">
+									<text class="st-task-icon-text" :style="{ color: getTaskIconPalette(index).color }">{{ getTaskIconText(`${item.title ?? ""}`) }}</text>
+								</view>
+							</view>
+							<view class="st-task-actions">
+								<view class="st-task-btn st-task-btn--light" @tap="onParticipateTask(item)">
+									<text class="st-task-btn-text st-task-btn-text--primary">参与任务</text>
+								</view>
+								<view class="st-task-btn st-task-btn--primary" v-if="item.category_id != 6 && item.category_id != 5" @tap="onBackfill(item)">
+									<text class="st-task-btn-text st-task-btn-text--white">立即回填</text>
+								</view>
+							</view>
+						</view>
+					</view>
+
+					<view v-if="taskRows.length > 0" class="st-task-loadmore" @tap="onTaskLoadMoreTap">
+						<cl-loadmore
+							:loading="taskLoadingMore"
+							:finish="!taskHasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</view>
+
+					<view class="st-footer">
+						<view
+							v-if="enterpriseName != '' || enterpriseFooterLine != ''"
+							class="st-footer-banner"
+						>
+							<view class="st-footer-brand-row">
+								<view class="st-footer-brand-inner">
+									<image
+										v-if="enterpriseLogo != ''"
+										class="st-footer-logo-img"
+										:src="enterpriseLogo"
+										mode="aspectFill"
+									></image>
+									<view v-else class="st-footer-logo">
+										<text class="st-footer-logo-text">{{ enterpriseLogoText }}</text>
+									</view>
+									<text class="st-footer-name">{{ enterpriseName }}</text>
+								</view>
+							</view>
+							<text v-if="enterpriseFooterLine != ''" class="st-footer-line">{{ enterpriseFooterLine }}</text>
+						</view>
+						<text class="st-footer-copy">© 2026 · 服务于您的事业</text>
+					</view>
+				</view>
+			</scroll-view>
+		</view>
+
+		<cl-back-top :top="scrollTop" @back-top="onBackTop"></cl-back-top>
+		<custom-tabbar></custom-tabbar>
+
+		<cl-popup
+			v-model="resignedNoticeVisible"
+			direction="center"
+			size="560rpx"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="false"
+			:swipe-close="false"
+			:pt="{ className: 'st-resigned-popup-wrap' }"
+		>
+			<view class="st-resigned-popup">
+				<text class="st-resigned-title">提示</text>
+				<text class="st-resigned-content">{{ RESIGNED_STATUS_NOTICE }}</text>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, nextTick, ref } from "vue";
+	import { getEnterpriseInfo } from "@/.cool/api/enterprise";
+	import { getAppSystem } from "@/.cool/api/app";
+	import { getProjectTypes } from "@/.cool/api/project";
+	import { getTaskList } from "@/.cool/api/task";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import {
+		isResignedEmployeeState,
+		parseAppSystemRouteState,
+		RESIGNED_STATUS_NOTICE
+	} from "@/.cool/navigation/appSystemNavigation";
+	import type { EnterpriseInfo, Response, TaskListItem } from "@/.cool";
+	import type { ProjectTypeItem } from "@/.cool/types/project";
+	import type { TaskListParams } from "@/.cool/types/task";
+	import type { ClTabsItem } from "@/uni_modules/cool-ui/types/index";
+	import CustomTabbar from "@/components/tabbar.uvue";
+	import { syncTabbarRoutePath } from "@/.cool/store/tabbar";
+
+	const TASK_PAGE_LIMIT = 20;
+	const TYPE_FILTER_ALL_ID = 0;
+	const TASK_ICON_PALETTE = [
+		{ bg: "#ecfdf5", color: "#16a34a" },
+		{ bg: "#1a1a1a", color: "#ffffff" },
+		{ bg: "#eff6ff", color: "#2563eb" },
+		{ bg: "#fef2f2", color: "#ef4444" },
+		{ bg: "#f5f3ff", color: "#7c3aed" }
+	];
+
+	type TypeFilterItem = {
+		id: number;
+		label: string;
+	};
+
+	const typeFilters = ref<TypeFilterItem[]>([{ id: TYPE_FILTER_ALL_ID, label: "全部" }]);
+	const activeTypeId = ref<number>(TYPE_FILTER_ALL_ID);
+	const typesLoaded = ref<boolean>(false);
+	const typesLoading = ref<boolean>(false);
+
+	const typeFilterTabList = computed((): ClTabsItem[] => {
+		return typeFilters.value.map((item) => {
+			return {
+				label: item.label,
+				value: item.id
+			} as ClTabsItem;
+		});
+	});
+
+	const typeTabsPt = {
+		className: "st-type-cl-tabs",
+		item: {
+			className: "st-type-cl-tabs-item"
+		}
+	};
+
+	const taskRows = ref<TaskListItem[]>([]);
+	const taskLoading = ref(false);
+	const taskLoadingMore = ref(false);
+	const taskPage = ref(1);
+	const taskHasMore = ref(true);
+	const taskListRequestId = ref(0);
+
+	const enterpriseName = ref("工作室");
+	const enterpriseIntro = ref("");
+	const enterpriseLogo = ref("");
+	const enterpriseLogoText = ref("企");
+	const enterpriseFooterLine = ref("");
+	const enterpriseInfoLoading = ref(false);
+	const resignedNoticeVisible = ref(false);
+
+	const scrollTop = ref(0);
+	const scrollViewTop = ref(0);
+
+	function onScroll(e: UniScrollEvent) {
+		scrollTop.value = Math.floor(e.detail.scrollTop);
+	}
+
+	function onBackTop() {
+		scrollViewTop.value = 0.01;
+		nextTick(() => {
+			scrollViewTop.value = 0;
+		});
+	}
+
+	function getEnterpriseLogoText(name: string): string {
+		const text = name.trim();
+		if (text == "") {
+			return "企";
+		}
+		return text.substring(0, 1);
+	}
+
+	function parseEnterpriseInfo(res: any | null): EnterpriseInfo | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		return data as EnterpriseInfo;
+	}
+
+	function applyEnterpriseInfo(info: EnterpriseInfo) {
+		const name = `${info.name ?? ""}`.trim();
+		const intro = `${info.intro ?? ""}`.trim();
+		const logo = `${info.logo ?? ""}`.trim();
+		enterpriseName.value = name != "" ? name : "工作室";
+		enterpriseIntro.value = intro;
+		enterpriseLogo.value = logo;
+		enterpriseLogoText.value = getEnterpriseLogoText(enterpriseName.value);
+		enterpriseFooterLine.value = intro;
+	}
+
+	function loadEnterpriseInfo() {
+		if (enterpriseInfoLoading.value) {
+			return;
+		}
+		enterpriseInfoLoading.value = true;
+		getEnterpriseInfo()
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const info = parseEnterpriseInfo(res);
+				if (info == null) {
+					return;
+				}
+				applyEnterpriseInfo(info);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				enterpriseInfoLoading.value = false;
+			});
+	}
+
+	function formatTaskUpdateDate(raw: string): string {
+		const text = `${raw}`.trim();
+		if (text == "") {
+			return "--";
+		}
+		const spaceIdx = text.indexOf(" ");
+		const datePart = spaceIdx >= 0 ? text.substring(0, spaceIdx) : text;
+		const parts = datePart.split("-");
+		if (parts.length >= 3) {
+			return `${parts[1]}-${parts[2]}`;
+		}
+		return datePart;
+	}
+
+	function getTaskIconText(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "任";
+		}
+		return text.substring(0, 1);
+	}
+
+	function getTaskLogoUrl(item: TaskListItem): string {
+		return `${item.logo_url ?? item.logo ?? ""}`.trim();
+	}
+
+	function getTaskIconPalette(index: number) {
+		return TASK_ICON_PALETTE[index % TASK_ICON_PALETTE.length];
+	}
+
+	function mapTaskRow(item: TaskListItem): TaskListItem {
+		return item;
+	}
+
+	function parseTaskListPayload(res: any | null): { list: TaskListItem[]; count: number } {
+		if (res == null) {
+			return { list: [], count: 0 };
+		}
+		const envelope = res as UTSJSONObject;
+		const data = envelope["data"] ?? envelope;
+		if (Array.isArray(data)) {
+			return { list: data as TaskListItem[], count: data.length };
+		}
+		const obj = data as UTSJSONObject;
+		const list = obj["list"];
+		const rawList =
+			list != null && Array.isArray(list) ? (list as TaskListItem[]) : ([] as TaskListItem[]);
+		const countVal = obj["count"] ?? obj["total"] ?? obj["total_count"];
+		let count = 0;
+		if (countVal != null) {
+			const n = parseInt(`${countVal}`);
+			count = isNaN(n) ? 0 : n;
+		}
+		return { list: rawList, count };
+	}
+
+	function parseProjectTypeList(res: any | null): TypeFilterItem[] {
+		const items: TypeFilterItem[] = [{ id: TYPE_FILTER_ALL_ID, label: "全部" }];
+		if (res == null) {
+			return items;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			return items;
+		}
+		const data = envelope["data"] ?? envelope;
+		if (!Array.isArray(data)) {
+			return items;
+		}
+		const rows = data as ProjectTypeItem[];
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const idVal = row.id ?? 0;
+			const id = typeof idVal == "number" ? (idVal as number) : parseInt(`${idVal}`);
+			if (isNaN(id) || id <= 0) {
+				continue;
+			}
+			const labelRaw = row.label ?? row.title ?? "";
+			const label = `${labelRaw}`.trim();
+			if (label == "") {
+				continue;
+			}
+			items.push({ id: id, label: label });
+		}
+		return items;
+	}
+
+	function loadProjectTypes(andLoadTasks: boolean = true) {
+		if (typesLoading.value) {
+			return;
+		}
+		if (typesLoaded.value) {
+			if (andLoadTasks) {
+				loadTaskList(false);
+			}
+			return;
+		}
+		typesLoading.value = true;
+		getProjectTypes()
+			.then((res) => {
+				typeFilters.value = parseProjectTypeList(res);
+				typesLoaded.value = true;
+				if (activeTypeId.value != TYPE_FILTER_ALL_ID) {
+					const exists = typeFilters.value.find((item) => item.id == activeTypeId.value);
+					if (exists == null) {
+						activeTypeId.value = TYPE_FILTER_ALL_ID;
+					}
+				}
+				if (andLoadTasks) {
+					loadTaskList(false);
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载分类失败"), icon: "none" });
+				if (andLoadTasks) {
+					loadTaskList(false);
+				}
+			})
+			.finally(() => {
+				typesLoading.value = false;
+			});
+	}
+
+	function resolveTypeId(value: string | number | null | undefined): number {
+		if (value == null) {
+			return activeTypeId.value;
+		}
+		if (typeof value == "number") {
+			return value as number;
+		}
+		const n = parseInt(`${value}`);
+		return isNaN(n) ? activeTypeId.value : n;
+	}
+
+	function onTypeFilterChange(value: string | number) {
+		loadTaskList(false, resolveTypeId(value));
+	}
+
+	function updateTaskHasMore(rawListLength: number, count: number, currentPage: number) {
+		if (count > 0) {
+			taskHasMore.value = currentPage * TASK_PAGE_LIMIT < count;
+			return;
+		}
+		taskHasMore.value = rawListLength >= TASK_PAGE_LIMIT;
+	}
+
+	function loadTaskList(more: boolean = false, categoryId?: number) {
+		const targetCategoryId = categoryId ?? activeTypeId.value;
+
+		if (more) {
+			if (taskLoadingMore.value || !taskHasMore.value || taskLoading.value) {
+				return;
+			}
+			taskLoadingMore.value = true;
+			const requestId = taskListRequestId.value;
+			const requestPage = taskPage.value + 1;
+			const listParams: TaskListParams = {
+				page: requestPage,
+				limit: TASK_PAGE_LIMIT
+			};
+			if (targetCategoryId > 0) {
+				listParams.category_id = targetCategoryId;
+			}
+			getTaskList(listParams)
+				.then((res) => {
+					if (requestId != taskListRequestId.value) {
+						return;
+					}
+					const envelope = res as Response | null;
+					if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+						uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+						return;
+					}
+					const payload = parseTaskListPayload(res);
+					const rows = payload.list.map((item) => mapTaskRow(item));
+					taskRows.value = taskRows.value.concat(rows);
+					taskPage.value = requestPage;
+					updateTaskHasMore(payload.list.length, payload.count, requestPage);
+				})
+				.catch((err) => {
+					if (requestId != taskListRequestId.value) {
+						return;
+					}
+					const res = err as Response;
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+				})
+				.finally(() => {
+					if (requestId != taskListRequestId.value) {
+						return;
+					}
+					taskLoadingMore.value = false;
+				});
+			return;
+		}
+
+		const requestId = taskListRequestId.value + 1;
+		taskListRequestId.value = requestId;
+		taskLoading.value = true;
+		taskLoadingMore.value = false;
+		taskRows.value = [];
+		taskPage.value = 1;
+		taskHasMore.value = true;
+
+		const requestPage = 1;
+		const listParams: TaskListParams = {
+			page: requestPage,
+			limit: TASK_PAGE_LIMIT
+		};
+		if (targetCategoryId > 0) {
+			listParams.category_id = targetCategoryId;
+		}
+		getTaskList(listParams)
+			.then((res) => {
+				if (requestId != taskListRequestId.value) {
+					return;
+				}
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const payload = parseTaskListPayload(res);
+				const rows = payload.list.map((item) => mapTaskRow(item));
+				if (more) {
+					taskRows.value = taskRows.value.concat(rows);
+				} else {
+					taskRows.value = rows;
+				}
+				taskPage.value = requestPage;
+				updateTaskHasMore(payload.list.length, payload.count, requestPage);
+			})
+			.catch((err) => {
+				if (requestId != taskListRequestId.value) {
+					return;
+				}
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				if (requestId != taskListRequestId.value) {
+					return;
+				}
+				taskLoading.value = false;
+			});
+	}
+
+	function loadMoreTaskList() {
+		loadTaskList(true);
+	}
+
+	function onTaskScrollToLower() {
+		if (!taskHasMore.value || taskLoadingMore.value || taskLoading.value) {
+			return;
+		}
+		loadMoreTaskList();
+	}
+
+	function onTaskLoadMoreTap() {
+		if (!taskHasMore.value || taskLoadingMore.value || taskLoading.value) {
+			return;
+		}
+		loadMoreTaskList();
+	}
+
+	function onTaskDetail(item: TaskListItem) {
+		const query: UTSJSONObject = {
+			id: `${item.id}`,
+			title: item.title ?? "",
+			category_id: item.category_id,
+			logo: getTaskLogoUrl(item)
+		};
+		if (item.project_id != null && item.project_id > 0) {
+			query.project_id = item.project_id;
+		}
+		const cid = item.category_id ?? 0;
+		router.push({
+			path: cid == 5 || cid == 6 ? "/pages/task/novel-detail" : "/pages/task/detail",
+			query: query
+		});
+	}
+
+	function onParticipateTask(item: TaskListItem) {
+		const title = `${item.title ?? ""}`;
+		const isPromotionTask = title.indexOf("番茄") >= 0 || title.indexOf("红果") >= 0;
+		if (!isPromotionTask) {
+			onTaskDetail(item);
+			return;
+		}
+		const query: UTSJSONObject = {
+			id: item.id,
+			task_id: item.id,
+			project_id: item.project_id ?? 0,
+			category_id: item.category_id ?? 0,
+			title: title,
+			logo: getTaskLogoUrl(item)
+		};
+		router.push({
+			path: "/pages/task/promotion-content",
+			query: query
+		});
+	}
+
+	function onBackfill(item: TaskListItem) {
+		const itemId = `${item.id ?? ""}`;
+		if (itemId == "900001") {
+			router.push({
+				path: "/pages/task/prompt-record",
+				query: {
+					id: item.id,
+					title: item.title ?? ""
+				}
+			});
+			return;
+		}
+		const query: UTSJSONObject = {
+			title: item.title ?? "",
+			id: item.id,
+			logo: getTaskLogoUrl(item),
+			is_batch_back: item.is_batch_back
+		};
+		router.push({
+			path: "/pages/task/record-list",
+			query: query
+		});
+	}
+
+	function onSettingsTap() {
+		router.push({ path: "/pages/user/account" });
+	}
+
+	function syncResignedNotice() {
+		getAppSystem()
+			.then((res) => {
+				const state = parseAppSystemRouteState(res);
+				resignedNoticeVisible.value = isResignedEmployeeState(state);
+			})
+			.catch(() => {
+				resignedNoticeVisible.value = false;
+			});
+	}
+
+	onShow(() => {
+		syncTabbarRoutePath();
+		syncResignedNotice();
+		loadEnterpriseInfo();
+		loadProjectTypes(true);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.st-page {
+		width: 100%;
+		height: 100vh;
+		display: flex;
+		flex-direction: column;
+		background-color: #f5f5f5;
+		overflow: hidden;
+	}
+
+	.st-top-panel {
+		flex-shrink: 0;
+		width: 100%;
+		background-color: #f5f5f5;
+	}
+
+	.st-top-inner {
+		padding: 30rpx 30rpx 0;
+		box-sizing: border-box;
+	}
+
+	.st-scroll {
+		flex: 1;
+		height: 0;
+		width: 100%;
+	}
+
+	.st-scroll-inner {
+		padding: 0 30rpx calc(40rpx + 112rpx + env(safe-area-inset-bottom));
+		box-sizing: border-box;
+	}
+
+	.st-task-loadmore {
+		padding: 8rpx 0 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-hero-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		overflow: hidden;
+		margin-bottom: 20rpx;
+	}
+
+	.st-hero-top {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding: 28rpx 16rpx 24rpx 24rpx;
+		background-image: linear-gradient(180deg, #eef5ff 0%, #ffffff 100%);
+	}
+
+	.st-brand-row {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.st-settings-btn {
+		flex-shrink: 0;
+		width: 64rpx;
+		height: 64rpx;
+		margin-left: 8rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-brand-logo,
+	.st-brand-logo-img {
+		width: 88rpx;
+		height: 88rpx;
+		border-radius: 20rpx;
+		flex-shrink: 0;
+	}
+
+	.st-brand-logo {
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-brand-logo-img {
+		background-color: #f3f4f6;
+	}
+
+	.st-brand-logo-text {
+		font-size: 40rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 52rpx;
+	}
+
+	.st-brand-copy {
+		flex: 1;
+		min-width: 0;
+		margin-left: 20rpx;
+	}
+
+	.st-brand-name {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 44rpx;
+	}
+
+	.st-brand-sub {
+		margin-top: 6rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.st-type-card {
+		padding: 24rpx 12rpx 24rpx;
+		border-radius: 20rpx;
+		background-color: #ffffff;
+		margin-bottom: 20rpx;
+		overflow: hidden;
+	}
+
+	.st-type-tab-inner {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-end;
+		min-height: 68rpx;
+		padding: 0 20rpx 14rpx;
+		box-sizing: border-box;
+	}
+
+	.st-type-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		white-space: nowrap;
+		text-align: center;
+	}
+
+	.st-type-text--active {
+		color: #2b529f;
+		font-weight: 600;
+	}
+
+	.st-type-line {
+		position: absolute;
+		left: 20rpx;
+		right: 20rpx;
+		bottom: 0;
+		height: 6rpx;
+		border-radius: 3rpx;
+		background-color: #2b529f;
+	}
+
+	.st-type-card :deep(.st-type-cl-tabs) {
+		width: 100%;
+	}
+
+	.st-type-card :deep(.cl-tabs__inner) {
+		align-items: flex-end;
+		padding: 0 12rpx;
+		box-sizing: border-box;
+	}
+
+	.st-type-card :deep(.st-type-cl-tabs-item) {
+		height: 100%;
+		padding: 0;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.st-task-grid {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		justify-content: space-between;
+	}
+
+	.st-task-card {
+		width: 48.5%;
+		padding: 24rpx 20rpx;
+		border-radius: 20rpx;
+		background-color: #ffffff;
+		margin-bottom: 20rpx;
+		box-sizing: border-box;
+		box-shadow: 0 4rpx 20rpx rgba(15, 23, 42, 0.06);
+	}
+
+	.st-task-head {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: space-between;
+		margin-bottom: 24rpx;
+	}
+
+	.st-task-copy {
+		flex: 1;
+		min-width: 0;
+		margin-right: 12rpx;
+	}
+
+	.st-task-title {
+		font-size: 26rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 36rpx;
+	}
+
+	.st-task-date {
+		margin-top: 8rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.st-task-state {
+		padding: 80rpx 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-task-state-text {
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.st-task-logo {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 14rpx;
+		flex-shrink: 0;
+		background-color: #f3f4f6;
+	}
+
+	.st-task-icon {
+		width: 56rpx;
+		height: 56rpx;
+		border-radius: 14rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.st-task-icon-text {
+		font-size: 24rpx;
+		font-weight: 700;
+		line-height: 32rpx;
+	}
+
+	.st-task-actions {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+        justify-content: flex-end;
+		gap: 12rpx;
+	}
+
+	.st-task-btn {
+		flex-shrink: 0;
+		width: calc((100% - 12rpx) / 2);
+		height: 64rpx;
+		border-radius: 32rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.st-task-btn--light {
+		background-color: #eef3fc;
+	}
+
+	.st-task-btn--primary {
+		background-color: #2b59c3;
+	}
+
+	.st-task-btn-text {
+		font-size: 22rpx;
+		line-height: 32rpx;
+	}
+
+	.st-task-btn-text--dark {
+		color: #333333;
+	}
+
+	.st-task-btn-text--primary {
+		color: #2b59c3;
+		font-weight: 600;
+	}
+
+	.st-task-btn-text--white {
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.st-footer {
+		padding: 8rpx 0 8rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.st-footer-banner {
+		width: 100%;
+		padding: 20rpx 24rpx;
+		border-radius: 40rpx;
+		background-color: #f5f6f8;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.st-footer-brand-row {
+		width: 100%;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-footer-brand-inner {
+		max-width: 100%;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		flex-wrap: nowrap;
+	}
+
+	.st-footer-logo,
+	.st-footer-logo-img {
+		width: 28rpx;
+		height: 28rpx;
+		border-radius: 8rpx;
+		margin-right: 10rpx;
+		flex-shrink: 0;
+	}
+
+	.st-footer-logo {
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.st-footer-logo-img {
+		background-color: #eef3fc;
+	}
+
+	.st-footer-logo-text {
+		font-size: 16rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 22rpx;
+	}
+
+	.st-footer-name {
+		flex-shrink: 1;
+		min-width: 0;
+		max-width: 560rpx;
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #666666;
+		line-height: 34rpx;
+		text-align: center;
+		lines: 1;
+		text-overflow: ellipsis;
+		overflow: hidden;
+	}
+
+	.st-footer-line {
+		width: 100%;
+		margin-top: 8rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+		text-align: center;
+		lines: 1;
+		text-overflow: ellipsis;
+		overflow: hidden;
+	}
+
+	.st-footer-copy {
+		margin-top: 16rpx;
+		font-size: 22rpx;
+		color: #cccccc;
+		line-height: 32rpx;
+		text-align: center;
+	}
+
+	.st-resigned-popup {
+		padding: 48rpx 40rpx 40rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		box-sizing: border-box;
+	}
+
+	.st-resigned-title {
+		font-size: 34rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 48rpx;
+		text-align: center;
+	}
+
+	.st-resigned-content {
+		margin-top: 24rpx;
+		font-size: 28rpx;
+		color: #666666;
+		line-height: 42rpx;
+		text-align: center;
+	}
+</style>
+
+<style lang="scss">
+	.st-resigned-popup-wrap {
+		.cl-popup__inner {
+			border-radius: 24rpx;
+			background-color: #ffffff;
+			overflow: hidden;
+		}
+	}
+</style>

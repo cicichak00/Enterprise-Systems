@@ -1,0 +1,213 @@
+<template>
+	<cl-page :pt="{ className: 'rp-page' }">
+		<view class="rp-page">
+			<view class="rp-body">
+					<text class="rp-main-title">风控与违规处罚规则</text>
+
+					<view class="rp-meta-row">
+						<view class="rp-version-tag">
+							<text class="rp-version-tag-text">v2.5</text>
+						</view>
+						<text class="rp-meta-text">生效 2026/03/01</text>
+					</view>
+
+					<view class="rp-changes-box">
+						<text class="rp-changes-title">本版本相比上一版本的变化</text>
+						<view
+							class="rp-changes-item"
+							v-for="(item, index) in changeItems"
+							:key="index"
+						>
+							<text class="rp-changes-dot">·</text>
+							<text class="rp-changes-text">{{ item }}</text>
+						</view>
+					</view>
+
+					<view
+						class="rp-section"
+						v-for="(section, index) in sections"
+						:key="index"
+					>
+						<text class="rp-section-title">{{ section.title }}</text>
+						<text class="rp-section-content">{{ section.content }}</text>
+					</view>
+
+					<view class="rp-footer-note">
+						<text class="rp-footer-text">以上条款的最终解释权归本司所有 · 如有疑问联系 </text>
+						<text class="rp-footer-email" @tap="onCopyEmail">legal@youbao.com</text>
+					</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	type AgreementSection = {
+		title: string;
+		content: string;
+	};
+
+	const changeItems = [
+		"新增「终身绑定」说明条款，明确不会因身份切换而稀释",
+		"更新违规处罚梯度与对应信用分扣减规则",
+		"删除了已失效的「老用户特权」章节"
+	];
+
+	const sections: AgreementSection[] = [
+		{
+			title: "一、刷单识别",
+			content: "脚本特征 / UA 异常 / IP 段聚集 / 设备指纹重合中 2 项以上将触发二次审查。"
+		},
+		{
+			title: "二、薅羊毛",
+			content: "同一实名 / 设备 / 支付宝在 30 天内反复创建新人账号的，新人奖励作废。"
+		},
+		{
+			title: "三、处罚梯度",
+			content: "警告 → 扣信用分 → 功能限制 7/30 日 → 冻结收益 → 永久封号。"
+		}
+	];
+
+	function onCopyEmail() {
+		uni.setClipboardData({
+			data: "legal@youbao.com",
+			success: () => {
+				uni.showToast({ title: "邮箱已复制", icon: "none" });
+			}
+		});
+	}
+</script>
+
+<style lang="scss" scoped>
+	.rp-page {
+		min-height: 100vh;
+		background-color: #f9f9f7;
+	}
+
+	.rp-body {
+		padding: 32rpx 30rpx 40rpx;
+		box-sizing: border-box;
+	}
+
+	.rp-main-title {
+		display: flex;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 60rpx;
+	}
+
+	.rp-meta-row {
+		margin-top: 20rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.rp-version-tag {
+		padding: 4rpx 14rpx;
+		border-radius: 8rpx;
+		background-color: #eeeeee;
+		margin-right: 12rpx;
+	}
+
+	.rp-version-tag-text {
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 32rpx;
+	}
+
+	.rp-meta-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.rp-changes-box {
+		margin-top: 28rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #fff7e6;
+	}
+
+	.rp-changes-title {
+		display: flex;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #a0522d;
+		line-height: 38rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.rp-changes-item {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		margin-bottom: 12rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.rp-changes-dot {
+		font-size: 26rpx;
+		color: #a0522d;
+		line-height: 40rpx;
+		margin-right: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.rp-changes-text {
+		flex: 1;
+		min-width: 0;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+	}
+
+	.rp-section {
+		margin-top: 36rpx;
+	}
+
+	.rp-section-title {
+		display: flex;
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 42rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.rp-section-content {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.rp-footer-note {
+		margin-top: 48rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #f0f0f0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.rp-footer-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 38rpx;
+	}
+
+	.rp-footer-email {
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 38rpx;
+	}
+</style>

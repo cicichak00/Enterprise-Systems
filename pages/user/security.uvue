@@ -1,0 +1,471 @@
+<template>
+	<cl-page :pt="{ className: 'sc-page' }">
+		<view class="sc-page">
+			<view class="sc-header">
+				<view class="sc-hero">
+					<view class="sc-hero-tag">
+						<view class="sc-hero-dot"></view>
+						<text class="sc-hero-tag-text">安全等级 · 良好</text>
+					</view>
+					<text class="sc-hero-title">账户安全</text>
+					<text class="sc-hero-sub">管理登录密码与手机号，保障账号安全</text>
+				</view>
+			</view>
+
+			<view class="sc-body">
+				<text class="sc-section-label">登录与验证</text>
+				<view class="sc-card">
+					<view
+						class="sc-item"
+						v-for="(item, index) in loginItems"
+						:key="index"
+						@tap="onItemAction(item)"
+					>
+						<view class="sc-item-icon" :style="{ backgroundColor: item.iconBg }">
+							<cl-icon :name="item.iconName" :size="20" :color="item.iconColor"></cl-icon>
+						</view>
+						<view class="sc-item-copy">
+							<text class="sc-item-title">{{ item.title }}</text>
+						</view>
+						<view class="sc-item-extra">
+							<text
+								v-if="item.sub != ''"
+								class="sc-item-sub"
+							>{{ item.sub }}</text>
+							<view
+								v-if="hasAction(item)"
+								class="sc-action-btn"
+								:class="getItemActionClass(item)"
+							>
+								<text class="sc-action-text" :class="getItemActionTextClass(item)">{{ getActionLabel(item) }}</text>
+							</view>
+							<cl-icon
+								v-else-if="item.route != ''"
+								name="arrow-right-s-line"
+								:size="18"
+								color="#cccccc"
+							></cl-icon>
+						</view>
+						<view v-if="index < loginItems.length - 1" class="sc-row-divider"></view>
+					</view>
+				</view>
+
+				<text class="sc-section-label">账号操作</text>
+				<view class="sc-card">
+					<view
+						class="sc-item"
+						v-for="(item, index) in dangerItems"
+						:key="index"
+						@tap="onItemAction(item)"
+					>
+						<view class="sc-item-icon" :style="{ backgroundColor: item.iconBg }">
+							<cl-icon :name="item.iconName" :size="20" :color="item.iconColor"></cl-icon>
+						</view>
+						<view class="sc-item-copy">
+							<text class="sc-item-title">{{ item.title }}</text>
+						</view>
+						<view class="sc-item-extra">
+							<text v-if="item.sub != ''" class="sc-item-sub">{{ item.sub }}</text>
+							<view
+								v-if="hasAction(item)"
+								class="sc-action-btn sc-action-btn--danger"
+							>
+								<text class="sc-action-text sc-action-text--danger">{{ getActionLabel(item) }}</text>
+							</view>
+							<cl-icon
+								v-else-if="item.route != ''"
+								name="arrow-right-s-line"
+								:size="18"
+								color="#cccccc"
+							></cl-icon>
+						</view>
+						<view v-if="index < dangerItems.length - 1" class="sc-row-divider"></view>
+					</view>
+				</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { logoutLogin } from "@/.cool/api/login";
+	import { router, useStore } from "@/.cool";
+
+	const { user } = useStore();
+
+	type ActionType = "default" | "primary" | "danger";
+
+	type SecurityAction = {
+		type: ActionType;
+		text: string;
+	};
+
+	type SecurityItem = {
+		title: string;
+		sub: string;
+		iconName: string;
+		iconBg: string;
+		iconColor: string;
+		action: SecurityAction | null;
+		route: string;
+	};
+
+	const loginItems = ref<SecurityItem[]>([
+        {
+			title: "手机号",
+			sub: "+86 138 **** 8888",
+			iconName: "smartphone-line",
+			iconBg: "#f5f3ff",
+			iconColor: "#7c3aed",
+			action: null,
+			route: "/pages/user/change-mobile"
+		},
+		{
+			title: "登录密码",
+			sub: "",
+			iconName: "lock-password-line",
+			iconBg: "#fef9c3",
+			iconColor: "#ca8a04",
+			action: null,
+			route: "/pages/user/login-password"
+		}
+	]);
+
+	const dangerItems: SecurityItem[] = [
+		{
+			title: "退出登录",
+			sub: "",
+			iconName: "logout-circle-line",
+			iconBg: "#fef2f2",
+			iconColor: "#dc2626",
+			action: { type: "danger", text: "退出" },
+			route: ""
+		}
+	];
+
+	function hasAction(item: SecurityItem): boolean {
+		return item.action != null;
+	}
+
+	function getActionLabel(item: SecurityItem): string {
+		const action = item.action;
+		return action != null ? action.text : "";
+	}
+
+	function getItemActionClass(item: SecurityItem): string {
+		const action = item.action;
+		if (action == null) {
+			return "sc-action-btn--default";
+		}
+		return getActionClass(action.type);
+	}
+
+	function getItemActionTextClass(item: SecurityItem): string {
+		const action = item.action;
+		if (action == null) {
+			return "sc-action-text--default";
+		}
+		return getActionTextClass(action.type);
+	}
+
+	function getActionClass(type: ActionType): string {
+		if (type == "primary") {
+			return "sc-action-btn--primary";
+		}
+		if (type == "danger") {
+			return "sc-action-btn--danger";
+		}
+		return "sc-action-btn--default";
+	}
+
+	function getActionTextClass(type: ActionType): string {
+		if (type == "primary") {
+			return "sc-action-text--primary";
+		}
+		if (type == "danger") {
+			return "sc-action-text--danger";
+		}
+		return "sc-action-text--default";
+	}
+
+	function onLogout() {
+		logoutLogin()
+			.catch(() => {})
+			.finally(() => {
+				user.clear();
+				router.login();
+			});
+	}
+
+	function maskMobile(phone: string): string {
+		const p = phone.trim();
+		if (p.length >= 11) {
+			return `+86 ${p.slice(0, 3)} **** ${p.slice(7)}`;
+		}
+		return p != "" ? p : "未绑定手机号";
+	}
+
+	function pickBoundMobile(): string {
+		const info = user.info.value;
+		if (info != null && info.phone != "") {
+			return `${info.phone}`.trim();
+		}
+		const stored = uni.getStorageSync("userInfo") as UTSJSONObject | null;
+		if (stored != null) {
+			const m = `${stored["mobile"] ?? stored["phone"] ?? ""}`.trim();
+			if (m != "") {
+				return m;
+			}
+		}
+		const loginM = uni.getStorageSync("loginM") as string | null;
+		if (loginM != null && `${loginM}`.trim() != "") {
+			return `${loginM}`.trim();
+		}
+		return "";
+	}
+
+	function loadBoundMobile() {
+		const phone = pickBoundMobile();
+		const items = loginItems.value;
+		for (let i = 0; i < items.length; i++) {
+			if (items[i].title == "手机号") {
+				items[i].sub = maskMobile(phone);
+				break;
+			}
+		}
+		if (phone != "") {
+			return;
+		}
+		user.fetchProfile()
+			.then(() => {
+				const fetched = pickBoundMobile();
+				for (let j = 0; j < items.length; j++) {
+					if (items[j].title == "手机号") {
+						items[j].sub = maskMobile(fetched);
+						break;
+					}
+				}
+			})
+			.catch(() => {});
+	}
+
+	function onItemAction(item: SecurityItem) {
+		if (item.title == "退出登录") {
+			onLogout();
+			return;
+		}
+		if (item.route != "") {
+			router.push({ path: item.route });
+			return;
+		}
+		const label = getActionLabel(item);
+		if (label == "") {
+			return;
+		}
+		uni.showToast({ title: label, icon: "none" });
+	}
+	onShow(() => {
+		loadBoundMobile();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.sc-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.sc-header {
+		background-image:
+			radial-gradient(circle at 90% 8%, rgba(110, 100, 190, 0.34) 0%, rgba(86, 78, 155, 0.14) 30%, rgba(26, 31, 58, 0) 56%),
+			linear-gradient(180deg, #1a1f3a 0%, #0d0f18 100%);
+
+		:deep(.cl-safe-area) {
+			background-color: transparent;
+		}
+	}
+
+	.sc-nav {
+		height: 88rpx;
+		padding: 0 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+
+		.sc-nav-btn {
+			width: 72rpx;
+			height: 72rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.sc-nav-title {
+			font-size: 32rpx;
+			font-weight: 600;
+			color: #ffffff;
+		}
+	}
+
+	.sc-hero {
+		padding: 36rpx 30rpx 36rpx;
+	}
+
+	.sc-hero-tag {
+        width: auto;
+		align-self: flex-start;
+		padding: 6rpx 16rpx;
+		border-radius: 20rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: white;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.sc-hero-dot {
+		width: 10rpx;
+		height: 10rpx;
+		border-radius: 5rpx;
+		background-color: #22c55e;
+		margin-right: 8rpx;
+	}
+
+	.sc-hero-tag-text {
+		font-size: 20rpx;
+		color: white;
+		line-height: 28rpx;
+	}
+
+	.sc-hero-title {
+		margin-top: 20rpx;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 60rpx;
+	}
+
+	.sc-hero-sub {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: rgba(255, 255, 255, 0.55);
+		line-height: 34rpx;
+	}
+
+	.sc-body {
+		padding: 24rpx 30rpx 40rpx;
+	}
+
+	.sc-section-label {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.sc-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 32rpx;
+		overflow: hidden;
+	}
+
+	.sc-item {
+		position: relative;
+		padding: 28rpx 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.sc-item-icon {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 18rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.sc-item-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 16rpx;
+	}
+
+	.sc-item-extra {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-shrink: 0;
+	}
+
+	.sc-item-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.sc-item-sub {
+		margin-right: 8rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+		text-align: right;
+	}
+
+	.sc-action-btn {
+		padding: 10rpx 24rpx;
+		border-radius: 24rpx;
+		flex-shrink: 0;
+	}
+
+	.sc-action-btn--default {
+		background-color: #f3f4f6;
+	}
+
+	.sc-action-btn--primary {
+		background-color: #ea580c;
+	}
+
+	.sc-action-btn--danger {
+		background-color: #fef2f2;
+	}
+
+	.sc-action-text {
+		font-size: 24rpx;
+		line-height: 34rpx;
+	}
+
+	.sc-action-text--default {
+		color: #666666;
+	}
+
+	.sc-action-text--primary {
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.sc-action-text--danger {
+		color: #dc2626;
+	}
+
+	.sc-row-divider {
+		position: absolute;
+		left: 24rpx;
+		right: 24rpx;
+		bottom: 0;
+		height: 1rpx;
+		background-color: #f0f0f0;
+	}
+</style>

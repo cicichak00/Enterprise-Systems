@@ -1,0 +1,510 @@
+<template>
+	<cl-page :pt="{ className: 'pc-page' }" :back-top="false">
+		<view class="pc-page">
+			<view class="pc-head">
+				<view class="pc-head-copy">
+					<text class="pc-title">推广内容</text>
+					<text class="pc-subtitle">{{ taskTitle }} · 共 {{ filteredCount }} 本</text>
+				</view>
+				<view class="pc-data-badge"><text class="pc-data-badge-text">模拟数据</text></view>
+			</view>
+
+			<view class="pc-mode-wrap">
+				<view class="pc-mode" :class="{ 'pc-mode--active': promotionMode == 'recommend' }" @tap="switchMode('recommend')">
+					<cl-icon name="book-line" :size="18" :color="promotionMode == 'recommend' ? '#315dbe' : '#8b93a3'"></cl-icon>
+					<view class="pc-mode-copy">
+						<text class="pc-mode-title" :class="{ 'pc-mode-title--active': promotionMode == 'recommend' }">推荐选择</text>
+						<text class="pc-mode-sub">从推广书库中选择</text>
+					</view>
+				</view>
+				<view class="pc-mode" :class="{ 'pc-mode--active': promotionMode == 'manual' }" @tap="switchMode('manual')">
+					<cl-icon name="edit-line" :size="18" :color="promotionMode == 'manual' ? '#315dbe' : '#8b93a3'"></cl-icon>
+					<view class="pc-mode-copy">
+						<text class="pc-mode-title" :class="{ 'pc-mode-title--active': promotionMode == 'manual' }">自主填写</text>
+						<text class="pc-mode-sub">直接录入书籍信息</text>
+					</view>
+				</view>
+			</view>
+
+			<view v-if="promotionMode == 'recommend'" class="pc-tools">
+				<view class="pc-search">
+					<cl-icon name="search-line" :size="18" color="#8a91a3"></cl-icon>
+					<input
+						class="pc-search-input"
+						v-model="searchInput"
+						placeholder="搜索书名或书籍ID"
+						placeholder-class="pc-placeholder"
+						confirm-type="search"
+						@confirm="onSearch"
+					/>
+					<view v-if="searchInput != ''" class="pc-search-clear" @tap="clearSearch">
+						<cl-icon name="close-circle-fill" :size="17" color="#a7adbb"></cl-icon>
+					</view>
+					<view class="pc-search-btn" @tap="onSearch"><text class="pc-search-btn-text">搜索</text></view>
+				</view>
+
+				<scroll-view class="pc-tag-scroll" scroll-x="true" :show-scrollbar="false">
+					<view class="pc-tags">
+						<view
+							class="pc-tag"
+							:class="{ 'pc-tag--active': activeTag == item }"
+							v-for="item in tagOptions"
+							:key="item"
+							@tap="selectTag(item)"
+						>
+							<text class="pc-tag-text" :class="{ 'pc-tag-text--active': activeTag == item }">{{ item }}</text>
+						</view>
+					</view>
+				</scroll-view>
+
+				<view class="pc-result-row">
+					<text class="pc-result-text">已展示 {{ books.length }} / {{ filteredCount }}</text>
+					<view class="pc-sort" @tap="toggleSort">
+						<cl-icon name="sort-desc" :size="15" color="#315dbe"></cl-icon>
+						<text class="pc-sort-text">{{ newestFirst ? "最新更新" : "较早更新" }}</text>
+					</view>
+				</view>
+			</view>
+
+			<scroll-view
+				v-if="promotionMode == 'recommend'"
+				class="pc-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="140"
+				@scrolltolower="loadMore"
+			>
+				<view class="pc-list">
+					<view v-if="books.length == 0" class="pc-empty">
+						<cl-icon name="book-line" :size="46" color="#bdc5d4"></cl-icon>
+						<text class="pc-empty-title">没有找到相关书籍</text>
+						<text class="pc-empty-sub">请更换关键词或标签</text>
+					</view>
+
+					<view
+						class="pc-book"
+						:class="{ 'pc-book--selected': isBookSelected(item.id) }"
+						v-for="(item, index) in books"
+						:key="item.id"
+						@tap="selectBook(item)"
+					>
+						<view class="pc-cover" :class="'pc-cover--tone-' + (item.tone % 6)">
+							<text class="pc-cover-label">推广精选</text>
+							<text class="pc-cover-title">{{ item.name }}</text>
+						</view>
+						<view class="pc-book-copy">
+							<view class="pc-book-title-row">
+								<text class="pc-book-title">{{ item.name }}</text>
+								<view class="pc-radio" :class="{ 'pc-radio--active': isBookSelected(item.id) }">
+									<text v-if="isBookSelected(item.id)" class="pc-radio-mark">✓</text>
+								</view>
+							</view>
+							<text class="pc-book-id">书籍ID：{{ item.id }}</text>
+							<view class="pc-book-tags">
+								<view class="pc-book-tag" v-for="tag in item.tags" :key="tag"><text class="pc-book-tag-text">{{ tag }}</text></view>
+							</view>
+							<text class="pc-book-time">更新时间：{{ item.updatedAt }}</text>
+						</view>
+					</view>
+
+					<view v-if="books.length > 0" class="pc-loadmore">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="books.length >= filteredCount"
+							loading-text="正在加载更多书籍..."
+							finish-text="已加载全部书籍"
+						></cl-loadmore>
+					</view>
+				</view>
+			</scroll-view>
+
+			<scroll-view v-else class="pc-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="pc-manual">
+					<view class="pc-manual-tip">
+						<cl-icon name="information-line" :size="18" color="#315dbe"></cl-icon>
+						<text class="pc-manual-tip-text">未在推荐书库中找到时，可自行录入推广信息</text>
+					</view>
+					<view class="pc-manual-card">
+						<view class="pc-field">
+							<view class="pc-field-label-row"><text class="pc-field-label">书籍名称</text><text class="pc-field-required">*</text></view>
+							<input class="pc-field-input" v-model="manualBookName" placeholder="请输入完整书籍名称" placeholder-class="pc-placeholder" />
+						</view>
+						<view class="pc-field">
+							<view class="pc-field-label-row"><text class="pc-field-label">书籍ID</text><text class="pc-field-required">*</text></view>
+							<input class="pc-field-input" v-model="manualBookId" type="number" placeholder="请输入数字书籍ID" placeholder-class="pc-placeholder" />
+						</view>
+						<view class="pc-field">
+							<view class="pc-field-label-row"><text class="pc-field-label">推广关键词</text><text class="pc-field-required">*</text></view>
+							<textarea class="pc-field-textarea" v-model="manualKeyword" placeholder="请输入关键词，多个关键词可用空格分隔" placeholder-class="pc-placeholder"></textarea>
+							<text class="pc-field-help">示例：都市情感 久别重逢 温暖治愈</text>
+						</view>
+						<view class="pc-field">
+							<view class="pc-field-label-row"><text class="pc-field-label">题材选项</text><text class="pc-field-required">*</text></view>
+							<view class="pc-topic-list">
+								<view
+									class="pc-topic"
+									:class="{ 'pc-topic--active': manualTopic == item }"
+									v-for="item in topicOptions"
+									:key="item"
+									@tap="manualTopic = item"
+								>
+									<text class="pc-topic-text" :class="{ 'pc-topic-text--active': manualTopic == item }">{{ item }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+				</view>
+			</scroll-view>
+
+			<view class="pc-footer">
+				<view class="pc-selected-copy">
+					<text class="pc-selected-label">{{ getFooterLabel() }}</text>
+					<text v-if="getFooterName() != ''" class="pc-selected-name">{{ getFooterName() }}</text>
+				</view>
+				<view class="pc-submit" :class="{ 'pc-submit--disabled': !canContinue() }" @tap="onContinue">
+					<text class="pc-submit-text">立即推广</text>
+				</view>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { router } from "@/.cool";
+
+	type PromotionBook = {
+		id: number;
+		name: string;
+		tags: string[];
+		updatedAt: string;
+		keyword: string;
+		tone: number;
+	};
+
+	const TOTAL_BOOKS = 1200;
+	const PAGE_SIZE = 20;
+	const taskId = ref(0);
+	const projectId = ref(0);
+	const categoryId = ref(0);
+	const taskTitle = ref("推广项目");
+	const taskLogo = ref("");
+	const promotionMode = ref("recommend");
+	const searchInput = ref("");
+	const searchKeyword = ref("");
+	const activeTag = ref("全部");
+	const tagOptions = ref(["全部", "都市", "言情", "悬疑", "科幻", "短剧", "甜宠"]);
+	const newestFirst = ref(true);
+	const books = ref<PromotionBook[]>([]);
+	const filteredCount = ref(TOTAL_BOOKS);
+	const currentPage = ref(1);
+	const loadingMore = ref(false);
+	const selectedBook = ref<PromotionBook | null>(null);
+	const manualBookName = ref("");
+	const manualBookId = ref("");
+	const manualKeyword = ref("");
+	const manualTopic = ref("");
+	const topicOptions = ref(["都市", "言情", "悬疑", "科幻", "短剧", "甜宠", "逆袭", "历史"]);
+
+	const titlePool = ["深夜书屋", "春风也曾拥抱你", "星河之外", "她的逆袭剧本", "重逢后心动", "总裁的秘密合约", "风起南城", "月光落在你肩上", "无人知晓的夏天", "未来来信", "长街有雪", "归途有你"];
+	const tagPool = [["都市", "悬疑"], ["言情", "治愈"], ["科幻", "冒险"], ["短剧", "逆袭"], ["甜宠", "言情"], ["都市", "短剧"]];
+
+	function makeBook(sequence: number): PromotionBook {
+		const base = sequence - 1;
+		const title = titlePool[base % titlePool.length];
+		const tags = tagPool[base % tagPool.length];
+		const day = 14 - (base % 14);
+		const hour = 8 + (base % 12);
+		const minute = (base * 7) % 60;
+		return {
+			id: 100000 + sequence,
+			name: `${title}${sequence > titlePool.length ? ` · ${sequence}` : ""}`,
+			tags: tags,
+			updatedAt: `2026-08-${day < 10 ? "0" + day : day} ${hour < 10 ? "0" + hour : hour}:${minute < 10 ? "0" + minute : minute}`,
+			keyword: `${tags.join(" ")} ${title}`,
+			tone: base
+		};
+	}
+
+	function matchesBook(item: PromotionBook): boolean {
+		if (activeTag.value != "全部" && item.tags.indexOf(activeTag.value) < 0) {
+			return false;
+		}
+		const keyword = searchKeyword.value.trim().toLowerCase();
+		if (keyword == "") {
+			return true;
+		}
+		return item.name.toLowerCase().indexOf(keyword) >= 0 || `${item.id}`.indexOf(keyword) >= 0;
+	}
+
+	function refreshBooks(reset: boolean) {
+		if (reset) {
+			currentPage.value = 1;
+			selectedBook.value = null;
+		}
+		const limit = currentPage.value * PAGE_SIZE;
+		const result: PromotionBook[] = [];
+		let count = 0;
+		for (let i = 1; i <= TOTAL_BOOKS; i++) {
+			const sequence = newestFirst.value ? i : TOTAL_BOOKS - i + 1;
+			const item = makeBook(sequence);
+			if (!matchesBook(item)) {
+				continue;
+			}
+			count += 1;
+			if (result.length < limit) {
+				result.push(item);
+			}
+		}
+		books.value = result;
+		filteredCount.value = count;
+	}
+
+	function onSearch() {
+		searchKeyword.value = searchInput.value.trim();
+		refreshBooks(true);
+	}
+
+	function clearSearch() {
+		searchInput.value = "";
+		searchKeyword.value = "";
+		refreshBooks(true);
+	}
+
+	function selectTag(tag: string) {
+		if (activeTag.value == tag) {
+			return;
+		}
+		activeTag.value = tag;
+		refreshBooks(true);
+	}
+
+	function toggleSort() {
+		newestFirst.value = !newestFirst.value;
+		refreshBooks(true);
+	}
+
+	function loadMore() {
+		if (loadingMore.value || books.value.length >= filteredCount.value) {
+			return;
+		}
+		loadingMore.value = true;
+		currentPage.value += 1;
+		refreshBooks(false);
+		loadingMore.value = false;
+	}
+
+	function selectBook(item: PromotionBook) {
+		selectedBook.value = item;
+	}
+
+	function isBookSelected(id: number): boolean {
+		const item = selectedBook.value;
+		return item != null && item.id == id;
+	}
+
+	function getSelectedBookName(): string {
+		const item = selectedBook.value;
+		return item != null ? item.name : "";
+	}
+
+	function switchMode(mode: string) {
+		promotionMode.value = mode;
+	}
+
+	function isManualComplete(): boolean {
+		return manualBookName.value.trim() != "" && manualBookId.value.trim() != "" && manualKeyword.value.trim() != "" && manualTopic.value != "";
+	}
+
+	function canContinue(): boolean {
+		return promotionMode.value == "recommend" ? selectedBook.value != null : isManualComplete();
+	}
+
+	function getFooterLabel(): string {
+		if (promotionMode.value == "manual") {
+			return isManualComplete() ? "信息已填写完整" : "请完善推广信息";
+		}
+		return selectedBook.value == null ? "请选择推广书籍" : "已选择推荐书籍";
+	}
+
+	function getFooterName(): string {
+		if (promotionMode.value == "manual") {
+			return manualBookName.value.trim();
+		}
+		return getSelectedBookName();
+	}
+
+	function onContinue() {
+		if (promotionMode.value == "manual") {
+			if (manualBookName.value.trim() == "") {
+				uni.showToast({ title: "请输入书籍名称", icon: "none" });
+				return;
+			}
+			if (manualBookId.value.trim() == "") {
+				uni.showToast({ title: "请输入书籍ID", icon: "none" });
+				return;
+			}
+			if (manualKeyword.value.trim() == "") {
+				uni.showToast({ title: "请输入推广关键词", icon: "none" });
+				return;
+			}
+			if (manualTopic.value == "") {
+				uni.showToast({ title: "请选择题材", icon: "none" });
+				return;
+			}
+			router.push({
+				path: "/pages/task/form",
+				query: {
+					id: taskId.value,
+					task_id: taskId.value,
+					project_id: projectId.value,
+					category_id: categoryId.value,
+					title: taskTitle.value,
+					logo: taskLogo.value,
+					selected_book_id: manualBookId.value.trim(),
+					selected_book_name: manualBookName.value.trim(),
+					selected_book_tags: manualTopic.value,
+					selected_book_topic: manualTopic.value,
+					selected_book_keyword: manualKeyword.value.trim(),
+					promotion_source: "manual"
+				}
+			});
+			return;
+		}
+		const item = selectedBook.value;
+		if (item == null) {
+			uni.showToast({ title: "请先选择一本推广书籍", icon: "none" });
+			return;
+		}
+		router.push({
+			path: "/pages/task/form",
+			query: {
+				id: taskId.value,
+				task_id: taskId.value,
+				project_id: projectId.value,
+				category_id: categoryId.value,
+				title: taskTitle.value,
+				logo: taskLogo.value,
+				selected_book_id: item.id,
+				selected_book_name: item.name,
+				selected_book_tags: item.tags.join(" · "),
+				selected_book_updated_at: item.updatedAt,
+				selected_book_keyword: item.keyword,
+				selected_book_topic: item.tags.length > 0 ? item.tags[0] : "",
+				promotion_source: "recommend"
+			}
+		});
+	}
+
+	onLoad((options) => {
+		const idRaw = options["task_id"] ?? options["id"];
+		const projectRaw = options["project_id"];
+		const categoryRaw = options["category_id"];
+		if (idRaw != null) {
+			const id = parseInt(`${idRaw}`);
+			taskId.value = isNaN(id) ? 0 : id;
+		}
+		if (projectRaw != null) {
+			const id = parseInt(`${projectRaw}`);
+			projectId.value = isNaN(id) ? 0 : id;
+		}
+		if (categoryRaw != null) {
+			const id = parseInt(`${categoryRaw}`);
+			categoryId.value = isNaN(id) ? 0 : id;
+		}
+		const titleRaw = options["title"];
+		const logoRaw = options["logo"];
+		if (titleRaw != null && `${titleRaw}`.trim() != "") {
+			taskTitle.value = `${titleRaw}`.trim();
+		}
+		if (logoRaw != null) {
+			taskLogo.value = `${logoRaw}`.trim();
+		}
+		refreshBooks(true);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.pc-page { width: 100%; height: 100vh; background-color: #f5f7fa; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+	.pc-head { padding: 28rpx 30rpx 20rpx; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background-color: #ffffff; }
+	.pc-head-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+	.pc-title { font-size: 36rpx; font-weight: 700; color: #131a2f; line-height: 48rpx; }
+	.pc-subtitle { margin-top: 6rpx; font-size: 23rpx; color: #8790a3; line-height: 32rpx; }
+	.pc-data-badge { height: 48rpx; padding: 0 18rpx; border-radius: 24rpx; background-color: #eef4ff; display: flex; align-items: center; justify-content: center; }
+	.pc-data-badge-text { font-size: 22rpx; font-weight: 600; color: #2f62cc; }
+	.pc-mode-wrap { padding: 0 30rpx 20rpx; background-color: #ffffff; display: flex; flex-direction: row; }
+	.pc-mode { flex: 1; min-height: 92rpx; padding: 16rpx 18rpx; border-width: 2rpx; border-style: solid; border-color: #edf0f5; border-radius: 16rpx; background-color: #f8f9fb; display: flex; flex-direction: row; align-items: center; box-sizing: border-box; }
+	.pc-mode + .pc-mode { margin-left: 16rpx; }
+	.pc-mode--active { border-color: #8da9e4; background-color: #f2f6ff; }
+	.pc-mode-copy { flex: 1; min-width: 0; margin-left: 12rpx; display: flex; flex-direction: column; }
+	.pc-mode-title { font-size: 25rpx; font-weight: 600; color: #596173; line-height: 34rpx; }
+	.pc-mode-title--active { color: #315dbe; }
+	.pc-mode-sub { margin-top: 2rpx; font-size: 19rpx; color: #969dab; line-height: 28rpx; }
+	.pc-tools { padding: 0 30rpx 18rpx; background-color: #ffffff; border-bottom-width: 1rpx; border-bottom-style: solid; border-bottom-color: #edf0f5; }
+	.pc-search { height: 76rpx; padding-left: 22rpx; border-radius: 18rpx; background-color: #f3f5f8; display: flex; flex-direction: row; align-items: center; overflow: hidden; }
+	.pc-search-input { flex: 1; height: 76rpx; margin-left: 12rpx; font-size: 26rpx; color: #20283a; }
+	.pc-placeholder { color: #a0a7b6; }
+	.pc-search-clear { width: 54rpx; height: 76rpx; display: flex; align-items: center; justify-content: center; }
+	.pc-search-btn { width: 104rpx; height: 76rpx; background-color: #315dbe; display: flex; align-items: center; justify-content: center; }
+	.pc-search-btn-text { font-size: 25rpx; font-weight: 600; color: #ffffff; }
+	.pc-tag-scroll { width: 100%; margin-top: 18rpx; white-space: nowrap; }
+	.pc-tags { display: flex; flex-direction: row; padding-right: 8rpx; }
+	.pc-tag { height: 56rpx; margin-right: 12rpx; padding: 0 24rpx; border-radius: 28rpx; background-color: #f4f6f9; display: flex; align-items: center; justify-content: center; }
+	.pc-tag--active { background-color: #315dbe; }
+	.pc-tag-text { font-size: 23rpx; color: #697184; }
+	.pc-tag-text--active { font-weight: 600; color: #ffffff; }
+	.pc-result-row { margin-top: 18rpx; display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+	.pc-result-text { font-size: 22rpx; color: #969dac; }
+	.pc-sort { height: 44rpx; padding: 0 14rpx; border-radius: 12rpx; background-color: #eef4ff; display: flex; flex-direction: row; align-items: center; }
+	.pc-sort-text { margin-left: 6rpx; font-size: 22rpx; color: #315dbe; }
+	.pc-scroll { flex: 1; height: 0; }
+	.pc-list { padding: 20rpx 30rpx calc(180rpx + env(safe-area-inset-bottom)); box-sizing: border-box; }
+	.pc-book { min-height: 184rpx; margin-bottom: 18rpx; padding: 18rpx; border-width: 2rpx; border-style: solid; border-color: transparent; border-radius: 20rpx; background-color: #ffffff; display: flex; flex-direction: row; box-sizing: border-box; }
+	.pc-book--selected { border-color: #315dbe; background-color: #f7faff; }
+	.pc-cover { width: 112rpx; height: 148rpx; padding: 14rpx 10rpx; border-radius: 12rpx; background-color: #294b8f; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; }
+	.pc-cover--tone-1 { background-color: #ad5546; }
+	.pc-cover--tone-2 { background-color: #4b7562; }
+	.pc-cover--tone-3 { background-color: #795b93; }
+	.pc-cover--tone-4 { background-color: #a06c35; }
+	.pc-cover--tone-5 { background-color: #496b87; }
+	.pc-cover-label { font-size: 18rpx; color: rgba(255, 255, 255, 0.72); line-height: 26rpx; }
+	.pc-cover-title { margin-top: 10rpx; font-size: 22rpx; font-weight: 700; color: #ffffff; line-height: 30rpx; text-align: center; }
+	.pc-book-copy { flex: 1; min-width: 0; margin-left: 20rpx; display: flex; flex-direction: column; justify-content: center; }
+	.pc-book-title-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+	.pc-book-title { flex: 1; min-width: 0; font-size: 29rpx; font-weight: 700; color: #1d2538; line-height: 40rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.pc-radio { width: 34rpx; height: 34rpx; margin-left: 12rpx; border-width: 2rpx; border-style: solid; border-color: #c4cad5; border-radius: 18rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+	.pc-radio--active { border-color: #315dbe; background-color: #315dbe; }
+	.pc-radio-mark { font-size: 21rpx; font-weight: 700; color: #ffffff; line-height: 28rpx; }
+	.pc-book-id { margin-top: 4rpx; font-size: 22rpx; color: #7d8596; line-height: 30rpx; }
+	.pc-book-tags { margin-top: 8rpx; display: flex; flex-direction: row; flex-wrap: wrap; }
+	.pc-book-tag { height: 38rpx; margin-right: 8rpx; padding: 0 12rpx; border-radius: 8rpx; background-color: #eef3fd; display: flex; align-items: center; }
+	.pc-book-tag-text { font-size: 20rpx; color: #4265aa; }
+	.pc-book-time { margin-top: 8rpx; font-size: 21rpx; color: #9aa1af; line-height: 30rpx; }
+	.pc-empty { padding: 150rpx 30rpx; display: flex; flex-direction: column; align-items: center; }
+	.pc-empty-title { margin-top: 24rpx; font-size: 28rpx; font-weight: 600; color: #5e6678; }
+	.pc-empty-sub { margin-top: 8rpx; font-size: 23rpx; color: #a0a6b3; }
+	.pc-loadmore { padding: 16rpx 0 28rpx; }
+	.pc-manual { padding: 20rpx 30rpx calc(180rpx + env(safe-area-inset-bottom)); box-sizing: border-box; }
+	.pc-manual-tip { min-height: 70rpx; padding: 14rpx 18rpx; border-radius: 14rpx; background-color: #eef4ff; display: flex; flex-direction: row; align-items: center; box-sizing: border-box; }
+	.pc-manual-tip-text { flex: 1; margin-left: 10rpx; font-size: 22rpx; color: #526b9e; line-height: 32rpx; }
+	.pc-manual-card { margin-top: 18rpx; padding: 8rpx 26rpx 28rpx; border-radius: 20rpx; background-color: #ffffff; }
+	.pc-field { padding-top: 24rpx; }
+	.pc-field-label-row { margin-bottom: 12rpx; display: flex; flex-direction: row; align-items: center; }
+	.pc-field-label { font-size: 26rpx; font-weight: 600; color: #252d3f; line-height: 36rpx; }
+	.pc-field-required { margin-left: 4rpx; font-size: 25rpx; color: #ef4444; }
+	.pc-field-input { width: 100%; height: 80rpx; padding: 0 20rpx; border-width: 1rpx; border-style: solid; border-color: #e5e8ee; border-radius: 14rpx; background-color: #fafbfc; font-size: 25rpx; color: #252d3f; box-sizing: border-box; }
+	.pc-field-textarea { width: 100%; height: 156rpx; padding: 18rpx 20rpx; border-width: 1rpx; border-style: solid; border-color: #e5e8ee; border-radius: 14rpx; background-color: #fafbfc; font-size: 25rpx; color: #252d3f; line-height: 36rpx; box-sizing: border-box; }
+	.pc-field-help { margin-top: 8rpx; font-size: 20rpx; color: #9aa1af; line-height: 28rpx; }
+	.pc-topic-list { display: flex; flex-direction: row; flex-wrap: wrap; }
+	.pc-topic { height: 58rpx; margin-right: 12rpx; margin-bottom: 12rpx; padding: 0 24rpx; border-width: 1rpx; border-style: solid; border-color: #e2e6ed; border-radius: 29rpx; background-color: #f7f8fa; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+	.pc-topic--active { border-color: #315dbe; background-color: #eef4ff; }
+	.pc-topic-text { font-size: 23rpx; color: #697184; }
+	.pc-topic-text--active { font-weight: 600; color: #315dbe; }
+	.pc-footer { position: fixed; left: 0; right: 0; bottom: 0; min-height: 128rpx; padding: 18rpx 30rpx calc(18rpx + env(safe-area-inset-bottom)); background-color: rgba(255, 255, 255, 0.98); border-top-width: 1rpx; border-top-style: solid; border-top-color: #e8ebf0; display: flex; flex-direction: row; align-items: center; box-sizing: border-box; }
+	.pc-selected-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-right: 18rpx; }
+	.pc-selected-label { font-size: 21rpx; color: #8c94a4; line-height: 30rpx; }
+	.pc-selected-name { margin-top: 3rpx; font-size: 25rpx; font-weight: 600; color: #20283a; line-height: 34rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.pc-submit { width: 260rpx; height: 86rpx; border-radius: 43rpx; background-color: #315dbe; display: flex; align-items: center; justify-content: center; }
+	.pc-submit--disabled { background-color: #b9c5dc; }
+	.pc-submit-text { font-size: 29rpx; font-weight: 700; color: #ffffff; }
+</style>

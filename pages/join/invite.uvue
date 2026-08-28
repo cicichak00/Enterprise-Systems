@@ -1,0 +1,1112 @@
+<template>
+	<view class="ja-page" :class="{ 'ja-page--pending': pageView == 'pending' }">
+		<cl-safe-area type="top"></cl-safe-area>
+
+		<!-- <view class="ja-nav" :class="{ 'ja-nav--white': pageView == 'pending' }">
+			<text class="ja-nav-title">{{ companyName }}</text>
+		</view> -->
+
+		<!-- 邀请加入 -->
+		<view v-if="pageView == 'invite'" class="ja-main">
+			<view class="ja-brand">
+				<view v-if="companyLogo != ''" class="ja-logo-img-wrap">
+					<image class="ja-logo-img" :src="companyLogo" mode="aspectFill"></image>
+				</view>
+				<view v-else class="ja-logo-placeholder">
+					<text class="ja-logo-text">{{ logoText }}</text>
+				</view>
+				<text class="ja-brand-name">{{ companyName }}</text>
+			</view>
+
+			<text class="ja-title">申请加入「{{ companyName }}」</text>
+			<text class="ja-desc">{{ companyIntro }}</text>
+		</view>
+
+		<view v-if="pageView == 'invite'" class="ja-spacer"></view>
+
+		<view v-if="pageView == 'invite'" class="ja-footer">
+			<button
+				class="ja-submit"
+				:class="{ 'ja-submit--inactive': !canSubmit }"
+				:disabled="!canSubmit"
+				@tap.stop="onContinue"
+			>
+				<text class="ja-submit-text">{{ submitting ? "提交中..." : "同意并继续" }}</text>
+			</button>
+			<view class="ja-agreement" @tap="toggleAgreement">
+				<view class="ja-checkbox" :class="{ 'is-checked': agreed }">
+					<text v-if="agreed" class="ja-checkbox-mark">✓</text>
+				</view>
+				<view class="ja-agreement-copy">
+					<text class="ja-agreement-text">已阅读并同意</text>
+					<template v-for="(item, index) in protocolList" :key="getProtocolKey(item, index)">
+						<text v-if="index > 0" class="ja-agreement-text">和</text>
+						<text class="ja-link" @tap.stop="openProtocol(item)">{{ formatProtocolTitle(getProtocolDisplayTitle(item)) }}</text>
+					</template>
+				</view>
+			</view>
+			<cl-safe-area type="bottom"></cl-safe-area>
+		</view>
+
+		<!-- 待审核 -->
+		<view v-if="pageView == 'pending'" class="ja-pending-wrap">
+			<view class="ja-main ja-main--pending">
+				<view class="ja-illustration">
+					<view class="ja-illustration-fallback">
+						<cl-icon name="time-line" :size="96" color="#2b529f"></cl-icon>
+					</view>
+				</view>
+
+				<text class="ja-status-title">{{ statusTitle }}</text>
+				<view class="ja-status-desc-wrap">
+					<text class="ja-status-desc">{{ statusDescLine1 }}</text>
+					<text v-if="statusDescLine2 != ''" class="ja-status-desc">{{ statusDescLine2 }}</text>
+				</view>
+			</view>
+
+			<view class="ja-spacer"></view>
+
+			<view class="ja-footer ja-footer--pending">
+				<view class="ja-submit ja-submit--disabled">
+					<text class="ja-submit-text ja-submit-text--disabled">{{ statusBtnText }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+
+		<cl-popup
+			v-model="protocolPopupVisible"
+			direction="center"
+			size="640rpx"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="true"
+			:swipe-close="false"
+			:pt="{ className: 'ja-protocol-popup-wrap' }"
+		>
+			<view class="ja-protocol-popup">
+				<view class="ja-protocol-head">
+					<text class="ja-protocol-title">{{ activeProtocolTitle }}</text>
+					<view class="ja-protocol-close" @tap="closeProtocolPopup">
+						<cl-icon name="close-line" :size="20" color="#999999"></cl-icon>
+					</view>
+				</view>
+
+				<scroll-view class="ja-protocol-scroll" scroll-y="true" :show-scrollbar="true">
+					<rich-text class="ja-protocol-rich" :nodes="activeProtocolRichHtml"></rich-text>
+				</scroll-view>
+			</view>
+		</cl-popup>
+	</view>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getAppSystem } from "@/.cool/api/app";
+	import { getEnterpriseByCode } from "@/.cool/api/enterprise";
+	import { applyJoinEnterprise, getJoinStatus } from "@/.cool/api/join";
+	import { joinInvitePageActive, parseMenusFromResponse, tabbar } from "@/.cool/store/tabbar";
+	import {
+		getApiMessage,
+		isApiSuccess,
+		router,
+		TABBAR_HOME_PATH,
+		useStore,
+		type JoinApplicationStatus,
+		type JoinApplyInfo,
+		type JoinEnterpriseInfo,
+		type JoinProtocolContentExtra,
+		type JoinProtocolItem,
+		type JoinStatusEnvelope,
+		type Response
+	} from "@/.cool";
+	import type { EnterpriseByCodeInfo } from "@/.cool/types/enterprise";
+
+	const { user } = useStore();
+
+	type PageView = "invite" | "pending";
+
+	const pageView = ref<PageView>("invite");
+	const loadCode = ref("");
+	const enterpriseCode = ref("");
+	const companyId = ref("");
+	const companyName = ref("企业名称");
+	const companyLogo = ref("");
+	const companyIntro = ref("加入后，你可以在该企业下接任务并获得收益");
+	const protocolList = ref<JoinProtocolItem[]>([]);
+	const protocolPopupVisible = ref(false);
+	const activeProtocol = ref<JoinProtocolItem | null>(null);
+	const statusTitle = ref("加入申请已提交，等待企业审核...");
+	const statusRejectReason = ref("");
+	const statusBtnText = ref("等待审核中");
+	const agreed = ref(false);
+	const loading = ref(false);
+	const submitting = ref(false);
+	const statusRequesting = ref(false);
+	const pageInited = ref(false);
+	const joinApprovedRedirecting = ref(false);
+
+	const logoText = computed(() => {
+		const name = companyName.value.trim();
+		return name.length > 0 ? name.charAt(0) : "企";
+	});
+
+	const canSubmit = computed(() => {
+		return agreed.value && !submitting.value && loadCode.value != "";
+	});
+
+	const statusDescLine1 = computed(() => {
+		const reason = statusRejectReason.value;
+		if (reason != "") {
+			return `原因：${reason}`;
+		}
+		const name = companyName.value.trim();
+		const label = name != "" ? name : "该企业";
+		return `审核通过后您将成为「${label}」员工`;
+	});
+
+	const statusDescLine2 = computed(() => {
+		if (statusRejectReason.value != "") {
+			return "";
+		}
+		return "届时可在本页面进入任务台";
+	});
+
+	function getProtocolDisplayTitle(item: JoinProtocolItem): string {
+		return `${item.title ?? ""}`.trim();
+	}
+
+	function parseEnterpriseProtocols(raw: any | null): JoinProtocolItem[] {
+		if (raw == null) {
+			return [];
+		}
+		let rows: any[] = [];
+		if (Array.isArray(raw)) {
+			rows = raw as any[];
+		} else {
+			const obj = raw as UTSJSONObject;
+			const listRaw = obj["list"];
+			if (listRaw != null && Array.isArray(listRaw)) {
+				rows = listRaw as any[];
+			}
+		}
+		const result: JoinProtocolItem[] = [];
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i] as UTSJSONObject;
+			const title = `${row["title"] ?? row["protocol_title"] ?? ""}`.trim();
+			if (title == "") {
+				continue;
+			}
+			const summary = `${row["summary"] ?? ""}`.trim();
+			const item: JoinProtocolItem = {
+				id: row["id"] as number | null,
+				key: `${row["key"] ?? row["protocol_key"] ?? ""}`.trim(),
+				title: title,
+				content: `${row["content"] ?? ""}`
+			};
+			if (summary != "") {
+				item.content_extra = {
+					summary: summary
+				} as JoinProtocolContentExtra;
+			}
+			result.push(item);
+		}
+		return result;
+	}
+
+	function applyEnterpriseProtocols(data: EnterpriseByCodeInfo) {
+		const raw = (data as UTSJSONObject)["protocols"];
+		const list = parseEnterpriseProtocols(raw);
+		if (list.length > 0) {
+			protocolList.value = list;
+		}
+	}
+
+	const activeProtocolTitle = computed(() => {
+		const item = activeProtocol.value;
+		if (item == null) {
+			return "协议";
+		}
+		const title = item.title ?? "";
+		return title != "" ? title : "协议";
+	});
+
+	const activeProtocolRichHtml = computed(() => {
+		const item = activeProtocol.value;
+		if (item == null) {
+			return "";
+		}
+		return protocolRichHtmlFromItem(item);
+	});
+
+	function formatProtocolTitle(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "";
+		}
+		if (text.indexOf("《") == 0) {
+			return text;
+		}
+		return `《${text}》`;
+	}
+
+	function getProtocolKey(item: JoinProtocolItem, index: number): string {
+		const idVal = item.id;
+		if (idVal != null) {
+			return `protocol-${idVal}`;
+		}
+		const key = item.key ?? "";
+		return key != "" ? key : `protocol-${index}`;
+	}
+
+	function toggleAgreement() {
+		agreed.value = !agreed.value;
+	}
+
+	function closeProtocolPopup() {
+		protocolPopupVisible.value = false;
+	}
+
+	function enterPendingView() {
+		pageView.value = "pending";
+	}
+
+	function openProtocol(item: JoinProtocolItem) {
+		router.push({
+			path: "/pages/protocol/detail",
+			query: {
+				id: item.id
+			}
+		});
+	}
+
+	function protocolRichHtmlFromItem(item: JoinProtocolItem): string {
+		const extra = item.content_extra;
+		if (extra != null) {
+			const html = extra.html ?? extra.content ?? "";
+			if (html != "") {
+				return html;
+			}
+			const summary = extra.summary ?? "";
+			if (summary != "") {
+				return toProtocolRichHtml(summary);
+			}
+		}
+		const content = item.content ?? "";
+		if (content != "") {
+			return toProtocolRichHtml(content);
+		}
+		return "";
+	}
+
+	function toProtocolRichHtml(text: string): string {
+		const trimmed = text.trim();
+		if (trimmed == "") {
+			return "";
+		}
+		if (trimmed.indexOf("<") >= 0 && trimmed.indexOf(">") > trimmed.indexOf("<")) {
+			return trimmed;
+		}
+		const escaped = trimmed
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
+		return `<div style="font-size:14px;color:#666;line-height:1.6;word-break:break-word;">${escaped.replace(/\n/g, "<br/>")}</div>`;
+	}
+
+	function getApplyCode(): string {
+		return loadCode.value != "" ? loadCode.value : enterpriseCode.value;
+	}
+
+	function parseEnterpriseByCode(res: any | null): EnterpriseByCodeInfo | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			return null;
+		}
+		const data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		return data as EnterpriseByCodeInfo;
+	}
+
+	function applyEnterpriseFromApi(ent: JoinEnterpriseInfo | EnterpriseByCodeInfo) {
+		const idVal = ent.id ?? 0;
+		if (typeof idVal == "number" && idVal > 0) {
+			companyId.value = `${idVal}`;
+		} else {
+			const parsed = parseInt(`${idVal}`);
+			if (!isNaN(parsed) && parsed > 0) {
+				companyId.value = `${parsed}`;
+			}
+		}
+		const code = `${ent.enterprise_code ?? ""}`.trim();
+		if (code != "") {
+			enterpriseCode.value = code;
+		}
+		const name = `${ent.name ?? ""}`.trim();
+		if (name != "") {
+			companyName.value = name;
+		}
+		const logoRaw = ent.logo ?? (ent as JoinEnterpriseInfo).logo_url ?? "";
+		const logo = `${logoRaw}`.trim();
+		if (logo != "") {
+			companyLogo.value = logo;
+		}
+		const intro = `${ent.intro ?? ""}`.trim();
+		if (intro != "") {
+			companyIntro.value = intro;
+		}
+	}
+
+	function loadEnterpriseByCode(code: string) {
+		if (code == "") {
+			return;
+		}
+		getEnterpriseByCode(code)
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					return;
+				}
+				const data = parseEnterpriseByCode(res);
+				if (data != null) {
+					applyEnterpriseFromApi(data);
+					applyEnterpriseProtocols(data);
+				}
+			})
+			.catch(() => {
+				// 企业信息加载失败时保留 join/status 回填
+			});
+	}
+
+	function onContinue() {
+		if (submitting.value) {
+			return;
+		}
+		if (!agreed.value) {
+			uni.showToast({ title: "请先阅读并同意相关协议", icon: "none" });
+			return;
+		}
+		const code = getApplyCode();
+		if (code == "") {
+			uni.showToast({ title: "缺少企业编码", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		applyJoinEnterprise(code, true)
+			.then((res) => {
+				const envelope = res as JoinStatusEnvelope | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "提交失败"), icon: "none" });
+					return;
+				}
+				const data = parseJoinStatus(res);
+				if (data != null) {
+					applyPageViewFromStatus(data);
+				} else {
+					enterPendingView();
+				}
+				uni.showToast({ title: "申请已提交", icon: "success" });
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "提交失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function getJoinApply(data: JoinApplicationStatus): JoinApplyInfo | null {
+		const apply = data.apply as JoinApplyInfo | null;
+		if (apply == null) {
+			return null;
+		}
+		const applyNo = apply.apply_no ?? "";
+		if (`${applyNo}`.trim() != "" || apply.status != null) {
+			return apply;
+		}
+		return null;
+	}
+
+	function getApplyStatus(data: JoinApplicationStatus): number | null {
+		const apply = getJoinApply(data);
+		if (apply != null && apply.status != null) {
+			return apply.status;
+		}
+		if (data.apply_status != null) {
+			return data.apply_status;
+		}
+		if (data.status != null) {
+			return data.status;
+		}
+		return null;
+	}
+
+	function getApplyStatusText(data: JoinApplicationStatus): string {
+		const apply = getJoinApply(data);
+		if (apply != null) {
+			const text = apply.status_text ?? "";
+			if (text != "") {
+				return text;
+			}
+		}
+		const applyStatusText = data.apply_status_text ?? "";
+		if (applyStatusText != "") {
+			return applyStatusText;
+		}
+		return data.status_text ?? "";
+	}
+
+	function getApplyNo(data: JoinApplicationStatus): string {
+		const apply = getJoinApply(data);
+		if (apply != null) {
+			const no = apply.apply_no ?? "";
+			if (no != "") {
+				return no;
+			}
+		}
+		return data.apply_no ?? "";
+	}
+
+	function getRejectReason(data: JoinApplicationStatus): string {
+		const apply = getJoinApply(data);
+		if (apply != null) {
+			return apply.reject_reason ?? "";
+		}
+		return data.reject_reason ?? "";
+	}
+
+	function getApplyEnterpriseName(data: JoinApplicationStatus): string {
+		const apply = getJoinApply(data);
+		if (apply != null) {
+			const name = apply.enterprise_name ?? "";
+			if (name != "") {
+				return name;
+			}
+		}
+		return data.enterprise_name ?? "";
+	}
+
+	function applyJoinStatus(data: JoinApplicationStatus) {
+		const ent = data.enterprise;
+		if (ent != null) {
+			applyEnterpriseFromApi(ent);
+		} else {
+			if (data.enterprise_id != null) {
+				companyId.value = `${data.enterprise_id}`;
+			}
+			const name = getApplyEnterpriseName(data);
+			if (name != "") {
+				companyName.value = name;
+			}
+		}
+
+		const reason = getRejectReason(data);
+		statusRejectReason.value = reason;
+
+		if (shouldShowPendingView(data)) {
+			statusTitle.value = "加入申请已提交，等待企业审核...";
+			statusBtnText.value = "等待审核中";
+			const text = getApplyStatusText(data);
+			if (text.length > 10) {
+				statusTitle.value = text;
+			}
+		}
+		applyJoinProtocols(data);
+	}
+
+	function applyJoinProtocols(data: JoinApplicationStatus) {
+		if (protocolList.value.length > 0) {
+			return;
+		}
+		const protocols = data.protocols;
+		const list = parseEnterpriseProtocols(protocols ?? null);
+		if (list.length > 0) {
+			protocolList.value = list;
+		}
+	}
+
+	function parseJoinStatus(res: any | null): JoinApplicationStatus | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as JoinStatusEnvelope;
+		if (envelope.data != null) {
+			return envelope.data;
+		}
+		const direct = res as JoinApplicationStatus;
+		if (
+			direct.apply != null ||
+			direct.apply_status != null ||
+			direct.apply_status_text != null ||
+			direct.can_apply != null ||
+			direct.status != null ||
+			direct.apply_no != null ||
+			direct.status_text != null ||
+			direct.enterprise != null ||
+			direct.enterprise_id != null ||
+			direct.enterprise_name != null ||
+			direct.protocols != null
+		) {
+			return direct;
+		}
+		return null;
+	}
+
+	function hasJoinApplication(data: JoinApplicationStatus): boolean {
+		if (getJoinApply(data) != null) {
+			return true;
+		}
+		const applyNo = getApplyNo(data);
+		if (`${applyNo}`.trim() != "") {
+			return true;
+		}
+		if (getApplyStatus(data) != null) {
+			return true;
+		}
+		if (data.can_apply == false) {
+			return true;
+		}
+		return false;
+	}
+
+	function shouldShowPendingView(data: JoinApplicationStatus): boolean {
+		const status = getApplyStatus(data);
+		if (status == 0) {
+			return true;
+		}
+		const text = getApplyStatusText(data);
+		if (
+			text.indexOf("待审核") >= 0 ||
+			text.indexOf("审核中") >= 0 ||
+			text.indexOf("等待") >= 0
+		) {
+			return true;
+		}
+		return false;
+	}
+
+	/** apply.status=1 或 status_text 含「已通过」视为审核通过 */
+	function isJoinApproved(data: JoinApplicationStatus): boolean {
+		const apply = getJoinApply(data);
+		if (apply != null) {
+			const applyStatus = apply.status;
+			if (applyStatus == 1 || `${applyStatus}` == "1") {
+				return true;
+			}
+			const applyText = `${apply.status_text ?? ""}`;
+			if (applyText.indexOf("已通过") >= 0) {
+				return true;
+			}
+		}
+		if (data.is_member == true) {
+			return true;
+		}
+		const status = getApplyStatus(data);
+		if (status == 1) {
+			return true;
+		}
+		const text = getApplyStatusText(data);
+		return text.indexOf("已通过") >= 0;
+	}
+
+	function pushToMenuPath(path: string) {
+		const normalized = path.trim();
+		if (normalized == "") {
+			router.push({
+				path: TABBAR_HOME_PATH,
+				mode: "switchTab"
+			});
+			return;
+		}
+		const pathOnly = normalized.split("?")[0];
+		if (router.isTabPage(pathOnly)) {
+			router.push({
+				path: pathOnly,
+				mode: "switchTab"
+			});
+			return;
+		}
+		router.push({
+			path: normalized.startsWith("/") ? normalized : `/${normalized}`,
+			mode: "reLaunch"
+		});
+	}
+
+	function navigateAfterJoinApproved() {
+		if (joinApprovedRedirecting.value) {
+			return;
+		}
+		joinApprovedRedirecting.value = true;
+		joinInvitePageActive.value = false;
+		getAppSystem()
+			.then((res) => {
+				const menus = parseMenusFromResponse(res);
+				if (menus.length > 0) {
+					tabbar.menus.value = menus;
+					tabbar.loaded.value = true;
+					pushToMenuPath(menus[0].path);
+					return;
+				}
+				pushToMenuPath(TABBAR_HOME_PATH);
+			})
+			.catch(() => {
+				pushToMenuPath(TABBAR_HOME_PATH);
+			});
+	}
+
+	function applyPageViewFromStatus(data: JoinApplicationStatus | null) {
+		if (data == null) {
+			pageView.value = "invite";
+			return;
+		}
+		applyJoinStatus(data);
+		if (isJoinApproved(data)) {
+			navigateAfterJoinApproved();
+			return;
+		}
+		if (!hasJoinApplication(data)) {
+			pageView.value = "invite";
+			return;
+		}
+		if (shouldShowPendingView(data)) {
+			enterPendingView();
+			return;
+		}
+		pageView.value = "invite";
+	}
+
+	function readCodeFromOptions(options: UTSJSONObject): string {
+		const val = options["code"] as string | null;
+		return val != null ? `${val}`.trim() : "";
+	}
+
+	function buildInviteRedirectPath(code: string): string {
+		const query = {} as UTSJSONObject;
+		query["code"] = code;
+		return router.buildRedirectPath("/pages/join/invite", query);
+	}
+
+	function ensureLogin(): boolean {
+		user.hydrateLocalProfile();
+		return user.isLoggedIn();
+	}
+
+	function redirectToLogin(code: string) {
+		router.login(buildInviteRedirectPath(code));
+	}
+
+	function initPageData(code: string) {
+		if (!ensureLogin()) {
+			redirectToLogin(code);
+			return;
+		}
+		loadEnterpriseByCode(code);
+		loadJoinStatus(code, true);
+	}
+
+	function loadJoinStatus(code: string, showLoading: boolean) {
+		if (statusRequesting.value) {
+			return;
+		}
+		statusRequesting.value = true;
+		if (showLoading) {
+			loading.value = true;
+			uni.showLoading({ title: "加载中..." });
+		}
+		return getJoinStatus(code)
+			.then((res) => {
+				const envelope = res as JoinStatusEnvelope | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					if (showLoading) {
+						uni.showToast({ title: envelope.msg ?? "加载失败", icon: "none" });
+					}
+					return;
+				}
+				const data = parseJoinStatus(res);
+				if (data != null) {
+					applyPageViewFromStatus(data);
+				}
+			})
+			.catch((err) => {
+				if (showLoading) {
+					const res = err as Response;
+					uni.showToast({ title: res.msg ?? res.message ?? "加载失败", icon: "none" });
+				}
+			})
+			.finally(() => {
+				statusRequesting.value = false;
+				if (showLoading) {
+					loading.value = false;
+					pageInited.value = true;
+					uni.hideLoading();
+				}
+			});
+	}
+
+	function refreshJoinStatus() {
+		if (!pageInited.value || statusRequesting.value) {
+			return;
+		}
+		const code = getApplyCode();
+		if (code == "") {
+			return;
+		}
+		loadJoinStatus(code, false);
+	}
+
+	onLoad((options) => {
+		joinInvitePageActive.value = true;
+		const code = readCodeFromOptions((options ?? {}) as UTSJSONObject);
+		if (code == "") {
+			uni.showToast({ title: "缺少企业编码", icon: "none" });
+			return;
+		}
+		loadCode.value = code;
+		enterpriseCode.value = code;
+		initPageData(code);
+	});
+
+	onUnload(() => {
+		joinInvitePageActive.value = false;
+	});
+
+	onShow(() => {
+		joinInvitePageActive.value = true;
+		if (!ensureLogin() || !pageInited.value) {
+			return;
+		}
+		refreshJoinStatus();
+	});
+</script>
+
+<style lang="scss">
+	page {
+		background-color: #f5f5f5;
+	}
+</style>
+
+<style lang="scss" scoped>
+	.ja-page {
+		min-height: 100vh;
+		background-color: #f5f5f5;
+		display: flex;
+		flex-direction: column;
+
+		&--pending {
+			background-color: #f5f5f5;
+		}
+	}
+
+	.ja-nav {
+		padding: 24rpx 40rpx 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--white {
+			background-color: #ffffff;
+			padding-bottom: 28rpx;
+		}
+	}
+
+	.ja-pending-wrap {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	.ja-nav-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 44rpx;
+	}
+
+	.ja-main {
+		padding: 200rpx 48rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		flex-shrink: 0;
+
+		&--pending {
+			flex: 1;
+			padding: 48rpx 48rpx 24rpx;
+			justify-content: flex-start;
+		}
+	}
+
+	.ja-spacer {
+		flex: 1;
+		min-height: 150rpx;
+		max-height: 600rpx;
+	}
+
+	.ja-brand {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		margin-bottom: 64rpx;
+	}
+
+	.ja-logo-placeholder,
+	.ja-logo-img-wrap {
+		width: 120rpx;
+		height: 120rpx;
+		border-radius: 28rpx;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.06);
+	}
+
+	.ja-logo-img {
+		width: 120rpx;
+		height: 120rpx;
+	}
+
+	.ja-logo-text {
+		font-size: 48rpx;
+		font-weight: 800;
+		color: #2b529f;
+		line-height: 64rpx;
+	}
+
+	.ja-brand-name {
+		margin-top: 20rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.ja-title {
+		font-size: 40rpx;
+		font-weight: 800;
+		color: #1a1a1a;
+		line-height: 56rpx;
+		text-align: center;
+	}
+
+	.ja-desc {
+		margin-top: 24rpx;
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 42rpx;
+		text-align: center;
+	}
+
+	.ja-illustration {
+		width: 400rpx;
+		height: 400rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 48rpx;
+	}
+
+	.ja-illustration-fallback {
+		width: 280rpx;
+		height: 280rpx;
+		border-radius: 32rpx;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.04);
+	}
+
+	.ja-status-title {
+		font-size: 36rpx;
+		font-weight: 800;
+		color: #1a1a1a;
+		line-height: 52rpx;
+		text-align: center;
+	}
+
+	.ja-status-desc-wrap {
+		margin-top: 24rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.ja-status-desc {
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 44rpx;
+		text-align: center;
+	}
+
+	.ja-footer {
+		padding: 0 40rpx 120rpx;
+		flex-shrink: 0;
+
+		&--pending {
+			padding-bottom: 80rpx;
+		}
+	}
+
+	.ja-submit {
+		width: 100%;
+		height: 96rpx;
+		border-radius: 48rpx;
+		border-width: 0;
+		padding: 0;
+		margin: 0;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+
+		&::after {
+			border-width: 0;
+		}
+
+		&.ja-submit--inactive {
+			opacity: 0.5;
+		}
+
+		&--disabled {
+			background-color: #e8e8e8;
+			box-shadow: none;
+		}
+	}
+
+	.ja-submit-text {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 44rpx;
+
+		&--disabled {
+			color: #999999;
+		}
+	}
+
+	.ja-agreement {
+		margin-top: 28rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: center;
+	}
+
+	.ja-checkbox {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 16rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		background-color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		margin-top: 4rpx;
+
+		&.is-checked {
+			background-color: #2b529f;
+			border-color: #2b529f;
+		}
+	}
+
+	.ja-checkbox-mark {
+		font-size: 20rpx;
+		color: #ffffff;
+		line-height: 28rpx;
+	}
+
+	.ja-agreement-copy {
+		margin-left: 12rpx;
+		flex: 1;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.ja-agreement-text {
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ja-link {
+		font-size: 22rpx;
+		color: #2b529f;
+		line-height: 34rpx;
+	}
+</style>
+
+<style lang="scss">
+	.ja-protocol-popup-wrap {
+		.cl-popup__inner {
+			border-radius: 24rpx;
+			background-color: #ffffff;
+			overflow: hidden;
+		}
+	}
+</style>
+
+<style lang="scss" scoped>
+	.ja-protocol-popup {
+		width: 640rpx;
+		max-width: 85vw;
+		padding: 32rpx 32rpx 24rpx;
+		min-height: 720rpx;
+		max-height: 80vh;
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+	}
+
+	.ja-protocol-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 24rpx;
+	}
+
+	.ja-protocol-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 44rpx;
+		flex: 1;
+	}
+
+	.ja-protocol-close {
+		width: 48rpx;
+		height: 48rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.ja-protocol-scroll {
+		flex: 1;
+		min-height: 420rpx;
+		max-height: 600rpx;
+	}
+
+	.ja-protocol-rich {
+		width: 100%;
+	}
+</style>

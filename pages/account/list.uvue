@@ -1,0 +1,2045 @@
+<template>
+	<cl-page :pt="{ className: 'ac-list-page' }">
+		<view class="ac-list-page">
+			<view class="ac-platform-head">
+				<view class="ac-platform-head-actions">
+					<view
+						v-if="!manageMode"
+						class="ac-platform-add-btn"
+						@tap="onAdd"
+					>
+						<cl-icon name="add-line" :size="16" color="#ffffff"></cl-icon>
+						<text class="ac-platform-add-text">新增</text>
+					</view>
+					<view
+						class="ac-platform-manage-btn"
+						:class="{ 'ac-platform-manage-btn--active': manageMode }"
+						@tap="onToggleManage"
+					>
+						<text class="ac-platform-manage-text">{{ manageMode ? "取消" : "管理" }}</text>
+					</view>
+				</view>
+			</view>
+			<view class="ac-platform-scroll">
+				<view class="ac-platform-inner">
+					<view
+						v-for="(tab, index) in platformOptions"
+						:key="tab.id != null ? tab.id : index"
+						class="ac-platform-tab"
+						:class="{
+							'ac-platform-tab--active': activePlatform == tab.name,
+							'ac-platform-tab--last': index == platformOptions.length - 1
+						}"
+						@tap="onPlatformTap(tab)"
+					>
+						<view class="ac-platform-main">
+							<image
+								v-if="shouldShowTabIcon(tab)"
+								class="ac-platform-icon"
+								:src="getTabIcon(tab)"
+								mode="aspectFill"
+								@error="onTabIconError(tab)"
+							></image>
+							<view class="ac-platform-info">
+								<text class="ac-platform-name">{{ tab.name }}</text>
+								<!-- <text class="ac-platform-sub">{{ tabAccountCount(tab) }}个账号</text> -->
+							</view>
+						</view>
+					</view>
+				</view>
+			</view>
+
+			<view class="ac-search-bar">
+				<view class="ac-search-field">
+					<cl-icon name="search-line" :size="16" color="#aeb1bd"></cl-icon>
+					<input
+						class="ac-search-input"
+						v-model="keyword"
+						placeholder="输入账号名称/ID/UID搜索"
+						placeholder-class="ac-search-placeholder"
+						confirm-type="search"
+						@confirm="refreshList"
+						@input="onKeywordInput"
+					/>
+				</view>
+				<view class="ac-sort-btn" @tap="sortPopupVisible = true">
+					<text class="ac-sort-text">{{ activeSortLabel }}</text>
+					<cl-icon name="arrow-down-s-line" :size="14" color="#7b8193"></cl-icon>
+				</view>
+			</view>
+
+			<view class="ac-list-scroll" :class="{ 'ac-list-scroll--manage': manageMode }">
+				<view class="ac-list-inner">
+					<view v-if="listLoading" class="ac-state">
+						<text class="ac-state-text">加载中...</text>
+					</view>
+					<view v-else-if="accountRows.length == 0" class="ac-state">
+						<text class="ac-state-text">暂无数据</text>
+					</view>
+					<view
+						v-else
+						v-for="item in accountRows"
+						:key="item.id"
+						class="ac-card"
+						:class="{ 'ac-card--selected': manageMode && isRowSelected(item.id) }"
+						@tap="onCardTap(item)"
+					>
+						<view
+							v-if="manageMode"
+							class="ac-card-check"
+							:class="{ 'ac-card-check--checked': isRowSelected(item.id) }"
+						>
+							<cl-icon
+								v-if="isRowSelected(item.id)"
+								name="check-line"
+								:size="14"
+								color="#ffffff"
+							></cl-icon>
+						</view>
+						<view class="ac-card-body">
+							<view class="ac-card-head">
+								<view class="ac-card-head-left">
+									<view class="ac-platform-tag" :style="{ backgroundColor: item.color }">
+										<text class="ac-platform-tag-text">{{ item.platform_name }}</text>
+									</view>
+									<text class="ac-account-name">{{ item.account_title }}</text>
+								</view>
+								<view v-if="!manageMode" class="ac-edit-btn" @tap.stop="onEdit(item)">
+									<text class="ac-edit-text">编辑</text>
+									<cl-icon name="arrow-right-s-line" :size="14" color="#7b8193"></cl-icon>
+								</view>
+							</view>
+							<view class="ac-data-box">
+                                <view class="ac-data-col">
+									<text class="ac-data-label">账号昵称</text>
+									<text class="ac-data-val">{{ item.account_title }}</text>
+								</view>
+								<view class="ac-data-col">
+									<text class="ac-data-label">账号 ID</text>
+									<text class="ac-data-val">{{ item.account_id }}</text>
+								</view>
+								<view class="ac-data-col">
+									<text class="ac-data-label">粉丝量</text>
+									<text class="ac-data-val">{{ item.fans }}</text>
+								</view>
+								
+							</view>
+							<text class="ac-create-time">创建时间 · {{ item.create_time }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+
+			<view v-if="manageMode" class="ac-manage-footer">
+				<view class="ac-manage-select" @tap="onToggleSelectAll">
+					<view class="ac-card-check ac-manage-select-check" :class="{ 'ac-card-check--checked': isAllSelected }">
+						<cl-icon
+							v-if="isAllSelected"
+							name="check-line"
+							:size="14"
+							color="#ffffff"
+						></cl-icon>
+					</view>
+					<text class="ac-manage-select-text">全选</text>
+					<text class="ac-manage-select-sub">已选</text>
+					<text class="ac-manage-select-count">{{ selectedCount }}/{{ accountRows.length }}</text>
+				</view>
+				<view
+					class="ac-manage-delete-btn"
+					:class="{ 'ac-manage-delete-btn--disabled': deleting }"
+					@tap="onDeleteSelected"
+				>
+					<text class="ac-manage-delete-text">{{ deleting ? "删除中..." : "删除" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+
+		<cl-popup v-model="sortPopupVisible" direction="bottom" :show-header="false">
+			<view class="ac-sort-popup">
+				<view class="ac-sort-head">
+					<text class="ac-sort-title">排序方式</text>
+					<cl-icon name="close-line" :size="18" color="#999999" @tap="sortPopupVisible = false"></cl-icon>
+				</view>
+				<view
+					v-for="opt in sortOptions"
+					:key="opt.key"
+					class="ac-sort-item"
+					:class="{ 'ac-sort-item--active': activeSort == opt.key }"
+					@tap="onPickSort(opt.key)"
+				>
+					<text class="ac-sort-item-text">{{ opt.label }}</text>
+					<cl-icon v-if="activeSort == opt.key" name="check-line" :size="18" color="#ff6033"></cl-icon>
+				</view>
+			</view>
+		</cl-popup>
+
+		<cl-popup v-model="addPopupVisible" direction="bottom" :show-header="false" :mask-closable="true">
+			<view class="ac-add-popup">
+				<view class="ac-add-head">
+					<view class="ac-add-title-row">
+						<text class="ac-add-title">{{ linkLabel }}</text>
+						<text class="ac-add-required">*</text>
+					</view>
+					<cl-icon name="close-line" :size="18" color="#999999" @tap="closeAddPopup"></cl-icon>
+				</view>
+				<view class="ac-add-input-card">
+					<textarea
+						class="ac-add-textarea"
+						:value="linkInput"
+						:placeholder="linkPlaceholder"
+						placeholder-class="ac-add-textarea-ph"
+						@input="onLinkInput"
+					></textarea>
+					<view class="ac-add-action-row">
+						<view class="ac-add-action-btn" @tap.stop="onPasteLink">
+							<text class="ac-add-action-btn-text">粘贴</text>
+						</view>
+						<view class="ac-add-action-btn" @tap="onSmartRecognize">
+							<text class="ac-add-action-btn-text">智能识别</text>
+						</view>
+					</view>
+				</view>
+				<view v-if="recognizeResult != null" class="ac-add-result-card">
+					<image
+						v-if="recognizeAvatarSrc != ''"
+						class="ac-add-result-avatar"
+						:src="recognizeAvatarSrc"
+						mode="aspectFill"
+					></image>
+					<view v-else class="ac-add-result-avatar ac-add-result-avatar--ph">
+						<text class="ac-add-result-avatar-text">{{ recognizeAvatarText }}</text>
+					</view>
+					<view class="ac-add-result-main">
+						<view class="ac-add-result-name-row">
+							<text class="ac-add-result-name">{{ recognizeAccountTitle }}</text>
+							<view
+								class="ac-add-result-platform"
+								:style="{ backgroundColor: recognizePlatformColor }"
+							>
+								<text class="ac-add-result-platform-text">{{ recognizePlatformName }}</text>
+							</view>
+						</view>
+						<text class="ac-add-result-id">{{activePlatformName}}UID: {{ recognizeAccountUid }}</text>
+					</view>
+					<view class="ac-add-result-status">
+						<view class="ac-add-result-status-dot">
+							<cl-icon name="check-line" :size="12" color="#ffffff"></cl-icon>
+						</view>
+						<text class="ac-add-result-status-text">识别成功</text>
+					</view>
+				</view>
+				<view class="ac-add-footer">
+					<view
+						class="ac-add-footer-btn"
+						:class="{ 'ac-add-footer-btn--disabled': recognizing || submitting }"
+						@tap="onConfirmAdd"
+					>
+						<text class="ac-add-footer-btn-text">{{ submitting ? "提交中..." : "确定提交" }}</text>
+					</view>
+					<view class="ac-add-footer-btn ac-add-footer-btn--secondary" @tap="onManualAdd">
+						<text class="ac-add-footer-btn-text ac-add-footer-btn-text--secondary">手动添加</text>
+					</view>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { addAccount, addAccountByUrl, deleteAccounts, getAccountList, getAccountPlatformGuide, getDictList } from "@/.cool/api/account";
+	import { toDisplayImageSrc } from "@/.cool/api/upload";
+	import { getApiMessage, isApiSuccess, router, useStore } from "@/.cool";
+	import type { AccountDictItem, AccountSaveParams } from "@/.cool/types/account";
+
+	const { user } = useStore();
+
+	type AccountSortKey = "default" | "fans_desc" | "fans_asc" | "create_desc" | "create_asc";
+
+	type AccountRow = {
+		id: number;
+		platform_name: string;
+		account_id: string;
+		account_title: string;
+		account_uid: string;
+		account_did: string;
+		account_home: string;
+		account_type: string;
+		fans: number;
+		color: string;
+		create_time: string;
+	};
+
+	type SortOption = {
+		key: AccountSortKey;
+		label: string;
+	};
+
+	const sortOptions: SortOption[] = [
+		{ key: "default", label: "综合排序" },
+		{ key: "fans_desc", label: "粉丝从高到低" },
+		{ key: "fans_asc", label: "粉丝从低到高" },
+		{ key: "create_desc", label: "最近创建" },
+		{ key: "create_asc", label: "最早创建" }
+	];
+
+	const DEFAULT_PLATFORM_LOGO = "/static/images/image_logo.png";
+
+	const platformOptions = ref<AccountDictItem[]>([]);
+	const platformCountMap = ref<UTSJSONObject>({});
+	const iconErrorMap = ref<UTSJSONObject>({});
+	const activePlatform = ref("");
+	const keyword = ref("");
+	const activeSort = ref<AccountSortKey>("default");
+	const accountRows = ref<AccountRow[]>([]);
+	const sortPopupVisible = ref(false);
+	const addPopupVisible = ref(false);
+	const linkInput = ref("");
+	const recognizing = ref(false);
+	const submitting = ref(false);
+	const recognizeResult = ref<UTSJSONObject | null>(null);
+	const recognizeAvatarSrc = ref("");
+	const platformDictList = ref<AccountDictItem[]>([]);
+	const dictLoading = ref(false);
+	const listLoading = ref(false);
+	const listLoaded = ref(false);
+	const manageMode = ref(false);
+	const selectedIds = ref<number[]>([]);
+	const deleting = ref(false);
+	let keywordTimer: number | null = null;
+
+	const selectedCount = computed((): number => {
+		return selectedIds.value.length;
+	});
+
+	const isAllSelected = computed((): boolean => {
+		return accountRows.value.length > 0 && selectedCount.value == accountRows.value.length;
+	});
+
+	const activeSortLabel = computed((): string => {
+		for (let i = 0; i < sortOptions.length; i++) {
+			if (sortOptions[i].key == activeSort.value) {
+				return sortOptions[i].label;
+			}
+		}
+		return "综合排序";
+	});
+
+	const activePlatformTab = computed((): AccountDictItem | null => {
+		if (platformOptions.value.length == 0) {
+			return null;
+		}
+		for (let i = 0; i < platformOptions.value.length; i++) {
+			const tab = platformOptions.value[i];
+			if (tab.name == activePlatform.value) {
+				return tab;
+			}
+		}
+		return platformOptions.value[0];
+	});
+
+	const activePlatformName = computed((): string => {
+		const tab = activePlatformTab.value;
+		return tab != null && tab.name.trim() != "" ? tab.name : "平台";
+	});
+
+	const linkLabel = computed((): string => {
+		return `${activePlatformName.value}链接`;
+	});
+
+	const linkPlaceholder = computed((): string => {
+		return `请输入/粘贴${activePlatformName.value}账号主页链接`;
+	});
+
+	const recognizeAvatarText = computed((): string => {
+		const result = recognizeResult.value;
+		if (result == null) {
+			return "账";
+		}
+		const title = `${result["account_title"] ?? ""}`.trim();
+		return title != "" ? title.substring(0, 1) : "账";
+	});
+
+	const recognizeAccountTitle = computed((): string => {
+		const result = recognizeResult.value;
+		if (result == null) {
+			return "";
+		}
+		return `${result["account_title"] ?? ""}`;
+	});
+
+	const recognizePlatformColor = computed((): string => {
+		const result = recognizeResult.value;
+		if (result == null) {
+			return "";
+		}
+		return `${result["color"] ?? ""}`;
+	});
+
+	const recognizePlatformName = computed((): string => {
+		const result = recognizeResult.value;
+		if (result == null) {
+			return "";
+		}
+		return `${result["platform_name"] ?? ""}`;
+	});
+
+	const recognizeAccountUid = computed((): string => {
+		const result = recognizeResult.value;
+		if (result == null) {
+			return "";
+		}
+		return `${result["account_uid"] ?? ""}`;
+	});
+
+	function tabAccountCount(tab: AccountDictItem): number {
+		const preset = tab.account_count;
+		if (preset != null && preset >= 0) {
+			return preset;
+		}
+		const count = platformCountMap.value[tab.name] as number | null;
+		return count != null && count >= 0 ? count : 0;
+	}
+
+	function isOtherPlatformName(name: string): boolean {
+		const text = name.trim();
+		return text == "其它" || text == "其他";
+	}
+
+	function getTabIcon(tab: AccountDictItem): string {
+		const name = `${tab.name ?? ""}`.trim();
+		if (isOtherPlatformName(name) || tab.value == "qita") {
+			return DEFAULT_PLATFORM_LOGO;
+		}
+		return `${tab.icon ?? ""}`.trim();
+	}
+
+	function shouldShowTabIcon(tab: AccountDictItem): boolean {
+		if (isIconError(tab)) {
+			return false;
+		}
+		return getTabIcon(tab) != "";
+	}
+
+	function getTabSubtitle(tab: AccountDictItem): string {
+		const subtitle = `${tab.subtitle ?? ""}`.trim();
+		if (subtitle != "") {
+			return subtitle;
+		}
+		const name = `${tab.name ?? ""}`.trim();
+		if (name.length > 0) {
+			return name.substring(0, 1);
+		}
+		return "平";
+	}
+
+	function isIconError(tab: AccountDictItem): boolean {
+		const id = tab.id;
+		return id != null && iconErrorMap.value[`${id}`] == true;
+	}
+
+	function pickNonEmptyText(...values: string[]): string {
+		for (let i = 0; i < values.length; i++) {
+			const text = values[i].trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function sortDictList(list: AccountDictItem[]): AccountDictItem[] {
+		return list.slice().sort((a, b) => {
+			const sortDiff = (b.sort ?? 0) - (a.sort ?? 0);
+			if (sortDiff != 0) {
+				return sortDiff;
+			}
+			return (a.id ?? 0) - (b.id ?? 0);
+		});
+	}
+
+	function mapPlatformItem(row: UTSJSONObject): AccountDictItem {
+		const name = pickNonEmptyText(`${row["name"] ?? ""}`, `${row["title"] ?? ""}`, `${row["platform_name"] ?? ""}`, `${row["value"] ?? ""}`);
+		const accountCountRaw = row["account_count"] ?? row["accountCount"] ?? row["count"];
+		const accountCount = accountCountRaw != null ? parseInt(`${accountCountRaw}`) : -1;
+		return {
+			id: parseInt(`${row["id"] ?? 0}`),
+			name: name,
+			value: `${row["value"] ?? ""}`,
+			subtitle: pickNonEmptyText(`${row["subtitle"] ?? ""}`, `${row["short_name"] ?? ""}`, `${row["remark"] ?? ""}`),
+			icon: pickNonEmptyText(`${row["icon"] ?? ""}`, `${row["image"] ?? ""}`, `${row["logo"] ?? ""}`),
+			sort: parseInt(`${row["sort"] ?? 0}`),
+			account_count: isNaN(accountCount) || accountCount < 0 ? undefined : accountCount
+		};
+	}
+
+	function extractPlatformRows(payload: any | null): UTSJSONObject[] {
+		if (payload == null) {
+			return [];
+		}
+		let data = payload;
+		if (!(data instanceof Array)) {
+			const envelope = data as UTSJSONObject;
+			const code = envelope["code"];
+			if (code != null && !isApiSuccess(code)) {
+				return [];
+			}
+			data = envelope["data"] ?? envelope;
+		}
+		let listRaw: any | null = null;
+		if (data instanceof Array) {
+			listRaw = data;
+		} else {
+			const obj = data as UTSJSONObject;
+			listRaw = obj["platform_list"] ?? obj["platformList"] ?? obj["list"] ?? obj["platforms"];
+		}
+		if (!(listRaw instanceof Array)) {
+			return [];
+		}
+		const result: UTSJSONObject[] = [];
+		for (let i = 0; i < listRaw.length; i++) {
+			const row = listRaw[i];
+			if (row != null) {
+				result.push(row as UTSJSONObject);
+			}
+		}
+		return result;
+	}
+
+	function parsePlatformOptions(payload: any | null): AccountDictItem[] {
+		const rows = extractPlatformRows(payload);
+		const result: AccountDictItem[] = [];
+		const counts: UTSJSONObject = {};
+		let hasPresetCount = false;
+		for (let i = 0; i < rows.length; i++) {
+			const item = mapPlatformItem(rows[i]);
+			if (item.name.trim() == "") {
+				continue;
+			}
+			result.push(item);
+			if (item.account_count != null) {
+				counts[item.name] = item.account_count;
+				hasPresetCount = true;
+			}
+		}
+		if (hasPresetCount) {
+			platformCountMap.value = counts;
+		}
+		return sortDictList(result);
+	}
+
+	function readDictList(payload: any | null): AccountDictItem[] {
+		return parsePlatformOptions(payload);
+	}
+
+	function applyPlatformOptions(options: AccountDictItem[]) {
+		platformOptions.value = options;
+		if (options.length > 0 && activePlatform.value == "") {
+			activePlatform.value = options[0].name;
+		}
+		refreshList();
+	}
+
+	function loadPlatformOptionsFromDict() {
+		return getDictList("account_platform")
+			.then((res) => {
+				const options = readDictList(res);
+				applyPlatformOptions(options);
+			})
+			.catch(() => {
+				platformOptions.value = [];
+				refreshList();
+			});
+	}
+
+	function loadPlatformDictList() {
+		return getDictList("account_platform")
+			.then((res) => {
+				platformDictList.value = readDictList(res);
+			})
+			.catch(() => {
+				platformDictList.value = [];
+			});
+	}
+
+	function loadPlatformOptions() {
+		if (dictLoading.value) {
+			return;
+		}
+		dictLoading.value = true;
+		getAccountPlatformGuide(3)
+			.then((res) => {
+				const options = parsePlatformOptions(res);
+				if (options.length > 0) {
+					applyPlatformOptions(options);
+					return;
+				}
+				return loadPlatformOptionsFromDict();
+			})
+			.catch(() => {
+				return loadPlatformOptionsFromDict();
+			})
+			.finally(() => {
+				dictLoading.value = false;
+			});
+	}
+
+	function pickDisplayText(...values: string[]): string {
+		for (let i = 0; i < values.length; i++) {
+			const text = values[i].trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "-";
+	}
+
+	function mapAccountRow(row: UTSJSONObject): AccountRow {
+		const color = `${row["color"] ?? ""}`.trim();
+		return {
+			id: parseInt(`${row["id"] ?? 0}`),
+			platform_name: `${row["platform_name"] ?? ""}`,
+			account_id: `${row["account_id"] ?? ""}`,
+			account_title: `${row["account_title"] ?? ""}`,
+			account_uid: `${row["account_uid"] ?? ""}`,
+			account_did: `${row["account_did"] ?? ""}`,
+			account_home: `${row["account_home"] ?? ""}`,
+			account_type: pickDisplayText(`${row["account_type"] ?? ""}`),
+			fans: parseInt(`${row["fans"] ?? 0}`),
+			color: color != "" ? color : "#212121",
+			create_time: `${row["create_time"] ?? ""}`
+		};
+	}
+
+	function parseAccountListPayload(payload: any | null): AccountRow[] {
+		if (payload == null) {
+			return [];
+		}
+		let data = payload;
+		if (!(data instanceof Array)) {
+			const envelope = data as UTSJSONObject;
+			const code = envelope["code"];
+			if (code != null && !isApiSuccess(code)) {
+				return [];
+			}
+			data = envelope["data"] ?? envelope;
+		}
+		let listRaw: any | null = null;
+		if (data instanceof Array) {
+			listRaw = data;
+		} else {
+			listRaw = (data as UTSJSONObject)["list"];
+		}
+		if (!(listRaw instanceof Array)) {
+			return [];
+		}
+		const result: AccountRow[] = [];
+		for (let i = 0; i < listRaw.length; i++) {
+			const row = listRaw[i];
+			if (row == null) {
+				continue;
+			}
+			result.push(mapAccountRow(row as UTSJSONObject));
+		}
+		return result;
+	}
+
+	function updateActivePlatformCount(count: number) {
+		const platformName = currentPlatformName();
+		if (platformName == "") {
+			return;
+		}
+		platformCountMap.value[platformName] = count;
+	}
+
+	function currentPlatformName(): string {
+		return activePlatform.value;
+	}
+
+	function refreshList() {
+		const platformName = currentPlatformName();
+		if (platformName == "") {
+			accountRows.value = [];
+			return;
+		}
+		if (listLoading.value) {
+			return;
+		}
+		listLoading.value = true;
+		getAccountList({
+			platform_name: platformName,
+			keyword: keyword.value.trim(),
+			sort_type: activeSort.value
+		})
+			.then((res) => {
+				const rows = parseAccountListPayload(res);
+				accountRows.value = rows;
+				updateActivePlatformCount(rows.length);
+				if (manageMode.value) {
+					syncSelectedIds();
+				}
+			})
+			.catch((err) => {
+				accountRows.value = [];
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				listLoading.value = false;
+				listLoaded.value = true;
+			});
+	}
+
+	function onKeywordInput() {
+		if (keywordTimer != null) {
+			clearTimeout(keywordTimer);
+		}
+		keywordTimer = setTimeout(() => {
+			refreshList();
+		}, 300) as unknown as number;
+	}
+
+	function onPlatformTap(tab: AccountDictItem) {
+		activePlatform.value = tab.name;
+		refreshList();
+	}
+
+	function onTabIconError(tab: AccountDictItem) {
+		const id = tab.id;
+		if (id != null) {
+			iconErrorMap.value[`${id}`] = true;
+		}
+	}
+
+	function onAdd() {
+		resetAddPopupState();
+		addPopupVisible.value = true;
+	}
+
+	function closeAddPopup() {
+		addPopupVisible.value = false;
+		resetAddPopupState();
+	}
+
+	function resetAddPopupState() {
+		linkInput.value = "";
+		recognizeResult.value = null;
+		recognizeAvatarSrc.value = "";
+	}
+
+	function resetRecognizePreview() {
+		recognizeResult.value = null;
+		recognizeAvatarSrc.value = "";
+	}
+
+	function normalizePlatformName(name: string): string {
+		return name.replace(/\s+/g, "").replace(/KOC$/i, "").trim().toLowerCase();
+	}
+
+	function isNumberLike(val: string): boolean {
+		return /^-?\d+$/.test(val.trim());
+	}
+
+	function toPositiveInt(val: any | null): number {
+		const num = parseInt(`${val ?? 0}`);
+		return !isNaN(num) && num > 0 ? num : 0;
+	}
+
+	function extractPlatformIdFromSource(source: UTSJSONObject | AccountDictItem | null): number {
+		if (source == null) {
+			return 0;
+		}
+		const row = source as UTSJSONObject;
+		const keys = ["platform_id", "platformId", "id", "value_id", "dict_key"];
+		for (let i = 0; i < keys.length; i++) {
+			const num = toPositiveInt(row[keys[i]]);
+			if (num > 0) {
+				return num;
+			}
+		}
+		const dictItem = source as AccountDictItem;
+		const value = `${dictItem.value ?? ""}`.trim();
+		if (isNumberLike(value)) {
+			return toPositiveInt(value);
+		}
+		return 0;
+	}
+
+	function extractChannelFromSource(source: UTSJSONObject | AccountDictItem | null): string {
+		if (source == null) {
+			return "";
+		}
+		const row = source as UTSJSONObject;
+		const keys = ["channel", "value", "dict_value", "type_value"];
+		for (let i = 0; i < keys.length; i++) {
+			const raw = row[keys[i]];
+			if (raw == null || `${raw}` == "") {
+				continue;
+			}
+			const text = `${raw}`.trim().toLowerCase();
+			if (text != "" && !isNumberLike(text)) {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function resolveRecognizePlatformMeta(): { platformId: number; channel: string } {
+		const option = activePlatformTab.value;
+		let platformId = extractPlatformIdFromSource(option);
+		let channel = extractChannelFromSource(option);
+		if ((platformId > 0 && channel != "") || platformDictList.value.length == 0) {
+			return { platformId, channel };
+		}
+		const optionNames: string[] = [];
+		if (option != null) {
+			if (`${option.name ?? ""}`.trim() != "") {
+				optionNames.push(option.name);
+			}
+			if (`${option.subtitle ?? ""}`.trim() != "") {
+				optionNames.push(`${option.subtitle}`);
+			}
+		}
+		const optionNameKeys = optionNames.map((item) => normalizePlatformName(item)).filter((item) => item != "");
+		let matched: AccountDictItem | null = null;
+		for (let i = 0; i < platformDictList.value.length; i++) {
+			const item = platformDictList.value[i];
+			const itemNames: string[] = [];
+			if (`${item.name ?? ""}`.trim() != "") {
+				itemNames.push(item.name);
+			}
+			if (`${item.subtitle ?? ""}`.trim() != "") {
+				itemNames.push(`${item.subtitle}`);
+			}
+			const itemNameKeys = itemNames.map((name) => normalizePlatformName(name)).filter((name) => name != "");
+			let sameName = false;
+			for (let j = 0; j < optionNames.length; j++) {
+				if (itemNames.indexOf(optionNames[j]) != -1) {
+					sameName = true;
+					break;
+				}
+			}
+			if (!sameName) {
+				for (let j = 0; j < optionNameKeys.length; j++) {
+					if (itemNameKeys.indexOf(optionNameKeys[j]) != -1) {
+						sameName = true;
+						break;
+					}
+				}
+			}
+			if (sameName) {
+				matched = item;
+				break;
+			}
+			if (channel != "") {
+				const itemChannel = extractChannelFromSource(item);
+				if (itemChannel != "" && itemChannel == channel) {
+					matched = item;
+					break;
+				}
+			}
+			if (platformId > 0 && extractPlatformIdFromSource(item) == platformId) {
+				matched = item;
+				break;
+			}
+		}
+		if (matched != null) {
+			if (platformId <= 0) {
+				platformId = extractPlatformIdFromSource(matched);
+			}
+			if (channel == "") {
+				channel = extractChannelFromSource(matched);
+			}
+		}
+		return { platformId, channel };
+	}
+
+	function onLinkInput(e: UniInputEvent) {
+		linkInput.value = `${e.detail.value ?? ""}`;
+		resetRecognizePreview();
+	}
+
+	function applyClipboardText(text: string): boolean {
+		const value = text.trim();
+		if (value == "") {
+			return false;
+		}
+		linkInput.value = value;
+		return true;
+	}
+
+	function notifyClipboardFail() {
+		uni.showToast({ title: "读取剪贴板失败", icon: "none" });
+	}
+
+	function readClipboardByUni(): Promise<string> {
+		return new Promise((resolve, reject) => {
+			uni.getClipboardData({
+				success: (res) => {
+					resolve(`${res.data ?? ""}`);
+				},
+				fail: () => {
+					reject();
+				}
+			});
+		});
+	}
+
+	// #ifdef H5
+	function readClipboardByNavigator(): Promise<string> {
+		return new Promise((resolve, reject) => {
+			if (typeof navigator == "undefined" || navigator.clipboard == null) {
+				reject();
+				return;
+			}
+			navigator.clipboard.readText().then((text) => {
+				resolve(`${text ?? ""}`);
+			}).catch(() => {
+				reject();
+			});
+		});
+	}
+
+	function openManualPastePrompt() {
+		if (typeof window != "undefined" && window.prompt != null) {
+			const pasted = window.prompt("浏览器限制读取剪贴板，请手动粘贴链接后确定", linkInput.value);
+			if (pasted != null && applyClipboardText(pasted)) {
+				uni.showToast({ title: "粘贴成功", icon: "none" });
+				return;
+			}
+		}
+		uni.showModal({
+			title: "无法读取剪贴板",
+			content: "请长按输入框手动粘贴链接",
+			showCancel: false
+		});
+	}
+	// #endif
+
+	function onPasteLink() {
+		readClipboardByUni()
+			.then((text) => {
+				finishPasteWithText(text);
+			})
+			.catch(() => {
+				tryAlternatePaste();
+			});
+	}
+
+	function finishPasteWithText(text: string) {
+		if (applyClipboardText(text)) {
+			uni.showToast({ title: "粘贴成功", icon: "none" });
+			return;
+		}
+		tryAlternatePaste();
+	}
+
+	// #ifdef H5
+	function tryAlternatePaste() {
+		readClipboardByNavigator()
+			.then((text) => {
+				if (applyClipboardText(text)) {
+					uni.showToast({ title: "粘贴成功", icon: "none" });
+					return;
+				}
+				openManualPastePrompt();
+			})
+			.catch(() => {
+				openManualPastePrompt();
+			});
+	}
+	// #endif
+
+	// #ifndef H5
+	function tryAlternatePaste() {
+		notifyClipboardFail();
+	}
+	// #endif
+
+	function getCurrentUserId(): number {
+		const info = user.info.value;
+		if (info != null && info.id != null && info.id > 0) {
+			return info.id;
+		}
+		return 0;
+	}
+
+	function extractRecognizeData(res: any | null): UTSJSONObject | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			return null;
+		}
+		const data = envelope["data"];
+		if (data == null || typeof data != "object") {
+			return null;
+		}
+		return data as UTSJSONObject;
+	}
+
+	function applyRecognizeAvatar(row: UTSJSONObject | null) {
+		if (row == null) {
+			recognizeAvatarSrc.value = "";
+			return;
+		}
+		const trimmed = `${row["avatar"] ?? ""}`.trim();
+		if (trimmed == "") {
+			recognizeAvatarSrc.value = "";
+			return;
+		}
+		toDisplayImageSrc(trimmed).then((src) => {
+			recognizeAvatarSrc.value = src;
+		}).catch(() => {
+			recognizeAvatarSrc.value = trimmed;
+		});
+	}
+
+	function buildAddAccountByUrlParams(link: string) {
+		const platformMeta = resolveRecognizePlatformMeta();
+		return {
+			channel: platformMeta.channel,
+			user_id: getCurrentUserId(),
+			platform_id: platformMeta.platformId,
+			origin_resource_url: link
+		};
+	}
+
+	function validateAddAccountByUrlInput(link: string): boolean {
+		if (link == "") {
+			uni.showToast({ title: `请填写${linkLabel.value}`, icon: "none" });
+			return false;
+		}
+		const platformMeta = resolveRecognizePlatformMeta();
+		if (platformMeta.platformId <= 0 || platformMeta.channel == "") {
+			uni.showToast({ title: "当前平台参数缺失，请联系管理员", icon: "none" });
+			return false;
+		}
+		if (getCurrentUserId() <= 0) {
+			uni.showToast({ title: "请先登录", icon: "none" });
+			return false;
+		}
+		return true;
+	}
+
+	function recognizeAccountByUrl() {
+		const link = linkInput.value.trim();
+		if (!validateAddAccountByUrlInput(link)) {
+			return;
+		}
+		if (recognizing.value) {
+			return;
+		}
+		const params = buildAddAccountByUrlParams(link);
+		recognizing.value = true;
+		resetRecognizePreview();
+		uni.showLoading({ title: "识别中...", mask: true });
+		addAccountByUrl({
+			channel: params.channel,
+			user_id: params.user_id,
+			platform_id: params.platform_id,
+			origin_resource_url: link
+		})
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					const failMsg = getApiMessage(res, "识别失败");
+					if (failMsg.indexOf("解析失败") != -1) {
+						uni.showToast({
+							title: "解析失败，请点击下方手动添加",
+							icon: "none",
+							duration: 5000
+						});
+					} else {
+						uni.showToast({
+							title: failMsg,
+							icon: "none",
+							duration: 5000
+						});
+					}
+					return;
+				}
+				const data = extractRecognizeData(res);
+				if (data == null || `${data["account_title"] ?? ""}`.trim() == "") {
+					uni.showToast({ title: "识别结果为空", icon: "none" });
+					return;
+				}
+				recognizeResult.value = data;
+				applyRecognizeAvatar(data);
+				uni.showToast({ title: "识别成功", icon: "none" });
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "识别失败"), icon: "none" });
+			})
+			.finally(() => {
+				uni.hideLoading();
+				recognizing.value = false;
+			});
+	}
+
+	function buildAddAccountParamsFromRecognize(): AccountSaveParams | null {
+		const row = recognizeResult.value;
+		if (row == null) {
+			return null;
+		}
+		const platformName = `${row["platform_name"] ?? ""}`.trim();
+		const accountId = `${row["account_id"] ?? ""}`.trim();
+		const accountTitle = `${row["account_title"] ?? ""}`.trim();
+		if (platformName == "" || accountId == "" || accountTitle == "") {
+			return null;
+		}
+		const fansRaw = row["fans"];
+		let fans = 0;
+		if (fansRaw != null) {
+			const parsedFans = parseInt(`${fansRaw}`);
+			fans = isNaN(parsedFans) || parsedFans < 0 ? 0 : parsedFans;
+		}
+		return {
+			platform_name: platformName,
+			account_id: accountId,
+			account_title: accountTitle,
+			account_uid: `${row["account_uid"] ?? ""}`.trim(),
+			account_did: `${row["account_did"] ?? ""}`.trim(),
+			account_home: `${row["account_home"] ?? ""}`.trim(),
+			fans: fans
+		};
+	}
+
+	function confirmRecognizedAccount() {
+		if (recognizeResult.value == null) {
+			uni.showToast({ title: "请先进行智能识别", icon: "none" });
+			return;
+		}
+		if (submitting.value) {
+			return;
+		}
+		const payload = buildAddAccountParamsFromRecognize();
+		if (payload == null) {
+			uni.showToast({ title: "识别结果缺少必填字段", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中...", mask: true });
+		addAccount(payload)
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "添加失败"), icon: "none" });
+					return;
+				}
+				closeAddPopup();
+				uni.showToast({ title: getApiMessage(res, "添加成功"), icon: "none" });
+				refreshList();
+				loadPlatformOptions();
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "添加失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function onSmartRecognize() {
+		recognizeAccountByUrl();
+	}
+
+	function onConfirmAdd() {
+		confirmRecognizedAccount();
+	}
+
+	function onManualAdd() {
+		closeAddPopup();
+		const platformName = currentPlatformName();
+		const query: UTSJSONObject = {};
+		if (platformName != "") {
+			query["platform_name"] = platformName;
+		}
+		router.push({
+			path: "/pages/account/add",
+			query: query
+		});
+	}
+
+	function onPickSort(key: AccountSortKey) {
+		activeSort.value = key;
+		sortPopupVisible.value = false;
+		refreshList();
+	}
+
+	function isRowSelected(id: number): boolean {
+		return selectedIds.value.indexOf(id) != -1;
+	}
+
+	function syncSelectedIds() {
+		const validIds: number[] = [];
+		for (let i = 0; i < accountRows.value.length; i++) {
+			const id = accountRows.value[i].id;
+			if (isRowSelected(id)) {
+				validIds.push(id);
+			}
+		}
+		selectedIds.value = validIds;
+	}
+
+	function exitManageMode() {
+		manageMode.value = false;
+		selectedIds.value = [];
+	}
+
+	function onToggleManage() {
+		if (manageMode.value) {
+			exitManageMode();
+			return;
+		}
+		manageMode.value = true;
+		selectedIds.value = [];
+	}
+
+	function onCardTap(item: AccountRow) {
+		if (!manageMode.value) {
+			return;
+		}
+		const id = item.id;
+		const nextIds = selectedIds.value.slice();
+		const index = nextIds.indexOf(id);
+		if (index == -1) {
+			nextIds.push(id);
+		} else {
+			nextIds.splice(index, 1);
+		}
+		selectedIds.value = nextIds;
+	}
+
+	function onEdit(item: AccountRow) {
+		if (manageMode.value || item.id <= 0) {
+			return;
+		}
+		const query: UTSJSONObject = {
+			id: item.id,
+			platform_name: item.platform_name,
+			account_id: item.account_id,
+			account_title: item.account_title,
+			account_uid: item.account_uid,
+			account_did: item.account_did,
+			account_home: item.account_home,
+			fans: item.fans
+		};
+		router.push({
+			path: "/pages/account/add",
+			query: query
+		});
+	}
+
+	function onToggleSelectAll() {
+		if (accountRows.value.length == 0) {
+			return;
+		}
+		if (isAllSelected.value) {
+			selectedIds.value = [];
+			return;
+		}
+		const nextIds: number[] = [];
+		for (let i = 0; i < accountRows.value.length; i++) {
+			nextIds.push(accountRows.value[i].id);
+		}
+		selectedIds.value = nextIds;
+	}
+
+	function onDeleteSelected() {
+		if (deleting.value) {
+			return;
+		}
+		if (selectedIds.value.length == 0) {
+			uni.showToast({ title: "请先选择账号", icon: "none" });
+			return;
+		}
+		uni.showModal({
+			title: "删除账号",
+			content: "确定删除所选账号吗？",
+			confirmText: "删除",
+			confirmColor: "#ff3333",
+			success(res) {
+				if (res.confirm) {
+					confirmDeleteSelected();
+				}
+			}
+		});
+	}
+
+	function confirmDeleteSelected() {
+		const ids: number[] = [];
+		for (let i = 0; i < selectedIds.value.length; i++) {
+			const id = selectedIds.value[i];
+			if (id > 0) {
+				ids.push(id);
+			}
+		}
+		if (ids.length == 0) {
+			uni.showToast({ title: "所选账号无效", icon: "none" });
+			return;
+		}
+		deleting.value = true;
+		uni.showLoading({ title: "删除中...", mask: true });
+		deleteAccounts(ids)
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "删除失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(res, "删除成功"), icon: "none" });
+				selectedIds.value = [];
+				if (accountRows.value.length <= ids.length) {
+					exitManageMode();
+				}
+				refreshList();
+				loadPlatformOptions();
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "删除失败"), icon: "none" });
+			})
+			.finally(() => {
+				deleting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	onLoad(() => {
+		loadPlatformDictList();
+		loadPlatformOptions();
+	});
+
+	onShow(() => {
+		if (listLoaded.value && currentPlatformName() != "") {
+			refreshList();
+		}
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ac-list-page {
+		min-height: 100vh;
+		background-color: #f6f7fb;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ac-platform-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+		padding: 24rpx 30rpx 12rpx;
+		background-color: #ffffff;
+		box-sizing: border-box;
+		flex-shrink: 0;
+	}
+
+	.ac-platform-head-actions {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ac-platform-add-btn {
+		height: 64rpx;
+		padding: 0 24rpx;
+		background-color: #0651f8;
+		border-radius: 32rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.ac-platform-manage-btn {
+		height: 64rpx;
+		padding: 0 24rpx;
+		margin-left: 16rpx;
+		border-radius: 32rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #0651f8;
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+
+		&--active {
+			background-color: #eef3ff;
+		}
+	}
+
+	.ac-platform-manage-text {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #0651f8;
+		line-height: 36rpx;
+	}
+
+	.ac-platform-add-text {
+		margin-left: 6rpx;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 36rpx;
+	}
+
+	.ac-platform-scroll {
+		width: 100%;
+		max-width: 100%;
+		overflow-x: auto;
+		overflow-y: hidden;
+		-webkit-overflow-scrolling: touch;
+		touch-action: pan-x;
+		background-color: #ffffff;
+		flex-shrink: 0;
+	}
+
+	.ac-platform-inner {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: nowrap;
+		align-items: center;
+		width: max-content;
+		padding: 8rpx 30rpx 20rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-platform-tab {
+		display: flex;
+		flex-direction: row;
+		flex-shrink: 0;
+		flex-grow: 0;
+		margin-right: 16rpx;
+		padding: 20rpx 24rpx;
+		border-radius: 20rpx;
+		background-color: #f5f5f5;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: transparent;
+
+		&--last {
+			margin-right: 0;
+		}
+
+		&--active {
+			background-color: #ffffff;
+			border-color: #ff6033;
+		}
+	}
+
+	.ac-platform-main {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ac-platform-icon {
+		width: 48rpx;
+		height: 48rpx;
+		border-radius: 12rpx;
+		margin-right: 16rpx;
+		flex-shrink: 0;
+
+		&--ph {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background-color: #212121;
+		}
+	}
+
+	.ac-platform-icon-text {
+		font-size: 22rpx;
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.ac-platform-info {
+		display: flex;
+		flex-direction: column;
+		flex-shrink: 0;
+	}
+
+	.ac-platform-name {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 1.3;
+		white-space: nowrap;
+	}
+
+	.ac-platform-sub {
+		margin-top: 4rpx;
+		font-size: 22rpx;
+		color: #7b8193;
+		line-height: 1.3;
+		white-space: nowrap;
+	}
+
+	.ac-search-bar {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 10rpx 30rpx 20rpx;
+		background-color: #f6f7fb;
+	}
+
+	.ac-search-field {
+		flex: 1;
+		height: 70rpx;
+		padding: 0 20rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ac-search-input {
+		flex: 1;
+		margin-left: 12rpx;
+		font-size: 26rpx;
+		color: #141b36;
+	}
+
+	.ac-search-placeholder {
+		color: #aeb1bd;
+		font-size: 26rpx;
+	}
+
+	.ac-sort-btn {
+		margin-left: 16rpx;
+		height: 70rpx;
+		padding: 0 20rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-shrink: 0;
+	}
+
+	.ac-sort-text {
+		font-size: 24rpx;
+		color: #7b8193;
+		margin-right: 4rpx;
+	}
+
+	.ac-list-scroll {
+		flex: 1;
+		height: 0;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+
+		&--manage {
+			padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+		}
+	}
+
+	.ac-list-inner {
+		padding: 0 30rpx 40rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-state {
+		padding: 200rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ac-state-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #aeb1bd;
+	}
+
+	.ac-card {
+		display: flex;
+		flex-direction: row;
+		margin-bottom: 20rpx;
+		padding: 30rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: transparent;
+		box-sizing: border-box;
+
+		&--selected {
+			border-color: #0651f8;
+		}
+	}
+
+	.ac-card-check {
+		width: 36rpx;
+		height: 36rpx;
+		border-radius: 18rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		margin-right: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		align-self: center;
+
+		&--checked {
+			border-color: #0651f8;
+			background-color: #0651f8;
+		}
+	}
+
+	.ac-card-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ac-card-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding-bottom: 15rpx;
+	}
+
+	.ac-card-head-left {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ac-platform-tag {
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+		margin-right: 12rpx;
+		flex-shrink: 0;
+	}
+
+	.ac-platform-tag-text {
+		font-size: 20rpx;
+		color: #ffffff;
+	}
+
+	.ac-account-name {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #141b36;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		flex: 1;
+	}
+
+	.ac-edit-btn {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-left: 12rpx;
+		flex-shrink: 0;
+	}
+
+	.ac-edit-text {
+		font-size: 24rpx;
+		color: #7b8193;
+		margin-right: 4rpx;
+	}
+
+	.ac-data-box {
+		display: flex;
+		flex-direction: row;
+		padding: 20rpx 16rpx;
+		border-radius: 16rpx;
+		background-color: #f5f6fa;
+		margin-bottom: 12rpx;
+	}
+
+	.ac-data-col {
+		flex: 1;
+		min-width: 0;
+		padding: 0 8rpx;
+	}
+
+	.ac-data-label {
+		display: block;
+		font-size: 22rpx;
+		color: #7b8193;
+		margin-bottom: 8rpx;
+	}
+
+	.ac-data-val {
+		display: block;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #141b36;
+		word-break: break-all;
+	}
+
+	.ac-create-time {
+		font-size: 24rpx;
+		color: #7b8193;
+		line-height: 38rpx;
+	}
+
+	.ac-sort-popup {
+		padding: 30rpx 30rpx calc(20rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+	}
+
+	.ac-sort-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 20rpx;
+	}
+
+	.ac-sort-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #141b36;
+	}
+
+	.ac-sort-item {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding: 28rpx 8rpx;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: #f5f5f5;
+
+		&--active {
+			.ac-sort-item-text {
+				color: #ff6033;
+				font-weight: 600;
+			}
+		}
+	}
+
+	.ac-sort-item-text {
+		font-size: 30rpx;
+		color: #141b36;
+	}
+
+	.ac-add-popup {
+		width: 100%;
+		padding: 30rpx 30rpx calc(20rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		box-sizing: border-box;
+	}
+
+	.ac-add-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 24rpx;
+	}
+
+	.ac-add-title-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ac-add-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #141b36;
+	}
+
+	.ac-add-required {
+		margin-left: 4rpx;
+		font-size: 32rpx;
+		color: #ff3362;
+	}
+
+	.ac-add-input-card {
+		position: relative;
+		min-height: 240rpx;
+		padding: 24rpx 24rpx 100rpx;
+		border-radius: 16rpx;
+		background-color: #f5f6fa;
+		margin-bottom: 24rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-add-textarea {
+		width: 100%;
+		min-height: 128rpx;
+		font-size: 28rpx;
+		color: #141b36;
+		line-height: 1.5;
+	}
+
+	.ac-add-textarea-ph {
+		color: #aeb1bd;
+		font-size: 28rpx;
+	}
+
+	.ac-add-action-row {
+		position: absolute;
+		left: 24rpx;
+		right: 24rpx;
+		bottom: 24rpx;
+		display: flex;
+		flex-direction: row;
+		justify-content: flex-end;
+	}
+
+	.ac-add-action-btn {
+		margin-left: 12rpx;
+		padding: 12rpx 24rpx;
+		border-radius: 999rpx;
+		background-color: #ffffff;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #0651f8;
+
+		&--main {
+			background-color: #0651f8;
+			border-color: #0651f8;
+		}
+	}
+
+	.ac-add-action-btn-text {
+		font-size: 24rpx;
+		color: #0651f8;
+		font-weight: 600;
+
+		&--main {
+			color: #ffffff;
+		}
+	}
+
+	.ac-add-result-card {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 20rpx 24rpx;
+		margin-bottom: 24rpx;
+		border-radius: 16rpx;
+		background-color: #f5f6fa;
+		box-sizing: border-box;
+	}
+
+	.ac-add-result-avatar {
+		width: 80rpx;
+		height: 80rpx;
+		border-radius: 40rpx;
+		margin-right: 20rpx;
+		flex-shrink: 0;
+		background-color: #e8ebf2;
+
+		&--ph {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: center;
+		}
+	}
+
+	.ac-add-result-avatar-text {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #7b8193;
+	}
+
+	.ac-add-result-main {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ac-add-result-name-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 8rpx;
+	}
+
+	.ac-add-result-name {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #141b36;
+		margin-right: 12rpx;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		flex-shrink: 1;
+	}
+
+	.ac-add-result-platform {
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.ac-add-result-platform-text {
+		font-size: 20rpx;
+		color: #ffffff;
+	}
+
+	.ac-add-result-id {
+		font-size: 24rpx;
+		color: #7b8193;
+		line-height: 34rpx;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.ac-add-result-status {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-left: 12rpx;
+		flex-shrink: 0;
+	}
+
+	.ac-add-result-status-dot {
+		width: 28rpx;
+		height: 28rpx;
+		border-radius: 14rpx;
+		background-color: #22c55e;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		margin-right: 8rpx;
+	}
+
+	.ac-add-result-status-text {
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #141b36;
+		white-space: nowrap;
+	}
+
+	.ac-add-footer {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ac-add-footer-btn {
+		flex: 1;
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #0651f8;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+
+		&--secondary {
+			margin-left: 16rpx;
+			background-color: #ffffff;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #0651f8;
+		}
+
+		&--disabled {
+			opacity: 0.6;
+		}
+	}
+
+	.ac-add-footer-btn-text {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #ffffff;
+
+		&--secondary {
+			color: #0651f8;
+		}
+	}
+
+	.ac-manage-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		padding: 16rpx 30rpx calc(16rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		box-shadow: 0 -4rpx 24rpx rgba(15, 23, 42, 0.06);
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		box-sizing: border-box;
+		z-index: 20;
+	}
+
+	.ac-manage-select {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.ac-manage-select-check {
+		margin-right: 12rpx;
+	}
+
+	.ac-manage-select-text {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #141b36;
+	}
+
+	.ac-manage-select-sub {
+		margin-left: 12rpx;
+		font-size: 24rpx;
+		color: #7b8193;
+	}
+
+	.ac-manage-select-count {
+		margin-left: 6rpx;
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #0651f8;
+	}
+
+	.ac-manage-delete-btn {
+		width: 160rpx;
+		height: 72rpx;
+		border-radius: 36rpx;
+		background-color: #ff3333;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		margin-left: 20rpx;
+
+		&--disabled {
+			opacity: 0.6;
+		}
+	}
+
+	.ac-manage-delete-text {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #ffffff;
+	}
+</style>

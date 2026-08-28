@@ -1,0 +1,24 @@
+---
+description: @/.cool request 成功只返回 data，禁止 res.code / res.data
+globs: "{pages/**,.cool/**}/**/*.{ts,uvue}"
+alwaysApply: true
+---
+
+# 接口响应约定
+
+`@/.cool` 的 `request()` 在业务 **`code === 1`** 时 **只 resolve `data`**，不是完整 `{ code, msg, data }`。
+
+```typescript
+// ✅
+request({ url: "/login/mobile", method: "POST", data })
+  .then((res) => {
+    user.applyLoginResponse(res);
+  });
+
+// ❌
+if (res.code == 1) { ... }
+const token = res.data.token;
+```
+
+- 失败走 `.catch`，用 `(err as Response).msg ?? err.message` 提示。
+- 改接口时同步检查 captcha、登录、列表等是否仍写 `res.code` / `res.data.xxx`。

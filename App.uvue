@@ -1,0 +1,64 @@
+<script lang="uts">
+import { router } from "@/.cool/router";
+import { navigateToFirstMenu, tabbar } from "@/.cool/store/tabbar";
+import { user } from "@/.cool/store/user";
+import { checkH5VersionUpdate, initH5VersionWatch } from "@/.cool/utils/h5-version";
+
+function guardAuth() {
+	if (router.isLaunchPage()) {
+		return;
+	}
+	if (user.isInLoginGrace()) {
+		return;
+	}
+	const path = router.path() != "" ? router.path() : router.resolveRoutePathHint();
+	if (router.isPublicPage(path)) {
+		return;
+	}
+	if (router.isEnterpriseApplyPage(path)) {
+		return;
+	}
+	if (user.isLoggedIn()) {
+		return;
+	}
+	if (router.isJoinInvitePage(path)) {
+		user.requireLogin();
+		return;
+	}
+	navigateToFirstMenu();
+}
+
+export default {
+	onLaunch: function () {
+		console.log("App Launch");
+		user.hydrateLocalProfile();
+		// #ifdef H5
+		initH5VersionWatch();
+		// #endif
+	},
+	onShow: function () {
+		console.log("App Show");
+		user.hydrateLocalProfile();
+		// #ifdef H5
+		checkH5VersionUpdate();
+		// #endif
+		if (router.isLaunchPage()) {
+			return;
+		}
+		if (
+			user.isLoggedIn() &&
+			!user.isInLoginGrace() &&
+			!router.shouldSkipAppSystem()
+		) {
+			tabbar.load();
+		}
+		guardAuth();
+	},
+	onHide: function () {
+		console.log("App Hide");
+	},
+	onExit: function () {
+		console.log("App Exit");
+	}
+};
+</script>

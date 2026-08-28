@@ -1,0 +1,689 @@
+<template>
+	<cl-page :pt="{ className: 'ap-page' }" :back-top="false">
+		<view class="ap-page">
+			<view class="ap-tabs-fixed">
+				<view class="ap-tabs">
+					<view
+						v-for="tab in STATUS_TABS"
+						:key="tab.key"
+						class="ap-tab"
+						:class="{ 'ap-tab--active': activeStatus == tab.key }"
+						@tap="onTabChange(tab.key)"
+					>
+						<text
+							class="ap-tab-text"
+							:class="{ 'ap-tab-text--active': activeStatus == tab.key }"
+						>{{ tab.label }}</text>
+					</view>
+				</view>
+			</view>
+
+			<scroll-view
+				class="ap-list-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="80"
+				:scroll-top="listScrollTop"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="ap-list-inner">
+					<view v-if="loading" class="ap-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="ap-state-text">加载中...</text>
+					</view>
+					<view v-else-if="applyList.length == 0" class="ap-state">
+						<text class="ap-state-text">暂无申请记录</text>
+					</view>
+					<view v-else class="ap-cards">
+						<view
+							class="ap-card"
+							v-for="(item, index) in applyList"
+							:key="item.id != '' ? item.id : `row-${index}`"
+							@tap="onOpenAudit(item)"
+						>
+							<view
+								v-if="item.accentType != ''"
+								class="ap-card-accent"
+								:class="'ap-card-accent--' + item.accentType"
+							></view>
+							<view class="ap-card-head">
+								<view class="ap-icon" :style="{ backgroundColor: item.iconBg }">
+									<text class="ap-icon-text" :style="{ color: item.iconColor }">{{ item.iconText }}</text>
+								</view>
+								<view class="ap-card-copy">
+									<text class="ap-card-title">{{ item.title }}</text>
+									<text class="ap-card-sub">{{ item.sub }}</text>
+								</view>
+								<view class="ap-status-tag" :class="'ap-status-tag--' + item.tagType">
+									<text class="ap-status-tag-text" :class="'ap-status-tag-text--' + item.tagType">{{ item.statusText }}</text>
+								</view>
+							</view>
+							<view class="ap-meta">
+								<text class="ap-meta-line">申请单号：{{ item.applyNo }}</text>
+								<text v-if="item.nickname != ''" class="ap-meta-line">申请人：{{ item.nickname }}</text>
+								<text v-if="item.mobile != ''" class="ap-meta-line">手机号：{{ item.mobile }}</text>
+								<view class="ap-meta-row ap-meta-row--submit">
+									<text class="ap-meta-line ap-meta-line--grow">提交时间：{{ item.createTime }}</text>
+									<view v-if="item.canAudit" class="ap-audit-entry" @tap.stop="onOpenAudit(item)">
+										<text class="ap-audit-entry-text">去审核</text>
+										<cl-icon name="arrow-right-s-line" :size="14" color="#2b59c3"></cl-icon>
+									</view>
+								</view>
+								<text v-if="item.auditTime != ''" class="ap-meta-line">审核时间：{{ item.auditTime }}</text>
+							</view>
+							<view v-if="item.rejectReason != ''" class="ap-reject-box">
+								<text class="ap-reject-text">驳回原因：{{ item.rejectReason }}</text>
+							</view>
+						</view>
+					</view>
+					<view v-if="!loading && applyList.length > 0" class="ap-loadmore" @tap="onLoadMoreTap">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="上拉加载更多"
+						></cl-loadmore>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getEnterpriseJoinApplyList } from "@/.cool/api/join";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { JoinApplyListParams, JoinApplyListStatusKey } from "@/.cool/types/join";
+
+	type StatusTab = {
+		key: JoinApplyListStatusKey;
+		label: string;
+	};
+
+	type ApplyCard = {
+		id: string;
+		status: number;
+		canAudit: boolean;
+		title: string;
+		sub: string;
+		applyNo: string;
+		nickname: string;
+		mobile: string;
+		createTime: string;
+		auditTime: string;
+		statusText: string;
+		rejectReason: string;
+		iconText: string;
+		iconBg: string;
+		iconColor: string;
+		tagType: string;
+		accentType: string;
+	};
+
+	const JOIN_APPLY_LIST_REFRESH_KEY = "joinApplyListNeedRefresh";
+
+	const STATUS_TABS: StatusTab[] = [
+		{ key: "all", label: "全部" },
+		{ key: "pending", label: "未审核" },
+		{ key: "approved", label: "审核通过" },
+		{ key: "rejected", label: "驳回" }
+	];
+
+	const activeStatus = ref<JoinApplyListStatusKey>("all");
+	const applyList = ref<ApplyCard[]>([]);
+	const page = ref(1);
+	const limit = 10;
+	const hasMore = ref(true);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const listScrollTop = ref(0);
+
+	function resolveStatusFromUrl(options: UTSJSONObject | null): JoinApplyListStatusKey {
+		let raw = "";
+		if (options != null) {
+			const val = options["status"] as string | number | null;
+			if (val != null) {
+				raw = `${val}`.trim().toLowerCase();
+			}
+		}
+		if (raw == "") {
+			const query = router.query();
+			const qVal = query["status"] as string | number | null;
+			if (qVal != null) {
+				raw = `${qVal}`.trim().toLowerCase();
+			}
+		}
+		if (raw == "" || raw == "all") {
+			return "all";
+		}
+		if (raw == "0" || raw == "pending") {
+			return "pending";
+		}
+		if (raw == "1" || raw == "approved") {
+			return "approved";
+		}
+		if (raw == "2" || raw == "rejected") {
+			return "rejected";
+		}
+		return "all";
+	}
+
+	function getStatusApiValue(key: JoinApplyListStatusKey): number | null {
+		if (key == "pending") {
+			return 0;
+		}
+		if (key == "approved") {
+			return 1;
+		}
+		if (key == "rejected") {
+			return 2;
+		}
+		return null;
+	}
+
+	function pickNonEmpty(...values: string[]): string {
+		for (let i = 0; i < values.length; i++) {
+			const text = `${values[i]}`.trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function getLogoText(text: string): string {
+		const trimmed = text.trim();
+		if (trimmed == "") {
+			return "申";
+		}
+		return trimmed.substring(0, 1);
+	}
+
+	function resolveStatusStyle(status: number): UTSJSONObject {
+		if (status == 1) {
+			return {
+				tagType: "success",
+				accentType: "success",
+				iconBg: "#ecfdf5",
+				iconColor: "#16a34a"
+			};
+		}
+		if (status == 2) {
+			return {
+				tagType: "danger",
+				accentType: "danger",
+				iconBg: "#fff7ed",
+				iconColor: "#ea580c"
+			};
+		}
+		return {
+			tagType: "primary",
+			accentType: "",
+			iconBg: "#eef3fc",
+			iconColor: "#2b59c3"
+		};
+	}
+
+	function extractList(data: UTSJSONObject): UTSJSONObject[] {
+		const listRaw = data["list"] as any[] | null;
+		if (listRaw != null) {
+			return listRaw as UTSJSONObject[];
+		}
+		const records = data["records"] as any[] | null;
+		if (records != null) {
+			return records as UTSJSONObject[];
+		}
+		return [];
+	}
+
+	function parseListTotal(data: UTSJSONObject, fallback: number): number {
+		const totalVal = data["total"] ?? data["count"];
+		if (totalVal == null) {
+			return fallback;
+		}
+		const n = parseInt(`${totalVal}`);
+		return isNaN(n) ? fallback : n;
+	}
+
+	function mapRow(row: UTSJSONObject): ApplyCard {
+		const idVal = row["id"];
+		const statusRaw = row["status"];
+		const statusNum = statusRaw != null ? parseInt(`${statusRaw}`) : -1;
+		const style = resolveStatusStyle(isNaN(statusNum) ? -1 : statusNum);
+		const enterpriseName = pickNonEmpty(`${row["enterprise_name"] ?? ""}`);
+		const nickname = pickNonEmpty(`${row["nickname"] ?? ""}`);
+		const title = enterpriseName != "" ? enterpriseName : "加入企业申请";
+		const sub = nickname != "" ? nickname : pickNonEmpty(`${row["sn"] ?? ""}`);
+		const iconSource = enterpriseName != "" ? enterpriseName : nickname;
+		const statusNumFinal = isNaN(statusNum) ? -1 : statusNum;
+		return {
+			id: idVal != null ? `${idVal}` : "",
+			status: statusNumFinal,
+			canAudit: statusNumFinal == 0,
+			title: title,
+			sub: sub != "" ? sub : "—",
+			applyNo: pickNonEmpty(`${row["apply_no"] ?? ""}`, "—"),
+			nickname: nickname,
+			mobile: pickNonEmpty(`${row["mobile"] ?? ""}`),
+			createTime: pickNonEmpty(`${row["create_time"] ?? ""}`, "—"),
+			auditTime: pickNonEmpty(`${row["audit_time"] ?? ""}`),
+			statusText: pickNonEmpty(`${row["status_text"] ?? ""}`, "—"),
+			rejectReason: pickNonEmpty(`${row["reject_reason"] ?? ""}`),
+			iconText: getLogoText(iconSource),
+			iconBg: `${style["iconBg"]}`,
+			iconColor: `${style["iconColor"]}`,
+			tagType: `${style["tagType"]}`,
+			accentType: `${style["accentType"]}`
+		};
+	}
+
+	function fetchList(reset: boolean, force: boolean = false) {
+		if (reset) {
+			if (loading.value && !force) {
+				return;
+			}
+			applyList.value = [];
+			loading.value = true;
+			loadingMore.value = false;
+			page.value = 1;
+			hasMore.value = true;
+		} else {
+			if (loadingMore.value || !hasMore.value || loading.value) {
+				return;
+			}
+			loadingMore.value = true;
+		}
+		const reqPage = reset ? 1 : page.value;
+		const statusVal = getStatusApiValue(activeStatus.value);
+		const params: JoinApplyListParams = {
+			page: reqPage,
+			limit: limit
+		};
+		if (statusVal != null) {
+			params.status = statusVal;
+		}
+		getEnterpriseJoinApplyList(params)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const rows = extractList(data);
+				const mapped: ApplyCard[] = [];
+				for (let i = 0; i < rows.length; i++) {
+					mapped.push(mapRow(rows[i]));
+				}
+				if (reset) {
+					applyList.value = mapped;
+				} else {
+					applyList.value = applyList.value.concat(mapped);
+				}
+				const total = parseListTotal(data, -1);
+				if (total >= 0) {
+					hasMore.value = applyList.value.length < total;
+				} else {
+					hasMore.value = rows.length >= limit;
+				}
+				if (hasMore.value) {
+					page.value = reqPage + 1;
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loading.value = false;
+				loadingMore.value = false;
+			});
+	}
+
+	function scrollListToTop() {
+		listScrollTop.value = listScrollTop.value == 0 ? 1 : 0;
+	}
+
+	function reload(force: boolean = false) {
+		scrollListToTop();
+		fetchList(true, force);
+	}
+
+	function onTabChange(key: JoinApplyListStatusKey) {
+		if (activeStatus.value == key) {
+			return;
+		}
+		activeStatus.value = key;
+		reload(true);
+	}
+
+	function onScrollToLower() {
+		fetchList(false);
+	}
+
+	function onLoadMoreTap() {
+		if (!hasMore.value || loadingMore.value || loading.value) {
+			return;
+		}
+		fetchList(false);
+	}
+
+	function onOpenAudit(item: ApplyCard) {
+		if (item.id == "") {
+			return;
+		}
+		router.push({
+			path: "/pages/user/application-audit",
+			query: {
+				apply_id: item.id,
+				apply_no: item.applyNo,
+				enterprise_name: item.title,
+				nickname: item.nickname,
+				mobile: item.mobile,
+				create_time: item.createTime,
+				audit_time: item.auditTime,
+				status: `${item.status}`,
+				status_text: item.statusText,
+				reject_reason: item.rejectReason
+			}
+		});
+	}
+
+	function tryRefreshFromAudit() {
+		const need = uni.getStorageSync(JOIN_APPLY_LIST_REFRESH_KEY) as string | null;
+		if (need == "1") {
+			uni.removeStorageSync(JOIN_APPLY_LIST_REFRESH_KEY);
+			reload(true);
+		}
+	}
+
+	onLoad((options) => {
+		activeStatus.value = resolveStatusFromUrl((options ?? {}) as UTSJSONObject);
+		reload();
+	});
+
+	onShow(() => {
+		tryRefreshFromAudit();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ap-page {
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+	}
+
+	.ap-tabs-fixed {
+		flex-shrink: 0;
+		z-index: 20;
+		background-color: #f7f8fa;
+		padding: 24rpx 30rpx 16rpx;
+		box-sizing: border-box;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: rgba(0, 0, 0, 0.06);
+	}
+
+	.ap-tabs {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 8rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+	}
+
+	.ap-tab {
+		flex: 1;
+		height: 64rpx;
+		border-radius: 12rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ap-tab--active {
+		background-color: #eef3fc;
+	}
+
+	.ap-tab-text {
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.ap-tab-text--active {
+		color: #2b59c3;
+		font-weight: 600;
+	}
+
+	.ap-list-scroll {
+		flex: 1;
+		height: 0;
+		width: 100%;
+		background-color: #f7f8fa;
+	}
+
+	.ap-list-inner {
+		padding: 20rpx 30rpx 40rpx;
+		box-sizing: border-box;
+		min-height: 100%;
+	}
+
+	.ap-state {
+		padding: 120rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ap-state-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.ap-cards {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ap-card {
+		position: relative;
+		padding: 24rpx 24rpx 24rpx 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		margin-bottom: 20rpx;
+		overflow: hidden;
+	}
+
+	.ap-card-accent {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 6rpx;
+	}
+
+	.ap-card-accent--danger {
+		background-color: #ef4444;
+	}
+
+	.ap-card-accent--success {
+		background-color: #16a34a;
+	}
+
+	.ap-card-head {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+	}
+
+	.ap-icon {
+		width: 64rpx;
+		height: 64rpx;
+		border-radius: 32rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.ap-icon-text {
+		font-size: 28rpx;
+		font-weight: 700;
+		line-height: 36rpx;
+	}
+
+	.ap-card-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 12rpx;
+	}
+
+	.ap-card-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.ap-card-sub {
+		margin-top: 6rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.ap-status-tag {
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.ap-status-tag--danger {
+		background-color: #fef2f2;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #fecaca;
+	}
+
+	.ap-status-tag--primary {
+		background-color: #eef3fc;
+	}
+
+	.ap-status-tag--success {
+		background-color: #ecfdf5;
+	}
+
+	.ap-status-tag-text {
+		font-size: 20rpx;
+		line-height: 28rpx;
+	}
+
+	.ap-status-tag-text--danger {
+		color: #ef4444;
+	}
+
+	.ap-status-tag-text--primary {
+		color: #2b59c3;
+	}
+
+	.ap-status-tag-text--success {
+		color: #16a34a;
+	}
+
+	.ap-meta {
+		margin-top: 16rpx;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ap-meta-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 4rpx;
+	}
+
+	.ap-meta-row--submit {
+		margin-right: -8rpx;
+	}
+
+	.ap-meta-line {
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 34rpx;
+		margin-bottom: 4rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.ap-meta-line--grow {
+		flex: 1;
+		min-width: 0;
+		margin-bottom: 0;
+		margin-right: 12rpx;
+	}
+
+	.ap-reject-box {
+		margin-top: 16rpx;
+		padding: 16rpx 20rpx;
+		border-radius: 12rpx;
+		background-color: #fef2f2;
+	}
+
+	.ap-reject-text {
+		font-size: 22rpx;
+		color: #7c2d12;
+		line-height: 34rpx;
+	}
+
+	.ap-loadmore {
+		padding: 8rpx 0 16rpx;
+	}
+
+	.ap-audit-entry {
+		flex-shrink: 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+		padding-left: 8rpx;
+	}
+
+	.ap-audit-entry-text {
+		font-size: 24rpx;
+		color: #2b59c3;
+		font-weight: 600;
+		line-height: 34rpx;
+		margin-right: 2rpx;
+	}
+</style>
+
+<style lang="scss">
+	page {
+		height: 100%;
+		background-color: #f7f8fa;
+	}
+</style>

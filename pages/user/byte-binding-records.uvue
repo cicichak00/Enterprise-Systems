@@ -1,0 +1,361 @@
+<template>
+	<cl-page :pt="{ className: 'br-page' }" :back-top="false">
+		<view class="br-page">
+			<view class="br-fixed">
+				<view class="br-summary">
+					<view class="br-summary-item">
+						<text class="br-summary-value">{{ boundCount }}</text>
+						<text class="br-summary-label">已绑定</text>
+					</view>
+					<view class="br-summary-line"></view>
+					<view class="br-summary-item">
+						<text class="br-summary-value">{{ unboundCount }}</text>
+						<text class="br-summary-label">未绑定</text>
+					</view>
+				</view>
+
+				<view class="br-tabs">
+					<view
+						v-for="tab in statusTabs"
+						:key="tab.key"
+						class="br-tab"
+						:class="{ 'br-tab--active': activeStatus == tab.key }"
+						@tap="onStatusChange(tab.key)"
+					>
+						<text class="br-tab-text">{{ tab.label }}</text>
+					</view>
+				</view>
+
+				<view class="br-search-row">
+					<view class="br-search">
+						<cl-icon name="search-line" :size="16" color="#999999"></cl-icon>
+						<input
+							class="br-search-input"
+							v-model="keyword"
+							placeholder="员工昵称 / 用户ID / 手机号 / 字节UID"
+							placeholder-class="br-search-placeholder"
+							confirm-type="search"
+							@confirm="onSearch"
+						/>
+					</view>
+					<view class="br-search-btn" @tap="onSearch">
+						<text class="br-search-btn-text">搜索</text>
+					</view>
+				</view>
+			</view>
+
+			<scroll-view
+				class="br-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="100"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="br-list">
+					<view v-if="loading && rows.length == 0" class="br-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="br-state-text">加载中...</text>
+					</view>
+					<view v-else-if="rows.length == 0" class="br-state">
+						<text class="br-state-text">暂无绑定记录</text>
+					</view>
+
+					<view v-for="item in rows" :key="item.id" class="br-card">
+						<view class="br-card-head">
+							<view class="br-avatar">
+								<image v-if="item.avatar != ''" class="br-avatar-img" :src="item.avatar" mode="aspectFill"></image>
+								<text v-else class="br-avatar-text">{{ getAvatarText(item.nickname) }}</text>
+							</view>
+							<view class="br-person">
+								<text class="br-name">{{ item.nickname }}</text>
+								<text class="br-person-meta">用户ID：{{ item.userId }}</text>
+							</view>
+							<view class="br-bind-tag" :class="item.isBound ? 'br-bind-tag--on' : 'br-bind-tag--off'">
+								<text class="br-bind-tag-text">{{ item.isBound ? "已绑定" : "未绑定" }}</text>
+							</view>
+						</view>
+
+						<view class="br-divider"></view>
+						<view class="br-info-row">
+							<text class="br-info-label">手机号</text>
+							<text class="br-info-value">{{ item.mobile != "" ? item.mobile : "—" }}</text>
+						</view>
+						<view class="br-info-row">
+							<text class="br-info-label">字节UID</text>
+							<text class="br-info-value">{{ item.byteUid != "" ? item.byteUid : "—" }}</text>
+						</view>
+						<view v-if="item.isBound" class="br-info-row">
+							<text class="br-info-label">审核状态</text>
+							<text class="br-audit-text" :class="'br-audit-text--' + item.auditType">{{ item.auditText }}</text>
+						</view>
+						<view v-if="item.submitTime != ''" class="br-info-row">
+							<text class="br-info-label">提交时间</text>
+							<text class="br-info-value">{{ item.submitTime }}</text>
+						</view>
+						<view v-if="item.failReason != ''" class="br-fail-box">
+							<text class="br-fail-text">失败原因：{{ item.failReason }}</text>
+						</view>
+					</view>
+
+					<view v-if="rows.length > 0" class="br-loadmore" @tap="loadMore">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getStaffByteBindingList, type GetStaffByteBindingListParams } from "@/.cool/api/staff";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { Response, StaffByteBindingItem } from "@/.cool";
+
+	type BindingStatusKey = "all" | "bound" | "unbound";
+	type BindingStatusTab = { key: BindingStatusKey; label: string };
+	type BindingRow = {
+		id: number;
+		userId: string;
+		nickname: string;
+		mobile: string;
+		avatar: string;
+		isBound: boolean;
+		byteUid: string;
+		auditText: string;
+		auditType: string;
+		failReason: string;
+		submitTime: string;
+	};
+
+	const statusTabs: BindingStatusTab[] = [
+		{ key: "all", label: "全部" },
+		{ key: "bound", label: "已绑定" },
+		{ key: "unbound", label: "未绑定" }
+	];
+	const activeStatus = ref<BindingStatusKey>("all");
+	const keyword = ref("");
+	const rows = ref<BindingRow[]>([]);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const hasMore = ref(true);
+	const page = ref(1);
+	const limit = 10;
+	const boundCount = ref(0);
+	const unboundCount = ref(0);
+
+	function getAvatarText(name: string): string {
+		const text = name.trim();
+		return text != "" ? text.charAt(0) : "员";
+	}
+
+	function parseNumber(raw: any | null): number {
+		if (raw == null) {
+			return 0;
+		}
+		const value = parseInt(`${raw}`);
+		return isNaN(value) ? 0 : value;
+	}
+
+	function parseBound(item: StaffByteBindingItem): boolean {
+		const raw = item.is_bound ?? item.bind_status;
+		if (typeof raw == "boolean") {
+			return raw as boolean;
+		}
+		if (raw != null) {
+			return parseNumber(raw) == 1;
+		}
+		return `${item.byte_uid ?? ""}`.trim() != "";
+	}
+
+	function resolveAudit(item: StaffByteBindingItem): { text: string; type: string } {
+		const custom = `${item.audit_status_text ?? ""}`.trim();
+		const status = parseNumber(item.audit_status ?? item["status"] ?? 0);
+		if (status == 1) {
+			return { text: custom != "" ? custom : "审核通过", type: "success" };
+		}
+		if (status == 2) {
+			return { text: custom != "" ? custom : "审核失败", type: "fail" };
+		}
+		return { text: custom != "" ? custom : "待审核", type: "pending" };
+	}
+
+	function mapRow(item: StaffByteBindingItem, index: number): BindingRow {
+		const audit = resolveAudit(item);
+		const userId = item.user_id ?? 0;
+		const nickname = `${item.nickname ?? ""}`.trim();
+		return {
+			id: item.id ?? item.staff_id ?? index,
+			userId: `${userId}`,
+			nickname: nickname != "" ? nickname : "未命名员工",
+			mobile: `${item.mobile ?? ""}`.trim(),
+			avatar: `${item.avatar ?? ""}`.trim(),
+			isBound: parseBound(item),
+			byteUid: `${item.byte_uid ?? item["uid"] ?? ""}`.trim(),
+			auditText: audit.text,
+			auditType: audit.type,
+			failReason: `${item.fail_reason ?? item.reject_reason ?? ""}`.trim(),
+			submitTime: `${item.submit_time ?? item.create_time ?? ""}`.trim()
+		};
+	}
+
+	function parsePayload(res: any | null): { list: StaffByteBindingItem[]; count: number; bound: number; unbound: number } {
+		if (res == null) {
+			return { list: [], count: 0, bound: 0, unbound: 0 };
+		}
+		const envelope = res as UTSJSONObject;
+		const dataRaw = envelope["data"] ?? envelope;
+		if (Array.isArray(dataRaw)) {
+			const list = dataRaw as StaffByteBindingItem[];
+			return { list, count: list.length, bound: 0, unbound: 0 };
+		}
+		const data = dataRaw as UTSJSONObject;
+		const listRaw = data["list"];
+		const list = listRaw != null && Array.isArray(listRaw) ? (listRaw as StaffByteBindingItem[]) : [];
+		return {
+			list,
+			count: parseNumber(data["count"] ?? data["total"]),
+			bound: parseNumber(data["bound_count"]),
+			unbound: parseNumber(data["unbound_count"])
+		};
+	}
+
+	function updateCounts(list: BindingRow[], bound: number, unbound: number, more: boolean) {
+		if (bound > 0 || unbound > 0) {
+			boundCount.value = bound;
+			unboundCount.value = unbound;
+			return;
+		}
+		if (!more && activeStatus.value == "all") {
+			let boundTotal = 0;
+			for (let i = 0; i < list.length; i++) {
+				if (list[i].isBound) {
+					boundTotal += 1;
+				}
+			}
+			boundCount.value = boundTotal;
+			unboundCount.value = list.length - boundTotal;
+		}
+	}
+
+	function loadList(more: boolean = false) {
+		if (more) {
+			if (loadingMore.value || !hasMore.value) return;
+			loadingMore.value = true;
+		} else {
+			if (loading.value || loadingMore.value) return;
+			loading.value = true;
+			rows.value = [];
+			page.value = 1;
+			hasMore.value = true;
+		}
+		const requestPage = more ? page.value + 1 : 1;
+		const params: GetStaffByteBindingListParams = { page: requestPage, limit };
+		if (activeStatus.value == "bound") params.bind_status = 1;
+		if (activeStatus.value == "unbound") params.bind_status = 0;
+		if (keyword.value.trim() != "") params.keyword = keyword.value.trim();
+
+		getStaffByteBindingList(params)
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const payload = parsePayload(res);
+				const mapped = payload.list.map((item, index) => mapRow(item, more ? rows.value.length + index : index));
+				rows.value = more ? rows.value.concat(mapped) : mapped;
+				page.value = requestPage;
+				hasMore.value = payload.count > 0 ? requestPage * limit < payload.count : payload.list.length >= limit;
+				updateCounts(mapped, payload.bound, payload.unbound, more);
+			})
+			.catch((err) => {
+				const envelope = err as Response | null;
+				uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loading.value = false;
+				loadingMore.value = false;
+			});
+	}
+
+	function onStatusChange(key: BindingStatusKey) {
+		if (activeStatus.value == key) return;
+		activeStatus.value = key;
+		loadList(false);
+	}
+
+	function onSearch() {
+		loadList(false);
+	}
+
+	function loadMore() {
+		loadList(true);
+	}
+
+	function onScrollToLower() {
+		loadMore();
+	}
+
+	onLoad(() => {
+		loadList(false);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.br-page { height: 100vh; overflow: hidden; background-color: #f7f8fa; display: flex; flex-direction: column; box-sizing: border-box; }
+	.br-fixed { flex-shrink: 0; background-color: #ffffff; }
+	.br-summary { margin: 24rpx 30rpx 12rpx; padding: 24rpx 0; border-radius: 18rpx; background: linear-gradient(135deg, #253f78, #2b59c3); display: flex; align-items: center; }
+	.br-summary-item { flex: 1; display: flex; flex-direction: column; align-items: center; }
+	.br-summary-value { font-size: 40rpx; line-height: 52rpx; font-weight: 700; color: #ffffff; }
+	.br-summary-label { margin-top: 2rpx; font-size: 22rpx; color: rgba(255,255,255,.72); }
+	.br-summary-line { width: 1rpx; height: 50rpx; background-color: rgba(255,255,255,.24); }
+	.br-tabs { display: flex; border-bottom: 1rpx solid #eeeeee; }
+	.br-tab { flex: 1; height: 80rpx; position: relative; display: flex; align-items: center; justify-content: center; }
+	.br-tab--active::after { content: ""; position: absolute; left: 34%; right: 34%; bottom: 0; height: 4rpx; border-radius: 4rpx; background-color: #2b59c3; }
+	.br-tab-text { font-size: 27rpx; color: #666666; }
+	.br-tab--active .br-tab-text { color: #2b59c3; font-weight: 600; }
+	.br-search-row { padding: 18rpx 30rpx 22rpx; display: flex; align-items: center; }
+	.br-search { flex: 1; height: 68rpx; padding: 0 20rpx; border-radius: 34rpx; background-color: #f3f4f6; display: flex; align-items: center; }
+	.br-search-input { flex: 1; min-width: 0; margin-left: 12rpx; font-size: 25rpx; color: #333333; }
+	.br-search-placeholder { font-size: 24rpx; color: #aaaaaa; }
+	.br-search-btn { height: 68rpx; margin-left: 14rpx; padding: 0 28rpx; border-radius: 34rpx; background-color: #2b59c3; display: flex; align-items: center; justify-content: center; }
+	.br-search-btn-text { font-size: 25rpx; color: #ffffff; }
+	.br-scroll { flex: 1; height: 0; }
+	.br-list { padding: 22rpx 30rpx; }
+	.br-card { margin-bottom: 20rpx; padding: 24rpx; border-radius: 18rpx; background-color: #ffffff; box-shadow: 0 4rpx 18rpx rgba(31,41,55,.05); }
+	.br-card-head { display: flex; align-items: center; }
+	.br-avatar { width: 76rpx; height: 76rpx; border-radius: 50%; overflow: hidden; flex-shrink: 0; background-color: #e8eefb; display: flex; align-items: center; justify-content: center; }
+	.br-avatar-img { width: 100%; height: 100%; }
+	.br-avatar-text { font-size: 28rpx; font-weight: 600; color: #2b59c3; }
+	.br-person { flex: 1; min-width: 0; margin-left: 18rpx; display: flex; flex-direction: column; }
+	.br-name { font-size: 29rpx; line-height: 40rpx; font-weight: 600; color: #333333; }
+	.br-person-meta { margin-top: 5rpx; font-size: 22rpx; color: #999999; }
+	.br-bind-tag { padding: 7rpx 16rpx; border-radius: 999rpx; }
+	.br-bind-tag--on { background-color: #ecfdf5; }
+	.br-bind-tag--off { background-color: #f3f4f6; }
+	.br-bind-tag-text { font-size: 21rpx; color: #16a34a; }
+	.br-bind-tag--off .br-bind-tag-text { color: #999999; }
+	.br-divider { height: 1rpx; margin: 22rpx 0 14rpx; background-color: #f0f0f0; }
+	.br-info-row { min-height: 44rpx; display: flex; align-items: flex-start; }
+	.br-info-label { width: 132rpx; flex-shrink: 0; font-size: 23rpx; line-height: 36rpx; color: #999999; }
+	.br-info-value { flex: 1; min-width: 0; font-size: 23rpx; line-height: 36rpx; color: #555555; word-break: break-all; }
+	.br-audit-text { flex: 1; font-size: 23rpx; line-height: 36rpx; color: #d97706; }
+	.br-audit-text--success { color: #16a34a; }
+	.br-audit-text--fail { color: #dc2626; }
+	.br-fail-box { margin-top: 10rpx; padding: 16rpx 18rpx; border-radius: 12rpx; background-color: #fef2f2; }
+	.br-fail-text { font-size: 22rpx; line-height: 34rpx; color: #991b1b; }
+	.br-state { padding: 140rpx 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+	.br-state-text { margin-top: 14rpx; font-size: 25rpx; color: #999999; }
+	.br-loadmore { padding: 8rpx 0 24rpx; }
+</style>
+
+<style lang="scss">
+	page { height: 100%; background-color: #f7f8fa; }
+</style>

@@ -1,0 +1,17 @@
+---
+description: 改 UI/能力须考虑 MP、App、H5 并注明条件编译
+globs: "**/*.uvue"
+alwaysApply: true
+---
+
+# 多端影响说明
+
+本项目目标端：**微信小程序（MP-WEIXIN）、App（APP）、H5**。
+
+修改 `pages/`、`components/` 下 UI、滚动、导航、登录、存储时：
+
+1. 对照同模块已有文件的 `#ifdef` / `#ifndef`（如 home、user 的 APP `scroll-view`、MP 胶囊留白）。
+2. 在回复或 PR 说明中**写明**：本次改动影响哪些端、哪些端未测。
+3. 仅一端生效的代码必须用条件编译包裹，勿用运行时平台判断替代整段 UI 结构（除非已有项目先例）。
+
+细则见 `.cursor/skills/youbao-multiplatform/SKILL.md`。

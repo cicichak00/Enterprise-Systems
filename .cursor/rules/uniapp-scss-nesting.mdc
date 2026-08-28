@@ -1,0 +1,47 @@
+---
+description: pages/components 的 scoped SCSS 必须按 DOM 嵌套，禁止 BEM 平铺
+globs: "{pages,components}/**/*.{uvue,vue}"
+alwaysApply: false
+---
+
+# SCSS 嵌套（高保真硬约束）
+
+编辑 **`pages/**`、`components/**`** 且写 `<style lang="scss">` 时，与 `youbao-design-fidelity` skill 一致。
+
+## 必须
+
+- **scoped 块**：按模板 **父子 DOM** 嵌套；修饰符 `&--on`、伪类 `&:last-child`
+- 每个 UI 区块一个根（如 `.bf-body`、`.fav-added-card`、`.wg-hero`），子元素写在根内
+- `cl-text` 的 `pt.className` 字重类，嵌套在**最近外层 view** 下
+- 非 scoped 块（popup / shell / cl-draggable）也要以**根容器**嵌套（如 `.bf-suc-pop { .bf-suc-head {} }`）
+
+## 禁止
+
+- 同一前缀（`bf-`、`fav-`、`wg-`）在**同一 scoped 块**内大量顶层平铺
+- 为「少行数」把 `.block-title`、`.block-main` 与 `.block` 并列写顶层
+
+## 自检
+
+```bash
+npm run check:scss-nesting
+```
+
+同 scoped 块内同前缀顶层 class 选择器应 **≤ 8**（导航 slot、body、footer 等少数根除外）。legacy 页面临时写入 `.scss-nesting-allowlist.json`。
+
+## 示例
+
+```scss
+// ✅
+.bf-body {
+  .bf-section {
+    .bf-book-card {
+      .bf-book-card-main { … }
+    }
+  }
+}
+
+// ❌
+.bf-section { … }
+.bf-book-card { … }
+.bf-book-card-main { … }
+```

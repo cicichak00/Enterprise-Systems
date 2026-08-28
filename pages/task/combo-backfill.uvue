@@ -1,0 +1,699 @@
+<!-- 组合回填 · 关键词作品回填（估算对稿 375，待设计确认） -->
+<template>
+	<cl-page :pt="{ className: 'cbk-page' }" :back-top="false">
+		<view class="cbk-page">
+			<scroll-view class="cbk-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="cbk-body">
+					<!-- 关键词信息 -->
+					<view class="cbk-info-card">
+						<text class="cbk-info-title">{{ keywordText }}</text>
+						<text class="cbk-info-platforms">{{ platformsText }}</text>
+						<text class="cbk-info-time">创建时间·{{ createTimeText }}</text>
+					</view>
+
+					<!-- 作品表单 -->
+					<view
+						class="cbk-work"
+						v-for="(row, index) in works"
+						:key="index"
+					>
+						<view class="cbk-field">
+							<view class="cbk-label-row">
+								<text class="cbk-label">视频链接</text>
+								<text class="cbk-required">*</text>
+							</view>
+							<input
+								class="cbk-input"
+								v-model="row.video_url"
+								placeholder="请填写视频链接"
+								placeholder-class="cbk-ph"
+							/>
+						</view>
+
+						<view class="cbk-field">
+							<view class="cbk-label-row">
+								<text class="cbk-label">平台账号</text>
+								<text class="cbk-required">*</text>
+							</view>
+							<view class="cbk-select" @tap="onPickAccount(index)">
+								<text
+									class="cbk-select-text"
+									:class="{ 'cbk-select-text--on': row.account_name != '' }"
+								>{{ row.account_name != '' ? row.account_name : '请选择平台账号' }}</text>
+								<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+							</view>
+						</view>
+
+						<view class="cbk-field">
+							<view class="cbk-label-row">
+								<text class="cbk-label">发布日期</text>
+								<text class="cbk-required">*</text>
+							</view>
+							<picker
+								mode="date"
+								:value="row.publish_time"
+								@change="onDateChange($event, index)"
+							>
+								<view class="cbk-select">
+									<text
+										class="cbk-select-text"
+										:class="{ 'cbk-select-text--on': row.publish_time != '' }"
+									>{{ row.publish_time != '' ? row.publish_time : '请选择发布日期' }}</text>
+									<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+								</view>
+							</picker>
+						</view>
+					</view>
+				</view>
+			</scroll-view>
+
+			<view class="cbk-footer">
+				<view class="cbk-footer-ok" @tap="onSubmit">
+					<text class="cbk-footer-ok-text">确定</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+
+		<!-- 平台账号弹窗（对齐 publish） -->
+		<cl-popup v-model="accountPopupVisible" direction="bottom" size="50%" :show-header="false">
+			<view class="cbk-account-popup">
+				<scroll-view
+					v-if="accountOptions.length > 0"
+					class="cbk-account-scroll"
+					scroll-y="true"
+					:show-scrollbar="false"
+				>
+					<view
+						class="cbk-select-option"
+						v-for="(opt, optIndex) in accountOptions"
+						:key="optIndex"
+						@tap="chooseAccountOption(opt)"
+					>
+						<text class="cbk-select-option-text">{{ opt.label }}</text>
+					</view>
+				</scroll-view>
+				<view v-else class="cbk-account-empty">
+					<text class="cbk-account-empty-text">暂无账号</text>
+				</view>
+				<view class="cbk-account-add-wrap">
+					<view class="cbk-account-add-btn" @tap="goCreateAccount">
+						<cl-icon name="add-line" :size="22" color="#ffffff"></cl-icon>
+						<text class="cbk-account-add-btn-text">添加账号</text>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	/** 组合回填页 */
+	import { ref } from "vue";
+	import { getAccountList } from "@/.cool/api/account";
+	import { submitComposePublish } from "@/.cool/api/compose";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { ComposePublishFormItem, ComposePublishProjectItem } from "@/.cool";
+
+	type BackfillWork = {
+		video_url: string;
+		account_id: string;
+		account_name: string;
+		platform_name: string;
+		publish_time: string;
+	};
+
+	type AccountOption = {
+		label: string;
+		account_id: string;
+		account_name: string;
+		platform_name: string;
+	};
+
+	const composeId = ref(0);
+	const logId = ref(0);
+	const keywordText = ref("我是关键词");
+	const platformsText = ref("番茄小说·番茄畅听·今日头条·悟空网文·蛋花小说");
+	const createTimeText = ref("2025.03.13 22:42:24");
+	const projectIds = ref<number[]>([]);
+	const accountOptions = ref<AccountOption[]>([]);
+	const accountPopupVisible = ref(false);
+	const activeWorkIndex = ref(-1);
+	const accountLoading = ref(false);
+	const submitting = ref(false);
+
+	function createEmptyWork(): BackfillWork {
+		return {
+			video_url: "",
+			account_id: "",
+			account_name: "",
+			platform_name: "",
+			publish_time: ""
+		};
+	}
+
+	const works = ref<BackfillWork[]>([createEmptyWork()]);
+
+	function formatAccountLabel(row: UTSJSONObject): string {
+		const platform = `${row["platform_name"] ?? ""}`.trim();
+		const title = `${row["account_title"] ?? ""}`.trim();
+		const accountId = `${row["account_id"] ?? ""}`.trim();
+		if (platform != "" || title != "") {
+			return `【${platform}】【${title}】${accountId}`;
+		}
+		return accountId;
+	}
+
+	function parseAccountListPayload(payload: any | null): AccountOption[] {
+		if (payload == null) {
+			return [];
+		}
+		let data = payload;
+		if (!(data instanceof Array)) {
+			const envelope = data as UTSJSONObject;
+			const code = envelope["code"];
+			if (code != null && !isApiSuccess(code)) {
+				return [];
+			}
+			data = envelope["data"] ?? envelope;
+		}
+		let listRaw: any | null = null;
+		if (data instanceof Array) {
+			listRaw = data;
+		} else {
+			listRaw = (data as UTSJSONObject)["list"];
+		}
+		if (!(listRaw instanceof Array)) {
+			return [];
+		}
+		const result: AccountOption[] = [];
+		for (let i = 0; i < listRaw.length; i++) {
+			const row = listRaw[i];
+			if (row == null) {
+				continue;
+			}
+			const obj = row as UTSJSONObject;
+			const accountId = `${obj["account_id"] ?? ""}`.trim();
+			const accountName = `${obj["account_title"] ?? ""}`.trim();
+			const platformName = `${obj["platform_name"] ?? ""}`.trim();
+			const label = formatAccountLabel(obj);
+			if (label == "") {
+				continue;
+			}
+			result.push({
+				label: label,
+				account_id: accountId,
+				account_name: accountName != "" ? accountName : label,
+				platform_name: platformName
+			});
+		}
+		return result;
+	}
+
+	function loadAccountList() {
+		if (accountLoading.value) {
+			return;
+		}
+		accountLoading.value = true;
+		getAccountList({ sort_type: "default" })
+			.then((res) => {
+				accountOptions.value = parseAccountListPayload(res);
+			})
+			.catch((err) => {
+				accountOptions.value = [];
+				uni.showToast({ title: getApiMessage(err, "账号加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				accountLoading.value = false;
+			});
+	}
+
+	function onPickAccount(index: number) {
+		activeWorkIndex.value = index;
+		if (accountOptions.value.length == 0 && !accountLoading.value) {
+			loadAccountList();
+		}
+		accountPopupVisible.value = true;
+	}
+
+	function chooseAccountOption(opt: AccountOption) {
+		const index = activeWorkIndex.value;
+		if (index < 0 || index >= works.value.length) {
+			accountPopupVisible.value = false;
+			return;
+		}
+		works.value[index].account_id = opt.account_id;
+		works.value[index].account_name = opt.label;
+		works.value[index].platform_name = opt.platform_name;
+		accountPopupVisible.value = false;
+	}
+
+	function goCreateAccount() {
+		accountPopupVisible.value = false;
+		router.push({ path: "/pages/account/add" });
+	}
+
+	function onDateChange(e: UniPickerChangeEvent, index: number) {
+		const val = e.detail.value as string | null;
+		works.value[index].publish_time = val != null ? val : "";
+	}
+
+	function extractUrlFromText(text: string): string {
+		const source = text.trim();
+		if (source == "") {
+			return "";
+		}
+		const match = source.match(/(https?:\/\/[^\s]+)/i);
+		if (match != null && match.length > 0) {
+			return `${match[0]}`.trim();
+		}
+		return source;
+	}
+
+	function validate(): string {
+		if (keywordText.value.trim() == "") {
+			return "缺少关键词";
+		}
+		if (projectIds.value.length == 0) {
+			return "缺少回填项目";
+		}
+		for (let i = 0; i < works.value.length; i++) {
+			const row = works.value[i];
+			const videoUrl = extractUrlFromText(row.video_url);
+			if (videoUrl == "") {
+				return `请填写作品${i + 1}的视频链接`;
+			}
+			if (row.account_id.trim() == "" && row.account_name.trim() == "") {
+				return `请选择作品${i + 1}的平台账号`;
+			}
+			if (row.publish_time.trim() == "") {
+				return `请选择作品${i + 1}的发布日期`;
+			}
+		}
+		return "";
+	}
+
+	function pushFormItem(
+		result: ComposePublishFormItem[],
+		name: string,
+		field: string,
+		value: string
+	) {
+		const text = value.trim();
+		if (text == "") {
+			return;
+		}
+		result.push({
+			name: name,
+			field: field,
+			value: text
+		});
+	}
+
+	function buildFormInfo(): ComposePublishFormItem[][] {
+		const batches: ComposePublishFormItem[][] = [];
+		for (let i = 0; i < works.value.length; i++) {
+			const row = works.value[i];
+			const batch: ComposePublishFormItem[] = [];
+			pushFormItem(batch, "作品链接", "video_url", extractUrlFromText(row.video_url));
+			pushFormItem(batch, "平台", "platform", row.platform_name);
+			pushFormItem(batch, "账号", "account_id", row.account_id);
+			pushFormItem(batch, "发布日期", "publish_time", row.publish_time);
+			if (batch.length > 0) {
+				batches.push(batch);
+			}
+		}
+		return batches;
+	}
+
+	function buildProjectLists(): ComposePublishProjectItem[] {
+		const rows: ComposePublishProjectItem[] = [];
+		for (let i = 0; i < projectIds.value.length; i++) {
+			rows.push({
+				id: projectIds.value[i],
+				checked: true
+			});
+		}
+		return rows;
+	}
+
+	function onSubmit() {
+		if (submitting.value) {
+			return;
+		}
+		const err = validate();
+		if (err != "") {
+			uni.showToast({ title: err, icon: "none" });
+			return;
+		}
+		const formInfo = buildFormInfo();
+		if (formInfo.length == 0) {
+			uni.showToast({ title: "请填写回填数据", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中...", mask: true });
+		submitComposePublish({
+			keyword: keywordText.value.trim(),
+			projectLists: buildProjectLists(),
+			form_info: formInfo
+		})
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "提交失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(res, "提交成功"), icon: "success" });
+				setTimeout(() => {
+					router.back();
+				}, 800);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function parseProjectIds(raw: string): number[] {
+		const text = raw.trim();
+		if (text == "") {
+			return [];
+		}
+		const parts = text.split(",");
+		const result: number[] = [];
+		for (let i = 0; i < parts.length; i++) {
+			const n = parseInt(parts[i].trim());
+			if (!isNaN(n) && n > 0 && result.indexOf(n) < 0) {
+				result.push(n);
+			}
+		}
+		return result;
+	}
+
+	function decodeQuery(raw: string): string {
+		const decoded = decodeURIComponent(raw);
+		return decoded != null ? decoded : raw;
+	}
+
+	function initPageOptions(options: OnLoadOptions) {
+		const idVal = (options["id"] ?? options["compose_id"]) as string | null;
+		if (idVal != null) {
+			const n = parseInt(`${idVal}`);
+			composeId.value = isNaN(n) ? 0 : n;
+		}
+		const logVal = options["log_id"] as string | null;
+		if (logVal != null) {
+			const n = parseInt(`${logVal}`);
+			logId.value = isNaN(n) ? 0 : n;
+		}
+		const kw = options["keyword"] as string | null;
+		if (kw != null && `${kw}`.trim() != "") {
+			keywordText.value = decodeQuery(`${kw}`);
+		}
+		const platforms = options["platforms"] as string | null;
+		if (platforms != null && `${platforms}`.trim() != "") {
+			platformsText.value = decodeQuery(`${platforms}`);
+		}
+		const createTime = options["create_time"] as string | null;
+		if (createTime != null && `${createTime}`.trim() != "") {
+			createTimeText.value = decodeQuery(`${createTime}`);
+		}
+		const idsVal = options["project_ids"] as string | null;
+		if (idsVal != null && `${idsVal}`.trim() != "") {
+			projectIds.value = parseProjectIds(decodeQuery(`${idsVal}`));
+		}
+	}
+
+	onLoad((options) => {
+		initPageOptions(options);
+		uni.setNavigationBarTitle({ title: "回填" });
+	});
+
+	onShow(() => {
+		loadAccountList();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.cbk-page {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		background-color: #f5f6f8;
+
+		.cbk-scroll {
+			flex: 1;
+			height: 0;
+		}
+
+		.cbk-body {
+			padding: 24rpx 24rpx 200rpx;
+			box-sizing: border-box;
+		}
+
+		// --- 关键词信息 ---
+		.cbk-info-card {
+			padding: 28rpx 28rpx 24rpx;
+			margin-bottom: 20rpx;
+			background-color: #ffffff;
+			border-radius: 20rpx;
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			.cbk-info-title {
+				display: block;
+				width: 100%;
+				font-size: 32rpx;
+				font-weight: 700;
+				color: #1a1a1a;
+				line-height: 44rpx;
+				margin-bottom: 12rpx;
+				text-align: center;
+			}
+
+			.cbk-info-platforms {
+				display: block;
+				width: 100%;
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+				margin-bottom: 8rpx;
+				text-align: center;
+			}
+
+			.cbk-info-time {
+				display: block;
+				width: 100%;
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+				text-align: center;
+			}
+		}
+
+		// --- 作品卡片 ---
+		.cbk-work {
+			padding: 28rpx;
+			margin-bottom: 20rpx;
+			background-color: #ffffff;
+			border-radius: 20rpx;
+			box-sizing: border-box;
+
+			.cbk-field {
+				margin-bottom: 28rpx;
+
+				&:last-child {
+					margin-bottom: 0;
+				}
+
+				.cbk-label-row {
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					margin-bottom: 16rpx;
+
+					.cbk-label {
+						font-size: 28rpx;
+						font-weight: 600;
+						color: #333333;
+						line-height: 40rpx;
+					}
+
+					.cbk-required {
+						margin-left: 4rpx;
+						font-size: 28rpx;
+						color: #ff4d4f;
+						line-height: 40rpx;
+					}
+				}
+
+				.cbk-input {
+					width: 100%;
+					height: 88rpx;
+					padding: 0 24rpx;
+					border-radius: 16rpx;
+					border-width: 2rpx;
+					border-style: solid;
+					border-color: #eeeeee;
+					background-color: #ffffff;
+					font-size: 28rpx;
+					color: #333333;
+					box-sizing: border-box;
+				}
+
+				.cbk-select {
+					width: 100%;
+					height: 88rpx;
+					padding: 0 24rpx;
+					border-radius: 16rpx;
+					border-width: 2rpx;
+					border-style: solid;
+					border-color: #eeeeee;
+					background-color: #ffffff;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					justify-content: space-between;
+					box-sizing: border-box;
+
+					.cbk-select-text {
+						flex: 1;
+						min-width: 0;
+						font-size: 28rpx;
+						color: #c0c4cc;
+						line-height: 40rpx;
+
+						&--on {
+							color: #333333;
+						}
+					}
+				}
+			}
+		}
+
+		.cbk-ph {
+			color: #c0c4cc;
+			font-size: 28rpx;
+		}
+
+		// --- 底栏 ---
+		.cbk-footer {
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			z-index: 30;
+			padding: 16rpx 24rpx;
+			background-color: #ffffff;
+			border-top-width: 1rpx;
+			border-top-style: solid;
+			border-top-color: #eeeeee;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			box-sizing: border-box;
+
+			.cbk-footer-ok {
+				flex: 1;
+				height: 88rpx;
+				border-radius: 12rpx;
+				background-color: #0651f8;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+
+				.cbk-footer-ok-text {
+					margin-left: 8rpx;
+					font-size: 30rpx;
+					font-weight: 600;
+					color: #ffffff;
+					line-height: 42rpx;
+				}
+			}
+		}
+	}
+
+	// --- 平台账号弹窗（对齐 publish） ---
+	.cbk-account-popup {
+		height: 100%;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		background-color: #ffffff;
+
+		.cbk-account-scroll {
+			flex: 1;
+			height: 0;
+		}
+
+		.cbk-account-empty {
+			flex: 1;
+			min-height: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			.cbk-account-empty-text {
+				font-size: 28rpx;
+				color: #999999;
+			}
+		}
+
+		.cbk-select-option {
+			height: 100rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-top-width: 1rpx;
+			border-top-style: solid;
+			border-top-color: #f2f2f2;
+
+			.cbk-select-option-text {
+				font-size: 28rpx;
+				color: #333333;
+			}
+		}
+
+		.cbk-account-add-wrap {
+			flex-shrink: 0;
+			padding: 24rpx 30rpx;
+			background-color: #ffffff;
+			border-top-width: 1rpx;
+			border-top-style: solid;
+			border-top-color: #eeeeee;
+			box-sizing: border-box;
+
+			.cbk-account-add-btn {
+				width: 100%;
+				height: 88rpx;
+				background-color: #0651f8;
+				border-radius: 16rpx;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+				box-sizing: border-box;
+
+				.cbk-account-add-btn-text {
+					margin-left: 8rpx;
+					font-size: 28rpx;
+					font-weight: 600;
+					color: #ffffff;
+					line-height: 40rpx;
+				}
+			}
+		}
+	}
+</style>

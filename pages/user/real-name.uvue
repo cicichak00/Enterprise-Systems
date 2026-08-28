@@ -1,0 +1,816 @@
+<!-- 实名认证 · 个人信息（按设计稿估算 375，待设计确认） -->
+<template>
+	<cl-page :pt="{ className: 'rn-page' }">
+		<view class="rn-page">
+			<view v-if="pageLoading" class="rn-loading">
+				<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+				<text class="rn-loading-text">加载中...</text>
+			</view>
+
+			<!-- 已实名：展示信息（字段直接取 queryVerify 返回值） -->
+			<scroll-view v-else-if="isVerified" class="rn-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="rn-status-card">
+					<text class="rn-status-title">{{ verifyInfo.is_certify_ly_desc }}</text>
+					<text class="rn-status-hint">认证信息已通过，暂不支持修改。</text>
+				</view>
+				<text class="rn-section-title">身份信息</text>
+				<view class="rn-info-card">
+					<view class="rn-info-row">
+						<text class="rn-info-label">真实姓名</text>
+						<text class="rn-info-value">{{ verifyInfo.name }}</text>
+					</view>
+					<view class="rn-info-row">
+						<text class="rn-info-label">身份证号</text>
+						<text class="rn-info-value">{{ verifyInfo.id_card }}</text>
+					</view>
+					<view class="rn-info-row">
+						<text class="rn-info-label">联系地址</text>
+						<text class="rn-info-value rn-info-value--wrap">{{ verifyInfo.address }}</text>
+					</view>
+					<view class="rn-info-row rn-info-row--last">
+						<text class="rn-info-label">联系电话</text>
+						<text class="rn-info-value">{{ verifyInfo.mobile }}</text>
+					</view>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</scroll-view>
+
+			<!-- 未实名：填写表单 -->
+			<template v-else>
+				<scroll-view class="rn-scroll" scroll-y="true" :show-scrollbar="false">
+					<text class="rn-section-title">个人信息</text>
+					<view class="rn-card">
+						<view class="rn-block">
+							<view class="rn-label-row">
+								<text class="rn-required">*</text>
+								<text class="rn-label">身份证验证</text>
+							</view>
+							<text class="rn-tip">限制年龄18-65岁</text>
+							<view class="rn-upload-row">
+								<view class="rn-upload-box" @tap="chooseImage('id_front')">
+									<image
+										v-if="idFrontDisplay != ''"
+										class="rn-upload-img"
+										:src="idFrontDisplay"
+										mode="aspectFill"
+									></image>
+									<view v-else class="rn-upload-placeholder">
+										<image
+											class="rn-upload-icon rn-upload-icon--id"
+											src="/static/images/realName/id-front.png"
+											mode="aspectFit"
+										></image>
+										<text class="rn-upload-text">上传身份证人像页</text>
+									</view>
+								</view>
+								<view class="rn-upload-box" @tap="chooseImage('id_back')">
+									<image
+										v-if="idBackDisplay != ''"
+										class="rn-upload-img"
+										:src="idBackDisplay"
+										mode="aspectFill"
+									></image>
+									<view v-else class="rn-upload-placeholder">
+										<image
+											class="rn-upload-icon rn-upload-icon--id"
+											src="/static/images/realName/id-back.png"
+											mode="aspectFit"
+										></image>
+										<text class="rn-upload-text">上传身份证国徽页</text>
+									</view>
+								</view>
+							</view>
+						</view>
+
+						<view class="rn-field">
+							<view class="rn-label-row">
+								<text class="rn-required">*</text>
+								<text class="rn-label">真实姓名</text>
+							</view>
+							<view class="rn-input-wrap">
+								<input
+									class="rn-input"
+									:value="realName"
+									maxlength="20"
+									placeholder="请输入真实姓名"
+									placeholder-class="rn-input-placeholder"
+									@input="onRealNameInput"
+								/>
+							</view>
+						</view>
+
+						<view class="rn-field">
+							<view class="rn-label-row">
+								<text class="rn-required">*</text>
+								<text class="rn-label">身份证号码</text>
+							</view>
+							<view class="rn-input-wrap">
+								<input
+									class="rn-input"
+									:value="idCard"
+									maxlength="18"
+									placeholder="请输入身份证号码"
+									placeholder-class="rn-input-placeholder"
+									@input="onIdCardInput"
+								/>
+							</view>
+						</view>
+
+						<view class="rn-field">
+							<view class="rn-label-row">
+								<text class="rn-required">*</text>
+								<text class="rn-label">联系地址</text>
+							</view>
+							<view class="rn-input-wrap">
+								<input
+									class="rn-input"
+									:value="address"
+									maxlength="100"
+									placeholder="请输入联系地址"
+									placeholder-class="rn-input-placeholder"
+									@input="onAddressInput"
+								/>
+							</view>
+						</view>
+
+						<view class="rn-field">
+							<view class="rn-label-row">
+								<text class="rn-required">*</text>
+								<text class="rn-label">联系电话</text>
+							</view>
+							<view class="rn-input-wrap">
+								<input
+									class="rn-input"
+									:value="phone"
+									type="digit"
+									maxlength="11"
+									placeholder="请输入联系电话"
+									placeholder-class="rn-input-placeholder"
+									@input="onPhoneInput"
+								/>
+							</view>
+						</view>
+
+						<view class="rn-block rn-block--last">
+							<view class="rn-label-row">
+								<text class="rn-required">*</text>
+								<text class="rn-label">人脸认证</text>
+							</view>
+							<text class="rn-tip">点击拍摄或相册上传面部图片</text>
+							<view class="rn-face-box" @tap="chooseImage('face')">
+								<image
+									v-if="faceDisplay != ''"
+									class="rn-face-img"
+									:src="faceDisplay"
+									mode="aspectFill"
+								></image>
+								<view v-else class="rn-face-placeholder">
+									<image
+										class="rn-upload-icon rn-upload-icon--face"
+										src="/static/images/realName/face-auth.png"
+										mode="aspectFit"
+									></image>
+								</view>
+							</view>
+							<text class="rn-face-tip">· 确保本人面部出现在框内</text>
+							<text class="rn-face-tip">· 确保面部与屏幕保持适当距离</text>
+							<text class="rn-face-tip">· 保证光线充足均匀</text>
+						</view>
+					</view>
+				</scroll-view>
+
+				<view class="rn-footer">
+					<view class="rn-tip-bar">
+						<text class="rn-tip-bar-text">认证后无法修改，请确保个人信息真实有效</text>
+					</view>
+					<view class="rn-btn-wrap">
+						<view
+							class="rn-submit"
+							:class="{ 'rn-submit--disabled': submitting }"
+							@tap="onSubmit"
+						>
+							<text class="rn-submit-text">{{ submitting ? "提交中..." : "提交认证" }}</text>
+						</view>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</template>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { queryUserCertifyVerify, submitUserCertify } from "@/.cool/api/user-certify";
+	import { normalizePickDisplayPath, uploadImage } from "@/.cool/api/upload";
+	import { getApiMessage, isApiSuccess } from "@/.cool/utils/comm";
+	import { isValidPhone, normalizePhone, readInputValue, readPhoneInput } from "@/.cool/utils/phone";
+
+	type UploadKind = "id_front" | "id_back" | "face";
+
+	type VerifyInfoView = {
+		is_certify_ly: number;
+		is_certify_ly_desc: string;
+		name: string;
+		id_card: string;
+		address: string;
+		mobile: string;
+		idCardFront: string;
+		idCardBack: string;
+		facePhoto: string;
+	};
+
+	const pageLoading = ref(true);
+	const isVerified = ref(false);
+	const verifyInfo = ref<VerifyInfoView>({
+		is_certify_ly: 0,
+		is_certify_ly_desc: "已认证",
+		name: "-",
+		id_card: "-",
+		address: "-",
+		mobile: "-",
+		idCardFront: "",
+		idCardBack: "",
+		facePhoto: ""
+	});
+	const realName = ref("");
+	const idCard = ref("");
+	const address = ref("");
+	const phone = ref("");
+	const idFrontUrl = ref("");
+	const idBackUrl = ref("");
+	const faceUrl = ref("");
+	const idFrontDisplay = ref("");
+	const idBackDisplay = ref("");
+	const faceDisplay = ref("");
+	const submitting = ref(false);
+
+	function onRealNameInput(e: UniInputEvent) {
+		realName.value = readInputValue(e, "").trim();
+	}
+
+	function onIdCardInput(e: UniInputEvent) {
+		idCard.value = readInputValue(e, "").trim().toUpperCase();
+	}
+
+	function onAddressInput(e: UniInputEvent) {
+		address.value = readInputValue(e, "");
+	}
+
+	function onPhoneInput(e: UniInputEvent) {
+		phone.value = readPhoneInput(e);
+	}
+
+	function isValidIdCard(value: string): boolean {
+		const text = value.trim().toUpperCase();
+		if (text.length != 15 && text.length != 18) {
+			return false;
+		}
+		if (text.length == 15) {
+			return /^[1-9]\d{14}$/.test(text);
+		}
+		return /^[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dX]$/.test(text);
+	}
+
+	function setUploadResult(kind: UploadKind, displayPath: string, remoteUrl: string) {
+		if (kind == "id_front") {
+			idFrontDisplay.value = displayPath;
+			idFrontUrl.value = remoteUrl;
+			return;
+		}
+		if (kind == "id_back") {
+			idBackDisplay.value = displayPath;
+			idBackUrl.value = remoteUrl;
+			return;
+		}
+		faceDisplay.value = displayPath;
+		faceUrl.value = remoteUrl;
+	}
+
+	function chooseImage(kind: UploadKind) {
+		if (submitting.value || isVerified.value) {
+			return;
+		}
+		uni.chooseImage({
+			count: 1,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				const paths = res.tempFilePaths;
+				if (paths == null || paths.length == 0) {
+					return;
+				}
+				const tempPath = paths[0];
+				uni.showLoading({ title: "上传中..." });
+				normalizePickDisplayPath(tempPath)
+					.then((displayPath) => {
+						return uploadImage(tempPath).then((url) => {
+							const remote = `${url}`.trim();
+							if (remote == "") {
+								uni.showToast({ title: "上传失败", icon: "none" });
+								return;
+							}
+							const preview = displayPath != "" ? displayPath : remote;
+							setUploadResult(kind, preview, remote);
+						});
+					})
+					.catch((err) => {
+						const msg =
+							err != null && (err as UTSJSONObject)["message"] != null
+								? `${(err as UTSJSONObject)["message"]}`
+								: "上传失败";
+						uni.showToast({ title: msg, icon: "none" });
+					})
+					.finally(() => {
+						uni.hideLoading();
+					});
+			}
+		});
+	}
+
+	function asText(raw: any | null, fallback: string = ""): string {
+		if (raw == null) {
+			return fallback;
+		}
+		const text = `${raw}`.trim();
+		return text != "" ? text : fallback;
+	}
+
+	function asNumber(raw: any | null): number {
+		if (raw == null) {
+			return 0;
+		}
+		const n = parseInt(`${raw}`);
+		return isNaN(n) ? 0 : n;
+	}
+
+	function applyVerifyData(data: UTSJSONObject) {
+		const ly = asNumber(data["is_certify_ly"]);
+		const info: VerifyInfoView = {
+			is_certify_ly: ly,
+			is_certify_ly_desc: asText(data["is_certify_ly_desc"], ly == 2 ? "审核中" : "已认证"),
+			name: asText(data["name"], "-"),
+			id_card: asText(data["id_card"], "-"),
+			address: asText(data["address"], "-"),
+			mobile: asText(data["mobile"], "-"),
+			idCardFront: asText(data["idCardFront"]),
+			idCardBack: asText(data["idCardBack"]),
+			facePhoto: asText(data["facePhoto"])
+		};
+		verifyInfo.value = info;
+
+		// 已驳回：回填表单可重提（直接用返回字段）
+		if (ly == 3) {
+			isVerified.value = false;
+			realName.value = asText(data["name"]);
+			idCard.value = asText(data["id_card"]);
+			address.value = asText(data["address"]);
+			phone.value = asText(data["mobile"]);
+			if (info.idCardFront != "") {
+				idFrontUrl.value = info.idCardFront;
+				idFrontDisplay.value = info.idCardFront;
+			}
+			if (info.idCardBack != "") {
+				idBackUrl.value = info.idCardBack;
+				idBackDisplay.value = info.idCardBack;
+			}
+			if (info.facePhoto != "") {
+				faceUrl.value = info.facePhoto;
+				faceDisplay.value = info.facePhoto;
+			}
+			return;
+		}
+
+		// 1已认证 / 2审核中 → 展示信息页
+		if (ly == 1 || ly == 2) {
+			isVerified.value = true;
+			return;
+		}
+
+		isVerified.value = false;
+	}
+
+	function loadVerifyStatus() {
+		pageLoading.value = true;
+		queryUserCertifyVerify({ bind_scope: 1, force_sync: 0 })
+			.then((res) => {
+				if (res == null) {
+					isVerified.value = false;
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code as number | string)) {
+					isVerified.value = false;
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				applyVerifyData(data);
+			})
+			.catch(() => {
+				isVerified.value = false;
+			})
+			.finally(() => {
+				pageLoading.value = false;
+			});
+	}
+
+	function validateForm(): string {
+		if (idFrontUrl.value == "") {
+			return "请上传身份证人像页";
+		}
+		if (idBackUrl.value == "") {
+			return "请上传身份证国徽页";
+		}
+		if (realName.value.trim() == "") {
+			return "请输入真实姓名";
+		}
+		if (!isValidIdCard(idCard.value)) {
+			return "请输入正确的身份证号码";
+		}
+		if (address.value.trim() == "") {
+			return "请输入联系地址";
+		}
+		const mobile = normalizePhone(phone.value);
+		if (!isValidPhone(mobile)) {
+			return "请输入正确的联系电话";
+		}
+		if (faceUrl.value == "") {
+			return "请上传面部图片";
+		}
+		return "";
+	}
+
+	function onSubmit() {
+		if (submitting.value || isVerified.value) {
+			return;
+		}
+		const errMsg = validateForm();
+		if (errMsg != "") {
+			uni.showToast({ title: errMsg, icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		submitUserCertify({
+			certify_type: 0,
+			name: realName.value.trim(),
+			contact_mobile: normalizePhone(phone.value),
+			idNo: idCard.value.trim().toUpperCase(),
+			address: address.value.trim(),
+			facePhoto: faceUrl.value,
+			idCardFront: idFrontUrl.value,
+			idCardBack: idBackUrl.value,
+			bind_scope: 1
+		})
+			.then((res) => {
+				uni.hideLoading();
+				const envelope = res as UTSJSONObject | null;
+				const code = envelope != null ? envelope["code"] : null;
+				if (code != null && !isApiSuccess(code as number | string)) {
+					submitting.value = false;
+					uni.showToast({ title: getApiMessage(envelope, "提交失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(envelope, "提交成功"), icon: "success" });
+				setTimeout(() => {
+					loadVerifyStatus();
+					submitting.value = false;
+				}, 400);
+			})
+			.catch((err) => {
+				uni.hideLoading();
+				submitting.value = false;
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			});
+	}
+
+	onShow(() => {
+		loadVerifyStatus();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.rn-page {
+		width: 100%;
+		height: 100%;
+		background-color: #f5f5f5;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+
+		.rn-loading {
+			padding-top: 240rpx;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.rn-loading-text {
+			margin-top: 16rpx;
+			font-size: 26rpx;
+			color: #999999;
+		}
+
+		.rn-scroll {
+			flex: 1;
+			min-height: 0;
+			padding: 0 24rpx 24rpx;
+			box-sizing: border-box;
+		}
+
+		.rn-status-card {
+			margin-top: 24rpx;
+			padding: 36rpx 28rpx;
+			border-radius: 16rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.rn-status-title {
+			display: block;
+			font-size: 36rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 50rpx;
+			text-align: center;
+		}
+
+		.rn-status-hint {
+			display: block;
+			margin-top: 12rpx;
+			font-size: 26rpx;
+			color: #999999;
+			line-height: 38rpx;
+			text-align: center;
+		}
+
+		.rn-info-card {
+			padding: 8rpx 24rpx;
+			border-radius: 16rpx;
+			background-color: #ffffff;
+			box-sizing: border-box;
+		}
+
+		.rn-info-row {
+			padding: 28rpx 0;
+			border-bottom-width: 1rpx;
+			border-bottom-style: solid;
+			border-bottom-color: #f0f0f0;
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			justify-content: space-between;
+
+			&--last {
+				border-bottom-width: 0;
+			}
+		}
+
+		.rn-info-label {
+			flex-shrink: 0;
+			width: 160rpx;
+			font-size: 28rpx;
+			color: #999999;
+			line-height: 40rpx;
+		}
+
+		.rn-info-value {
+			flex: 1;
+			min-width: 0;
+			text-align: right;
+			font-size: 28rpx;
+			color: #333333;
+			line-height: 40rpx;
+
+			&--wrap {
+				text-align: right;
+			}
+		}
+
+		.rn-section-title {
+			display: block;
+			padding: 24rpx 8rpx 16rpx;
+			font-size: 26rpx;
+			color: #999999;
+			line-height: 36rpx;
+		}
+
+		.rn-card {
+			padding: 28rpx 24rpx 32rpx;
+			border-radius: 16rpx;
+			background-color: #ffffff;
+			box-sizing: border-box;
+		}
+
+		.rn-block {
+			padding-bottom: 8rpx;
+
+			&--last {
+				padding-top: 24rpx;
+			}
+		}
+
+		.rn-field {
+			padding-top: 24rpx;
+
+			.rn-label-row {
+				margin-bottom: 16rpx;
+			}
+
+			.rn-input-wrap {
+				margin-top: 0;
+			}
+		}
+
+		.rn-label-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			margin-bottom: 6rpx;
+		}
+
+		.rn-required {
+			margin-right: 4rpx;
+			font-size: 28rpx;
+			color: #2b59c3;
+			line-height: 40rpx;
+		}
+
+		.rn-label {
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #333333;
+			line-height: 40rpx;
+		}
+
+		.rn-tip {
+			display: block;
+			margin-bottom: 24rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.rn-upload-row {
+			display: flex;
+			flex-direction: row;
+		}
+
+		.rn-upload-box {
+			flex: 1;
+			height: 200rpx;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #ebebeb;
+			border-radius: 12rpx;
+			background-color: #fafafa;
+			overflow: hidden;
+			box-sizing: border-box;
+
+			&:first-child {
+				margin-right: 24rpx;
+			}
+		}
+
+		.rn-upload-img {
+			width: 100%;
+			height: 100%;
+		}
+
+		.rn-upload-placeholder {
+			width: 100%;
+			height: 100%;
+			padding: 16rpx;
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.rn-upload-icon {
+			&--id {
+				width: 120rpx;
+				height: 76rpx;
+				margin-bottom: 16rpx;
+			}
+
+			&--face {
+				width: 160rpx;
+				height: 160rpx;
+			}
+		}
+
+		.rn-upload-text {
+			font-size: 22rpx;
+			color: #999999;
+			line-height: 30rpx;
+			text-align: center;
+		}
+
+		.rn-input-wrap {
+			height: 88rpx;
+			padding: 0 24rpx;
+			margin-top: 10rpx;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #ebebeb;
+			border-radius: 12rpx;
+			background-color: #ffffff;
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.rn-input {
+			flex: 1;
+			min-width: 0;
+			height: 88rpx;
+			font-size: 28rpx;
+			color: #333333;
+		}
+
+		.rn-input-placeholder {
+			color: #cccccc;
+			font-size: 28rpx;
+		}
+
+		.rn-face-box {
+			width: 100%;
+			height: 280rpx;
+			margin-bottom: 24rpx;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #ebebeb;
+			border-radius: 12rpx;
+			background-color: #fafafa;
+			overflow: hidden;
+			box-sizing: border-box;
+		}
+
+		.rn-face-img {
+			width: 100%;
+			height: 100%;
+		}
+
+		.rn-face-placeholder {
+			width: 100%;
+			height: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.rn-face-tip {
+			display: block;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 46rpx;
+		}
+
+		.rn-footer {
+			flex-shrink: 0;
+			background-color: #f5f5f5;
+		}
+
+		.rn-tip-bar {
+			margin-bottom: 24rpx;
+			padding: 20rpx 32rpx;
+			background-color: #e8f4ff;
+		}
+
+		.rn-tip-bar-text {
+			font-size: 24rpx;
+			color: #2563eb;
+			line-height: 36rpx;
+		}
+
+		.rn-btn-wrap {
+			padding: 0 32rpx 24rpx;
+		}
+
+		.rn-submit {
+			height: 100rpx;
+			border-radius: 16rpx;
+			background-color: #2b59c3;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			&--disabled {
+				opacity: 0.7;
+			}
+		}
+
+		.rn-submit-text {
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #ffffff;
+			line-height: 42rpx;
+		}
+	}
+</style>

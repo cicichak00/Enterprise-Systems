@@ -1,0 +1,504 @@
+<!-- 提现记录 -->
+<template>
+	<cl-page :pt="{ className: 'ww-page' }">
+		<view class="ww-page">
+			<scroll-view
+				class="ww-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				:refresher-enabled="true"
+				:refresher-triggered="refresherTriggered"
+				refresher-default-style="black"
+				refresher-background="#f4f6f8"
+				@scrolltolower="onScrollToLower"
+				@refresherrefresh="onRefresherRefresh"
+				@refresherrestore="onRefresherRestore"
+				@refresherabort="onRefresherRestore"
+			>
+				<view class="ww-inner">
+					<view v-if="pageLoading && list.length == 0" class="ww-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="ww-state-text">加载中...</text>
+					</view>
+					<template v-else>
+						<view class="ww-summary">
+							<view class="ww-summary-col">
+								<text class="ww-summary-label">累计提现</text>
+								<text class="ww-summary-value">{{ summary.totalWithdraw }}</text>
+							</view>
+							<view class="ww-summary-col">
+								<text class="ww-summary-label">实际到账</text>
+								<text class="ww-summary-value">{{ summary.actualReceived }}</text>
+							</view>
+							<view class="ww-summary-col">
+								<text class="ww-summary-label">预扣税额</text>
+								<text class="ww-summary-value">{{ summary.taxAmount }}</text>
+							</view>
+						</view>
+
+						<text class="ww-section-title">提现记录</text>
+
+						<view v-if="list.length == 0" class="ww-state ww-state--empty">
+							<text class="ww-state-text">暂无提现记录</text>
+						</view>
+						<view v-else class="ww-list">
+							<view class="ww-card" v-for="(item, index) in list" :key="item.id != '' ? item.id : index">
+								<view class="ww-card-top">
+									<text class="ww-card-title">{{ item.title }}</text>
+									<view class="ww-card-right">
+										<text class="ww-card-amount">{{ item.amount }}</text>
+										<view class="ww-card-status-row">
+											<text
+												class="ww-card-status"
+												:class="{ 'ww-card-status--reject': item.isRejected }"
+											>{{ item.statusText }}</text>
+											<view
+												v-if="item.isRejected"
+												class="ww-card-status-tip"
+												@tap.stop="onRejectTip(item)"
+											>
+												<cl-icon name="question-line" :size="14" color="#2b59c3"></cl-icon>
+											</view>
+										</view>
+									</view>
+								</view>
+								<view class="ww-card-detail">
+									<text class="ww-card-line">实际到账·{{ item.actualAmount }}</text>
+									<view class="ww-card-line-row">
+										<text class="ww-card-line">预扣税额·{{ item.taxAmount }}</text>
+										<view class="ww-card-tax-tip" @tap.stop="onTaxTip">
+											<cl-icon name="question-line" :size="12" color="#cccccc"></cl-icon>
+										</view>
+									</view>
+									<text class="ww-card-line">提现ID·{{ item.withdrawNo }}</text>
+									<text class="ww-card-line">申请时间·{{ item.createTime }}</text>
+									<text v-if="item.payTime != ''" class="ww-card-line">打款时间·{{ item.payTime }}</text>
+									<text v-if="item.rejectTime != ''" class="ww-card-line">驳回时间·{{ item.rejectTime }}</text>
+								</view>
+							</view>
+						</view>
+
+						<view v-if="loadingMore" class="ww-loadmore">
+							<cl-loading :loading="true" :size="20" color="#2b59c3"></cl-loading>
+							<text class="ww-loadmore-text">加载更多...</text>
+						</view>
+						<view v-else-if="!hasMore && list.length > 0" class="ww-loadmore">
+							<text class="ww-loadmore-text">没有更多了</text>
+						</view>
+					</template>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { reactive, ref } from "vue";
+	import { getStaffWithdrawRecords } from "@/.cool/api/wallet";
+	import type { StaffWithdrawRecordItem } from "@/.cool/types/wallet";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+
+	type WithdrawItem = {
+		id: string;
+		title: string;
+		amount: string;
+		statusText: string;
+		isRejected: boolean;
+		rejectReason: string;
+		actualAmount: string;
+		taxAmount: string;
+		withdrawNo: string;
+		createTime: string;
+		payTime: string;
+		rejectTime: string;
+	};
+
+	const PAGE_SIZE = 20;
+
+	const pageLoading = ref(true);
+	const loadingMore = ref(false);
+	const refresherTriggered = ref(false);
+	const hasMore = ref(true);
+	const pageNo = ref(1);
+	const list = ref<WithdrawItem[]>([]);
+	const summary = reactive({
+		totalWithdraw: "0.00",
+		actualReceived: "0.00",
+		taxAmount: "0.00"
+	});
+
+	function asText(raw: any | null, fallback: string = ""): string {
+		if (raw == null) {
+			return fallback;
+		}
+		const text = `${raw}`.trim();
+		return text != "" ? text : fallback;
+	}
+
+	function formatMoney(raw: any | null): string {
+		if (raw == null || `${raw}` == "") {
+			return "0.00";
+		}
+		const n = parseFloat(`${raw}`);
+		if (isNaN(n)) {
+			return "0.00";
+		}
+		return n.toFixed(2);
+	}
+
+	function formatAmountSigned(raw: any | null): string {
+		const text = asText(raw);
+		if (text == "") {
+			return "-0.00";
+		}
+		if (text.indexOf("-") == 0) {
+			return text;
+		}
+		return `-${text}`;
+	}
+
+	function isRejectedStatus(row: StaffWithdrawRecordItem): boolean {
+		const status = row.status;
+		if (status != null && parseInt(`${status}`) == 3) {
+			return true;
+		}
+		const label = asText(row.status_label ?? row.status_txt);
+		return label.indexOf("失败") >= 0 || label.indexOf("驳回") >= 0 || label.indexOf("拒绝") >= 0;
+	}
+
+	function buildTitle(row: StaffWithdrawRecordItem): string {
+		const bank = asText(row.bank_name ?? row.bank, "收款账户");
+		const bankNo = asText(row.bank_no_masked ?? row.bank_no);
+		if (bankNo != "") {
+			return `提现到${bank}(${bankNo})`;
+		}
+		return `提现到${bank}`;
+	}
+
+	function mapRecord(row: StaffWithdrawRecordItem, index: number): WithdrawItem {
+		const rejected = isRejectedStatus(row);
+		return {
+			id: row.id != null ? `${row.id}` : `row-${index}`,
+			title: buildTitle(row),
+			amount: formatAmountSigned(row.amount),
+			statusText: asText(row.status_label ?? row.status_txt, "处理中"),
+			isRejected: rejected,
+			rejectReason: asText(row.fail_reason ?? row.reject_reason ?? row.remarks),
+			actualAmount: formatMoney(row.actual_amount),
+			taxAmount: formatMoney(row.tax_amount),
+			withdrawNo: asText(row.withdraw_no, "-"),
+			createTime: asText(row.create_time, "-"),
+			payTime: asText(row.pay_time),
+			rejectTime: asText(row.reject_time)
+		};
+	}
+
+	function extractList(data: UTSJSONObject): StaffWithdrawRecordItem[] {
+		const raw = data["list"] ?? data["lists"] ?? data["records"] ?? data["items"];
+		if (raw == null || !Array.isArray(raw)) {
+			return [];
+		}
+		return raw as StaffWithdrawRecordItem[];
+	}
+
+	function extractTotal(data: UTSJSONObject): number {
+		const raw = data["total"] ?? data["count"] ?? data["total_count"];
+		if (raw == null) {
+			return -1;
+		}
+		const n = parseInt(`${raw}`);
+		return isNaN(n) ? -1 : n;
+	}
+
+	function applySummary(data: UTSJSONObject) {
+		summary.totalWithdraw = formatMoney(data["total_money"] ?? data["total_withdraw"]);
+		summary.actualReceived = formatMoney(data["total_amount"] ?? data["total_actual"]);
+		summary.taxAmount = formatMoney(data["total_tax"] ?? data["total_tax_amount"]);
+	}
+
+	function unwrapData(res: any): UTSJSONObject | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code as number | string)) {
+			return null;
+		}
+		return (envelope["data"] ?? envelope) as UTSJSONObject;
+	}
+
+	function loadList(more: boolean = false) {
+		if (more) {
+			if (!hasMore.value || loadingMore.value || pageLoading.value || refresherTriggered.value) {
+				return;
+			}
+			loadingMore.value = true;
+		} else {
+			if (list.value.length == 0) {
+				pageLoading.value = true;
+			}
+			pageNo.value = 1;
+			hasMore.value = true;
+		}
+		const nextPage = more ? pageNo.value + 1 : 1;
+		getStaffWithdrawRecords({ page: nextPage, limit: PAGE_SIZE })
+			.then((res) => {
+				const data = unwrapData(res);
+				if (data == null) {
+					if (!more) {
+						list.value = [];
+						uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					}
+					hasMore.value = false;
+					return;
+				}
+				if (!more) {
+					applySummary(data);
+				}
+				const rows = extractList(data);
+				const mapped: WithdrawItem[] = [];
+				for (let i = 0; i < rows.length; i++) {
+					mapped.push(mapRecord(rows[i], i));
+				}
+				const total = extractTotal(data);
+				if (more) {
+					list.value = list.value.concat(mapped);
+					pageNo.value = nextPage;
+				} else {
+					list.value = mapped;
+					pageNo.value = 1;
+				}
+				if (total >= 0) {
+					hasMore.value = list.value.length < total;
+				} else {
+					hasMore.value = mapped.length >= PAGE_SIZE;
+				}
+			})
+			.catch((err) => {
+				if (!more) {
+					list.value = [];
+					uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+				}
+				hasMore.value = false;
+			})
+			.finally(() => {
+				pageLoading.value = false;
+				loadingMore.value = false;
+				refresherTriggered.value = false;
+			});
+	}
+
+	function onScrollToLower() {
+		loadList(true);
+	}
+
+	function onRefresherRefresh() {
+		if (pageLoading.value || loadingMore.value) {
+			refresherTriggered.value = false;
+			return;
+		}
+		refresherTriggered.value = true;
+		loadList(false);
+	}
+
+	function onRefresherRestore() {
+		refresherTriggered.value = false;
+	}
+
+	function onRejectTip(item: WithdrawItem) {
+		uni.showToast({
+			title: item.rejectReason != "" ? item.rejectReason : "提现申请未通过",
+			icon: "none"
+		});
+	}
+
+	function onTaxTip() {
+		uni.showToast({ title: "预扣税额为平台代扣代缴金额", icon: "none" });
+	}
+
+	onShow(() => {
+		loadList(false);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ww-page {
+		height: 100%;
+		background-color: #f4f6f8;
+
+		.ww-scroll {
+			height: 100%;
+		}
+
+		.ww-inner {
+			padding: 24rpx 30rpx 40rpx;
+			box-sizing: border-box;
+		}
+
+		.ww-state {
+			padding: 120rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			&--empty {
+				padding: 80rpx 0;
+			}
+		}
+
+		.ww-state-text {
+			margin-top: 16rpx;
+			font-size: 26rpx;
+			color: #999999;
+		}
+
+		.ww-summary {
+			padding: 32rpx 12rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: row;
+			margin-bottom: 28rpx;
+		}
+
+		.ww-summary-col {
+			flex: 1;
+			min-width: 0;
+			padding: 0 12rpx;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.ww-summary-label {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.ww-summary-value {
+			margin-top: 12rpx;
+			font-size: 32rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 44rpx;
+		}
+
+		.ww-section-title {
+			display: block;
+			margin-bottom: 16rpx;
+			padding-left: 4rpx;
+			font-size: 30rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 42rpx;
+		}
+
+		.ww-list {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.ww-card {
+			margin-bottom: 16rpx;
+			padding: 28rpx 24rpx 24rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+		}
+
+		.ww-card-top {
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			justify-content: space-between;
+			margin-bottom: 12rpx;
+		}
+
+		.ww-card-title {
+			flex: 1;
+			min-width: 0;
+			padding-right: 16rpx;
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #1a1a1a;
+			line-height: 40rpx;
+		}
+
+		.ww-card-right {
+			flex-shrink: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+		}
+
+		.ww-card-amount {
+			font-size: 30rpx;
+			font-weight: 700;
+			color: #1a1a1a;
+			line-height: 40rpx;
+		}
+
+		.ww-card-status-row {
+			margin-top: 6rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.ww-card-status {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+
+			&--reject {
+				color: #2b59c3;
+			}
+		}
+
+		.ww-card-status-tip {
+			margin-left: 4rpx;
+			display: flex;
+			align-items: center;
+		}
+
+		.ww-card-detail {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.ww-card-line-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.ww-card-line {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 38rpx;
+		}
+
+		.ww-card-tax-tip {
+			margin-left: 6rpx;
+			display: flex;
+			align-items: center;
+		}
+
+		.ww-loadmore {
+			padding: 24rpx 0 8rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.ww-loadmore-text {
+			margin-left: 10rpx;
+			font-size: 24rpx;
+			color: #999999;
+		}
+	}
+</style>

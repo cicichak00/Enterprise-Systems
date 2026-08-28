@@ -1,0 +1,485 @@
+<template>
+	<cl-page :pt="{ className: 'kt-page' }" :back-top="false">
+		<view class="kt-page">
+			<cl-safe-area type="top"></cl-safe-area>
+			<view class="kt-header">
+				<view class="kt-back" @tap="router.back()">
+					<cl-icon name="arrow-left-s-line" :size="22" color="#24364f"></cl-icon>
+				</view>
+				<view class="kt-header-copy">
+					<text class="kt-title">关键词转赠</text>
+					<text class="kt-subtitle">离职回收 · 重新分配 · 全程留痕</text>
+				</view>
+			</view>
+
+			<view class="kt-tabs">
+				<view class="kt-tab" :class="{ 'kt-tab--active': activeTab == 'pending' }" @tap="switchTab('pending')">
+					<text class="kt-tab-text">待转赠</text>
+					<text class="kt-tab-count">{{ poolRows.length }}</text>
+				</view>
+				<view class="kt-tab" :class="{ 'kt-tab--active': activeTab == 'record' }" @tap="switchTab('record')">
+					<text class="kt-tab-text">转赠记录</text>
+				</view>
+			</view>
+
+			<view v-if="activeTab == 'pending'" class="kt-panel">
+				<view class="kt-rule-card">
+					<view class="kt-rule-icon"><cl-icon name="inbox-archive-line" :size="21" color="#2453aa"></cl-icon></view>
+					<view class="kt-rule-copy">
+						<text class="kt-rule-title">离职关键词公池</text>
+						<text class="kt-rule-desc">员工离职后，其未完成关键词自动进入待转赠；转赠后仅更新当前归属员工。</text>
+					</view>
+					<view class="kt-rule-total">
+						<text class="kt-rule-total-num">{{ poolRows.length }}</text>
+						<text class="kt-rule-total-label">待处理</text>
+					</view>
+				</view>
+
+				<view class="kt-search">
+					<cl-icon name="search-line" :size="17" color="#8b96a8"></cl-icon>
+					<input class="kt-search-input" v-model="poolKeyword" placeholder="搜索关键词、项目或离职员工" placeholder-class="kt-placeholder" confirm-type="search" @confirm="loadPool(false)" />
+					<text v-if="poolKeyword != ''" class="kt-search-clear" @tap="clearPoolSearch">清除</text>
+				</view>
+
+				<scroll-view class="kt-scroll" scroll-y="true" :show-scrollbar="false">
+					<view class="kt-scroll-inner kt-scroll-inner--footer">
+						<view v-if="poolLoading" class="kt-state"><cl-loading :loading="true" :size="26" color="#2b59c3"></cl-loading></view>
+						<view v-else-if="poolRows.length == 0" class="kt-state">
+							<view class="kt-state-icon"><cl-icon name="checkbox-circle-line" :size="30" color="#6f8bbd"></cl-icon></view>
+							<text class="kt-state-title">待转赠关键词已处理完</text>
+							<text class="kt-state-desc">后续有员工离职时，关键词会自动回收到这里</text>
+						</view>
+						<view v-for="item in poolRows" :key="item.id" class="kt-keyword-card" :class="{ 'kt-keyword-card--selected': isSelected(item.id) }" @tap="toggleSelect(item.id)">
+							<view class="kt-check" :class="{ 'kt-check--selected': isSelected(item.id) }">
+								<cl-icon v-if="isSelected(item.id)" name="check-line" :size="14" color="#ffffff"></cl-icon>
+							</view>
+							<view class="kt-keyword-main">
+								<view class="kt-keyword-title-row">
+									<text class="kt-keyword-title">{{ item.keyword }}</text>
+									<text class="kt-pool-tag">待转赠</text>
+								</view>
+								<text class="kt-project">{{ item.project }}</text>
+								<view class="kt-source-row">
+									<text class="kt-source-label">原归属</text>
+									<text class="kt-source-name">{{ item.sourceStaff }}</text>
+									<text class="kt-left-tag">已离职</text>
+								</view>
+								<view class="kt-time-row">
+									<text class="kt-time">创建 {{ item.createdAt }}</text>
+									<text class="kt-time">回收 {{ item.recoveredAt }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+				</scroll-view>
+
+				<view class="kt-footer">
+					<view class="kt-select-all" @tap="toggleSelectAll">
+						<view class="kt-check kt-check--small" :class="{ 'kt-check--selected': allSelected }">
+							<cl-icon v-if="allSelected" name="check-line" :size="13" color="#ffffff"></cl-icon>
+						</view>
+						<text class="kt-select-all-text">全选</text>
+					</view>
+					<text class="kt-selected-count">已选 {{ selectedIds.length }} 项</text>
+					<view class="kt-transfer-btn" :class="{ 'kt-transfer-btn--disabled': selectedIds.length == 0 }" @tap="openRecipientPopup">
+						<text class="kt-transfer-btn-text">转赠给员工</text>
+					</view>
+				</view>
+			</view>
+
+			<view v-else class="kt-panel">
+				<view class="kt-search kt-search--record">
+					<cl-icon name="search-line" :size="17" color="#8b96a8"></cl-icon>
+					<input class="kt-search-input" v-model="recordKeyword" placeholder="搜索关键词、原员工或接收员工" placeholder-class="kt-placeholder" confirm-type="search" @confirm="loadRecords" />
+					<text v-if="recordKeyword != ''" class="kt-search-clear" @tap="clearRecordSearch">清除</text>
+				</view>
+				<scroll-view class="kt-scroll" scroll-y="true" :show-scrollbar="false">
+					<view class="kt-scroll-inner">
+						<view class="kt-record-head">
+							<view><text class="kt-record-head-title">归属变更记录</text><text class="kt-record-head-desc">每次转赠新增一条行为记录</text></view>
+							<text class="kt-record-head-count">{{ recordRows.length }} 条</text>
+						</view>
+						<view v-if="recordLoading" class="kt-state"><cl-loading :loading="true" :size="26" color="#2b59c3"></cl-loading></view>
+						<view v-for="item in recordRows" :key="item.id" class="kt-record-card">
+							<view class="kt-record-top">
+								<view class="kt-record-keyword-wrap"><text class="kt-record-keyword">{{ item.keyword }}</text><text class="kt-record-project">{{ item.project }}</text></view>
+								<text class="kt-record-status">转赠成功</text>
+							</view>
+							<view class="kt-flow">
+								<view class="kt-person"><text class="kt-person-label">原员工</text><text class="kt-person-name">{{ item.fromStaff }}</text></view>
+								<view class="kt-flow-arrow"><cl-icon name="arrow-right-line" :size="19" color="#2b59c3"></cl-icon></view>
+								<view class="kt-person kt-person--target"><text class="kt-person-label">接收员工</text><text class="kt-person-name">{{ item.toStaff }}</text></view>
+							</view>
+							<view class="kt-record-foot"><text>操作人 {{ item.operator }}</text><text>{{ item.time }}</text></view>
+						</view>
+					</view>
+				</scroll-view>
+			</view>
+		</view>
+
+		<cl-popup v-model="recipientPopupVisible" direction="bottom" :show-header="false" :show-close="false" :mask-closable="true" :pt="{ className: 'kt-popup-wrap' }">
+			<view class="kt-popup">
+				<view class="kt-popup-head">
+					<view><text class="kt-popup-title">选择接收员工</text><text class="kt-popup-sub">将 {{ selectedIds.length }} 个关键词转赠给一名在职员工</text></view>
+					<view class="kt-popup-close" @tap="recipientPopupVisible = false"><cl-icon name="close-line" :size="19" color="#6b7280"></cl-icon></view>
+				</view>
+				<view class="kt-recipient-search"><cl-icon name="search-line" :size="16" color="#9aa5b5"></cl-icon><input class="kt-recipient-input" v-model="staffKeyword" placeholder="搜索员工" placeholder-class="kt-placeholder" @input="filterRecipients" /></view>
+				<scroll-view class="kt-recipient-list" scroll-y="true" :show-scrollbar="false">
+					<view v-for="item in visibleRecipients" :key="item.id" class="kt-recipient" :class="{ 'kt-recipient--selected': recipientId == item.id }" @tap="recipientId = item.id">
+						<view class="kt-recipient-avatar" :style="{ backgroundColor: item.color }"><text>{{ item.name.charAt(0) }}</text></view>
+						<view class="kt-recipient-copy"><text class="kt-recipient-name">{{ item.name }}</text><text class="kt-recipient-meta">{{ item.role }} · 协作ID {{ item.collabId }}</text></view>
+						<view class="kt-radio" :class="{ 'kt-radio--selected': recipientId == item.id }"><view v-if="recipientId == item.id" class="kt-radio-dot"></view></view>
+					</view>
+				</scroll-view>
+				<view class="kt-popup-footer">
+					<view class="kt-popup-confirm" :class="{ 'kt-popup-confirm--disabled': recipientId == 0 || submitting }" @tap="confirmTransfer"><text>{{ submitting ? '转赠中...' : '确认转赠' }}</text></view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getKeywordTransferPool, getKeywordTransferRecords, transferRetiredKeywords } from "@/.cool/api/keyword";
+	import { getStaffList } from "@/.cool/api/staff";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import { isLocalUiPreview } from "@/.cool/utils/local-preview";
+	import type { Response, StaffListItem } from "@/.cool";
+
+	type TransferTab = "pending" | "record";
+	type PoolRow = { id: number; keyword: string; project: string; sourceStaff: string; sourceStaffId: number; createdAt: string; recoveredAt: string };
+	type TransferRow = { id: string; keyword: string; project: string; fromStaff: string; toStaff: string; operator: string; time: string };
+	type RecipientRow = { id: number; userId: number; name: string; role: string; collabId: string; color: string };
+
+	const PREVIEW_POOL_KEY = "keyword_transfer_preview_pool_v60";
+	const PREVIEW_RECORD_KEY = "keyword_transfer_preview_record_v60";
+	const COLORS = ["#2b59c3", "#526f9f", "#5f6fb2", "#3d7a74"];
+	const activeTab = ref<TransferTab>("pending");
+	const poolRows = ref<PoolRow[]>([]);
+	const recordRows = ref<TransferRow[]>([]);
+	const recipients = ref<RecipientRow[]>([]);
+	const visibleRecipients = ref<RecipientRow[]>([]);
+	const selectedIds = ref<number[]>([]);
+	const recipientId = ref(0);
+	const poolKeyword = ref("");
+	const recordKeyword = ref("");
+	const staffKeyword = ref("");
+	const poolLoading = ref(false);
+	const recordLoading = ref(false);
+	const submitting = ref(false);
+	const recipientPopupVisible = ref(false);
+
+	const allSelected = computed(() => poolRows.value.length > 0 && selectedIds.value.length == poolRows.value.length);
+
+	function previewPool(): PoolRow[] {
+		return [
+			{ id: 96001, keyword: "盛夏心动计划", project: "夏日焕新品牌短剧", sourceStaff: "赵清荷", sourceStaffId: 93001, createdAt: "2026-08-12 10:26", recoveredAt: "2026-08-18 09:30" },
+			{ id: 96002, keyword: "回到十八岁", project: "夏日焕新品牌短剧", sourceStaff: "赵清荷", sourceStaffId: 93001, createdAt: "2026-08-13 14:18", recoveredAt: "2026-08-18 09:30" },
+			{ id: 96003, keyword: "职场向上生长", project: "职场成长品牌推文", sourceStaff: "许知远", sourceStaffId: 93002, createdAt: "2026-08-10 16:42", recoveredAt: "2026-08-17 18:05" },
+			{ id: 96004, keyword: "新人破局指南", project: "职场成长品牌推文", sourceStaff: "许知远", sourceStaffId: 93002, createdAt: "2026-08-11 09:15", recoveredAt: "2026-08-17 18:05" },
+			{ id: 96005, keyword: "清凉好物推荐", project: "清凉一夏品牌应用", sourceStaff: "苏念", sourceStaffId: 93003, createdAt: "2026-08-09 11:08", recoveredAt: "2026-08-16 15:20" }
+		];
+	}
+
+	function previewRecords(): TransferRow[] {
+		return [
+			{ id: "TR202608180021", keyword: "城市夜归人", project: "都市生活品牌短剧", fromStaff: "赵清荷", toStaff: "陈晓敏", operator: "企业主", time: "2026-08-18 10:12" },
+			{ id: "TR202608170018", keyword: "成长不设限", project: "职场成长品牌推文", fromStaff: "许知远", toStaff: "周明远", operator: "企业主", time: "2026-08-17 18:26" }
+		];
+	}
+
+	function previewRecipients(): RecipientRow[] {
+		return [
+			{ id: 91001, userId: 81001, name: "陈晓敏", role: "普通员工", collabId: "202608060101", color: COLORS[0] },
+			{ id: 91002, userId: 81002, name: "周明远", role: "小组长", collabId: "202608060102", color: COLORS[1] },
+			{ id: 91003, userId: 81003, name: "林小满", role: "组员", collabId: "202608060103", color: COLORS[2] }
+		];
+	}
+
+	function readPreviewRows<T>(key: string, defaults: T[]): T[] {
+		const stored = uni.getStorageSync(key);
+		if (stored != null && Array.isArray(stored)) return stored as T[];
+		uni.setStorageSync(key, defaults);
+		return defaults;
+	}
+
+	function textOf(item: UTSJSONObject, keys: string[]): string {
+		for (let i = 0; i < keys.length; i++) {
+			const val = item[keys[i]];
+			if (val != null && typeof val != "object" && `${val}`.trim() != "") return `${val}`.trim();
+		}
+		return "";
+	}
+
+	function listOf(res: any | null): UTSJSONObject[] {
+		if (res == null) return [];
+		const env = res as UTSJSONObject;
+		const data = env["data"] ?? env;
+		if (Array.isArray(data)) return data as UTSJSONObject[];
+		const obj = data as UTSJSONObject;
+		const list = obj["list"] ?? obj["records"] ?? [];
+		return Array.isArray(list) ? list as UTSJSONObject[] : [];
+	}
+
+	function mapPool(item: UTSJSONObject, index: number): PoolRow {
+		return {
+			id: parseInt(textOf(item, ["id", "keyword_id"])) || index + 1,
+			keyword: textOf(item, ["keyword", "keyword_text", "title"]) || "未命名关键词",
+			project: textOf(item, ["project_name", "project_title", "project"]) || "未关联项目",
+			sourceStaff: textOf(item, ["source_staff_name", "former_staff_name", "staff_name", "nickname"]) || "离职员工",
+			sourceStaffId: parseInt(textOf(item, ["source_staff_id", "former_staff_id", "staff_id"])) || 0,
+			createdAt: textOf(item, ["create_time", "created_at"]) || "—",
+			recoveredAt: textOf(item, ["recovered_at", "recycle_time", "updated_at"]) || "—"
+		};
+	}
+
+	function mapRecord(item: UTSJSONObject, index: number): TransferRow {
+		return {
+			id: textOf(item, ["record_no", "id"]) || `record-${index}`,
+			keyword: textOf(item, ["keyword", "keyword_text"]) || "关键词",
+			project: textOf(item, ["project_name", "project_title"]) || "未关联项目",
+			fromStaff: textOf(item, ["source_staff_name", "from_staff_name"]) || "离职员工",
+			toStaff: textOf(item, ["target_staff_name", "to_staff_name"]) || "接收员工",
+			operator: textOf(item, ["operator_name", "created_by_name"]) || "企业主",
+			time: textOf(item, ["transfer_time", "create_time", "created_at"]) || "—"
+		};
+	}
+
+	function filterPool(rows: PoolRow[]): PoolRow[] {
+		const kw = poolKeyword.value.trim().toLowerCase();
+		if (kw == "") return rows;
+		return rows.filter((item) => `${item.keyword} ${item.project} ${item.sourceStaff}`.toLowerCase().indexOf(kw) >= 0);
+	}
+
+	function filterRecords(rows: TransferRow[]): TransferRow[] {
+		const kw = recordKeyword.value.trim().toLowerCase();
+		if (kw == "") return rows;
+		return rows.filter((item) => `${item.keyword} ${item.project} ${item.fromStaff} ${item.toStaff}`.toLowerCase().indexOf(kw) >= 0);
+	}
+
+	function loadPool(showLoading: boolean = true) {
+		if (showLoading) poolLoading.value = true;
+		selectedIds.value = [];
+		if (isLocalUiPreview()) {
+			poolRows.value = filterPool(readPreviewRows<PoolRow>(PREVIEW_POOL_KEY, previewPool()));
+			poolLoading.value = false;
+			return;
+		}
+		getKeywordTransferPool({ page: 1, limit: 100, keyword: poolKeyword.value.trim() })
+			.then((res) => {
+				const env = res as Response | null;
+				if (env != null && env.code != null && !isApiSuccess(env.code)) { uni.showToast({ title: getApiMessage(env, "加载失败"), icon: "none" }); return; }
+				poolRows.value = listOf(res).map((item, index) => mapPool(item, index));
+			})
+			.catch((err) => uni.showToast({ title: getApiMessage(err as Response, "加载失败"), icon: "none" }))
+			.finally(() => poolLoading.value = false);
+	}
+
+	function loadRecords() {
+		recordLoading.value = true;
+		if (isLocalUiPreview()) {
+			recordRows.value = filterRecords(readPreviewRows<TransferRow>(PREVIEW_RECORD_KEY, previewRecords()));
+			recordLoading.value = false;
+			return;
+		}
+		getKeywordTransferRecords({ page: 1, limit: 100, keyword: recordKeyword.value.trim() })
+			.then((res) => {
+				const env = res as Response | null;
+				if (env != null && env.code != null && !isApiSuccess(env.code)) { uni.showToast({ title: getApiMessage(env, "加载失败"), icon: "none" }); return; }
+				recordRows.value = listOf(res).map((item, index) => mapRecord(item, index));
+			})
+			.catch((err) => uni.showToast({ title: getApiMessage(err as Response, "加载失败"), icon: "none" }))
+			.finally(() => recordLoading.value = false);
+	}
+
+	function mapRecipient(item: StaffListItem, index: number): RecipientRow {
+		const userId = parseInt(`${item.user_id ?? 0}`);
+		return { id: item.id ?? index + 1, userId: isNaN(userId) ? 0 : userId, name: `${item.nickname ?? "未命名员工"}`, role: `${item.staff_role_text ?? item.role_text ?? "普通员工"}`, collabId: `${item.sn ?? item.user_id ?? "—"}`, color: COLORS[index % COLORS.length] };
+	}
+
+	function loadRecipients() {
+		if (isLocalUiPreview()) {
+			recipients.value = previewRecipients();
+			filterRecipients();
+			return;
+		}
+		getStaffList({ page: 1, limit: 200, status: 1 }).then((res) => {
+			recipients.value = listOf(res).map((item, index) => mapRecipient(item as StaffListItem, index));
+			filterRecipients();
+		});
+	}
+
+	function filterRecipients() {
+		const kw = staffKeyword.value.trim().toLowerCase();
+		visibleRecipients.value = kw == "" ? recipients.value.slice() : recipients.value.filter((item) => `${item.name} ${item.collabId}`.toLowerCase().indexOf(kw) >= 0);
+	}
+
+	function switchTab(tab: TransferTab) {
+		activeTab.value = tab;
+		if (tab == "pending") loadPool(false); else loadRecords();
+	}
+
+	function isSelected(id: number): boolean { return selectedIds.value.indexOf(id) >= 0; }
+	function toggleSelect(id: number) { const ids = selectedIds.value.slice(); const i = ids.indexOf(id); if (i >= 0) ids.splice(i, 1); else ids.push(id); selectedIds.value = ids; }
+	function toggleSelectAll() { selectedIds.value = allSelected.value ? [] : poolRows.value.map((item) => item.id); }
+	function clearPoolSearch() { poolKeyword.value = ""; loadPool(false); }
+	function clearRecordSearch() { recordKeyword.value = ""; loadRecords(); }
+
+	function openRecipientPopup() {
+		if (selectedIds.value.length == 0) { uni.showToast({ title: "请先选择关键词", icon: "none" }); return; }
+		recipientId.value = 0;
+		staffKeyword.value = "";
+		loadRecipients();
+		recipientPopupVisible.value = true;
+	}
+
+	function selectedRecipient(): RecipientRow | null { return recipients.value.find((item) => item.id == recipientId.value) ?? null; }
+
+	function submitTransfer(target: RecipientRow) {
+		submitting.value = true;
+		const ids = selectedIds.value.slice();
+		if (isLocalUiPreview()) {
+			const allPool = readPreviewRows<PoolRow>(PREVIEW_POOL_KEY, previewPool());
+			const moved = allPool.filter((item) => ids.indexOf(item.id) >= 0);
+			const remain = allPool.filter((item) => ids.indexOf(item.id) < 0);
+			const oldRecords = readPreviewRows<TransferRow>(PREVIEW_RECORD_KEY, previewRecords());
+			const now = "2026-08-18 16:58";
+			const additions = moved.map((item, index) => ({ id: `TR20260818${980 + index}`, keyword: item.keyword, project: item.project, fromStaff: item.sourceStaff, toStaff: target.name, operator: "企业主", time: now } as TransferRow));
+			uni.setStorageSync(PREVIEW_POOL_KEY, remain);
+			uni.setStorageSync(PREVIEW_RECORD_KEY, additions.concat(oldRecords));
+			setTimeout(() => finishTransfer(target.name), 450);
+			return;
+		}
+		transferRetiredKeywords({ keyword_ids: ids, target_user_id: target.userId > 0 ? target.userId : target.id })
+			.then((res) => {
+				const env = res as Response | null;
+				if (env != null && env.code != null && !isApiSuccess(env.code)) { uni.showToast({ title: getApiMessage(env, "转赠失败"), icon: "none" }); submitting.value = false; return; }
+				finishTransfer(target.name);
+			})
+			.catch((err) => { submitting.value = false; uni.showToast({ title: getApiMessage(err as Response, "转赠失败"), icon: "none" }); });
+	}
+
+	function finishTransfer(targetName: string) {
+		submitting.value = false;
+		recipientPopupVisible.value = false;
+		selectedIds.value = [];
+		loadPool(false);
+		uni.showToast({ title: `已转赠给${targetName}`, icon: "success" });
+	}
+
+	function confirmTransfer() {
+		if (submitting.value) return;
+		const target = selectedRecipient();
+		if (target == null) { uni.showToast({ title: "请选择接收员工", icon: "none" }); return; }
+		uni.showModal({ title: "确认转赠", content: `将 ${selectedIds.value.length} 个关键词转赠给「${target.name}」？转赠后关键词当前归属将更新，并新增转赠记录。`, confirmText: "确认转赠", cancelText: "取消", success(res) { if (res.confirm) submitTransfer(target); } });
+	}
+
+	onLoad(() => {
+		const tab = `${router.query()["tab"] ?? "pending"}`;
+		activeTab.value = tab == "record" ? "record" : "pending";
+		loadPool();
+		loadRecords();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.kt-page { height: 100vh; overflow: hidden; background-color: #f3f6fb; display: flex; flex-direction: column; color: #24364f; }
+	.kt-header { height: 94rpx; padding: 0 24rpx; background-color: #fff; display: flex; flex-direction: row; align-items: center; flex-shrink: 0; border-bottom: 1rpx solid #edf1f6; }
+	.kt-back { width: 64rpx; height: 64rpx; margin-right: 10rpx; border-radius: 18rpx; background-color: #f3f6fa; display: flex; align-items: center; justify-content: center; }
+	.kt-header-copy { display: flex; flex-direction: column; }
+	.kt-title { font-size: 31rpx; line-height: 40rpx; font-weight: 750; color: #172033; }
+	.kt-subtitle { margin-top: 2rpx; font-size: 19rpx; color: #8a96a8; }
+	.kt-tabs { height: 78rpx; padding: 8rpx 24rpx; background-color: #fff; display: flex; flex-direction: row; gap: 8rpx; flex-shrink: 0; box-sizing: border-box; }
+	.kt-tab { flex: 1; border-radius: 14rpx; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 9rpx; }
+	.kt-tab--active { background-color: #edf3ff; }
+	.kt-tab-text { font-size: 25rpx; color: #718096; font-weight: 600; }
+	.kt-tab--active .kt-tab-text { color: #2453aa; font-weight: 700; }
+	.kt-tab-count { min-width: 34rpx; height: 28rpx; padding: 0 8rpx; border-radius: 14rpx; background-color: #dce8ff; font-size: 18rpx; line-height: 28rpx; text-align: center; color: #2453aa; box-sizing: border-box; }
+	.kt-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+	.kt-rule-card { margin: 16rpx 24rpx 0; padding: 20rpx; border: 1rpx solid #d7e2f4; border-radius: 20rpx; background-color: #f8fbff; display: flex; flex-direction: row; align-items: center; flex-shrink: 0; }
+	.kt-rule-icon { width: 62rpx; height: 62rpx; margin-right: 15rpx; border-radius: 18rpx; background-color: #e8f1ff; display: flex; align-items: center; justify-content: center; }
+	.kt-rule-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+	.kt-rule-title { font-size: 25rpx; line-height: 35rpx; font-weight: 700; }
+	.kt-rule-desc { margin-top: 3rpx; font-size: 19rpx; line-height: 29rpx; color: #738096; }
+	.kt-rule-total { margin-left: 14rpx; display: flex; flex-direction: column; align-items: center; }
+	.kt-rule-total-num { font-size: 34rpx; font-weight: 750; color: #2453aa; }
+	.kt-rule-total-label { font-size: 18rpx; color: #8b96a8; }
+	.kt-search { height: 68rpx; margin: 14rpx 24rpx 0; padding: 0 18rpx; border: 1rpx solid #e1e7f0; border-radius: 16rpx; background-color: #fff; display: flex; flex-direction: row; align-items: center; flex-shrink: 0; box-sizing: border-box; }
+	.kt-search--record { margin-bottom: 0; }
+	.kt-search-input { flex: 1; height: 66rpx; margin-left: 12rpx; font-size: 23rpx; color: #24364f; }
+	.kt-placeholder { color: #a3adbc; }
+	.kt-search-clear { padding-left: 16rpx; font-size: 21rpx; color: #2b59c3; }
+	.kt-scroll { flex: 1; height: 0; }
+	.kt-scroll-inner { padding: 16rpx 24rpx calc(30rpx + env(safe-area-inset-bottom)); }
+	.kt-scroll-inner--footer { padding-bottom: calc(130rpx + env(safe-area-inset-bottom)); }
+	.kt-keyword-card { margin-bottom: 14rpx; padding: 20rpx; border: 1rpx solid #e2e8f1; border-radius: 20rpx; background-color: #fff; display: flex; flex-direction: row; text-align: left; box-shadow: 0 6rpx 18rpx rgba(31,55,96,.04); }
+	.kt-keyword-card--selected { border-color: #8faee7; background-color: #f9fbff; }
+	.kt-check { width: 36rpx; height: 36rpx; margin: 4rpx 16rpx 0 0; border: 2rpx solid #c5cfdd; border-radius: 10rpx; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box; }
+	.kt-check--small { margin: 0 10rpx 0 0; width: 32rpx; height: 32rpx; border-radius: 9rpx; }
+	.kt-check--selected { border-color: #2b59c3; background-color: #2b59c3; }
+	.kt-keyword-main { flex: 1; min-width: 0; }
+	.kt-keyword-title-row { display: flex; flex-direction: row; align-items: center; }
+	.kt-keyword-title { flex: 1; min-width: 0; font-size: 27rpx; line-height: 38rpx; font-weight: 700; color: #1d2a3d; }
+	.kt-pool-tag { margin-left: 12rpx; padding: 4rpx 10rpx; border-radius: 8rpx; background-color: #fff1dc; font-size: 18rpx; color: #a56100; }
+	.kt-project { margin-top: 4rpx; font-size: 21rpx; color: #6f7c90; }
+	.kt-source-row { margin-top: 14rpx; display: flex; flex-direction: row; align-items: center; }
+	.kt-source-label { font-size: 20rpx; color: #94a0b0; }
+	.kt-source-name { margin-left: 12rpx; font-size: 22rpx; font-weight: 650; color: #34445a; }
+	.kt-left-tag { margin-left: 10rpx; padding: 3rpx 9rpx; border-radius: 8rpx; background-color: #f2f4f7; font-size: 17rpx; color: #7b8798; }
+	.kt-time-row { margin-top: 12rpx; padding-top: 12rpx; border-top: 1rpx solid #edf1f5; display: flex; flex-direction: row; justify-content: space-between; }
+	.kt-time { font-size: 18rpx; color: #99a4b3; }
+	.kt-footer { position: absolute; left: 0; right: 0; bottom: 0; min-height: 106rpx; padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid #dfe5ee; background-color: rgba(255,255,255,.97); display: flex; flex-direction: row; align-items: center; box-sizing: border-box; box-shadow: 0 -6rpx 20rpx rgba(31,55,96,.06); }
+	.kt-select-all { height: 72rpx; display: flex; flex-direction: row; align-items: center; }
+	.kt-select-all-text, .kt-selected-count { font-size: 21rpx; color: #657187; }
+	.kt-selected-count { flex: 1; margin-left: 20rpx; line-height: 72rpx; }
+	.kt-transfer-btn { min-width: 220rpx; height: 72rpx; padding: 0 24rpx; border-radius: 18rpx; background-color: #2453aa; display: flex; align-items: center; justify-content: center; }
+	.kt-transfer-btn--disabled { opacity: .42; }
+	.kt-transfer-btn-text { font-size: 25rpx; font-weight: 700; color: #fff; }
+	.kt-record-head { margin-bottom: 14rpx; padding: 18rpx 20rpx; border: 1rpx solid #e1e7f0; border-radius: 18rpx; background-color: #fff; display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+	.kt-record-head-title { display: block; font-size: 25rpx; font-weight: 700; color: #26364b; }
+	.kt-record-head-desc { display: block; margin-top: 3rpx; font-size: 19rpx; color: #919baa; }
+	.kt-record-head-count { font-size: 23rpx; font-weight: 700; color: #2b59c3; }
+	.kt-record-card { margin-bottom: 14rpx; padding: 20rpx; border: 1rpx solid #e2e8f1; border-radius: 20rpx; background-color: #fff; text-align: left; }
+	.kt-record-top { display: flex; flex-direction: row; align-items: flex-start; }
+	.kt-record-keyword-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+	.kt-record-keyword { font-size: 27rpx; line-height: 38rpx; font-weight: 700; color: #1d2a3d; }
+	.kt-record-project { margin-top: 3rpx; font-size: 20rpx; color: #8490a2; }
+	.kt-record-status { padding: 5rpx 11rpx; border-radius: 9rpx; background-color: #eaf8f0; font-size: 18rpx; color: #22865a; }
+	.kt-flow { margin-top: 18rpx; padding: 18rpx; border-radius: 16rpx; background-color: #f6f8fb; display: flex; flex-direction: row; align-items: center; }
+	.kt-person { flex: 1; display: flex; flex-direction: column; }
+	.kt-person--target { text-align: right; }
+	.kt-person-label { font-size: 18rpx; color: #96a1b0; }
+	.kt-person-name { margin-top: 4rpx; font-size: 23rpx; font-weight: 700; color: #34445a; }
+	.kt-flow-arrow { width: 64rpx; height: 44rpx; margin: 0 14rpx; border-radius: 22rpx; background-color: #e6efff; display: flex; align-items: center; justify-content: center; }
+	.kt-record-foot { margin-top: 12rpx; display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+	.kt-record-foot text { font-size: 16rpx; line-height: 24rpx; color: #a3adbc; font-weight: 400; }
+	.kt-state { min-height: 300rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+	.kt-state-icon { width: 84rpx; height: 84rpx; border-radius: 24rpx; background-color: #eaf1fb; display: flex; align-items: center; justify-content: center; }
+	.kt-state-title { margin-top: 18rpx; font-size: 26rpx; font-weight: 700; }
+	.kt-state-desc { margin-top: 7rpx; font-size: 20rpx; color: #8d98a8; }
+	.kt-popup { max-height: 78vh; border-radius: 32rpx 32rpx 0 0; background-color: #fff; display: flex; flex-direction: column; overflow: hidden; }
+	.kt-popup-head { padding: 26rpx 28rpx 20rpx; display: flex; flex-direction: row; align-items: center; }
+	.kt-popup-head > view:first-child { flex: 1; display: flex; flex-direction: column; }
+	.kt-popup-title { font-size: 30rpx; font-weight: 750; color: #172033; }
+	.kt-popup-sub { margin-top: 4rpx; font-size: 20rpx; color: #8792a4; }
+	.kt-popup-close { width: 58rpx; height: 58rpx; border-radius: 18rpx; background-color: #f2f4f7; display: flex; align-items: center; justify-content: center; }
+	.kt-recipient-search { height: 68rpx; margin: 0 28rpx 14rpx; padding: 0 18rpx; border: 1rpx solid #e0e6ee; border-radius: 16rpx; background-color: #f7f9fc; display: flex; flex-direction: row; align-items: center; }
+	.kt-recipient-input { flex: 1; height: 66rpx; margin-left: 12rpx; font-size: 23rpx; }
+	.kt-recipient-list { max-height: 600rpx; padding: 0 28rpx; box-sizing: border-box; }
+	.kt-recipient { min-height: 100rpx; padding: 12rpx 10rpx; border-bottom: 1rpx solid #edf1f5; display: flex; flex-direction: row; align-items: center; box-sizing: border-box; }
+	.kt-recipient--selected { background-color: #f6f9ff; }
+	.kt-recipient-avatar { width: 58rpx; height: 58rpx; margin-right: 15rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+	.kt-recipient-avatar text { font-size: 23rpx; font-weight: 700; color: #fff; }
+	.kt-recipient-copy { flex: 1; display: flex; flex-direction: column; }
+	.kt-recipient-name { font-size: 25rpx; font-weight: 700; color: #28384e; }
+	.kt-recipient-meta { margin-top: 4rpx; font-size: 19rpx; color: #8a96a8; }
+	.kt-radio { width: 34rpx; height: 34rpx; border: 2rpx solid #c8d1dd; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+	.kt-radio--selected { border-color: #2b59c3; }
+	.kt-radio-dot { width: 18rpx; height: 18rpx; border-radius: 50%; background-color: #2b59c3; }
+	.kt-popup-footer { padding: 18rpx 28rpx 0; border-top: 1rpx solid #edf1f5; }
+	.kt-popup-confirm { height: 82rpx; border-radius: 19rpx; background-color: #2453aa; display: flex; align-items: center; justify-content: center; }
+	.kt-popup-confirm--disabled { opacity: .42; }
+	.kt-popup-confirm text { font-size: 27rpx; font-weight: 700; color: #fff; }
+</style>

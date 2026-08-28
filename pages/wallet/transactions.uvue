@@ -1,0 +1,217 @@
+<!-- 项目收益明细（静态样式页，估算对稿 375，待设计确认） -->
+<template>
+	<cl-page :pt="{ className: 'wt-page' }">
+		<view class="wt-page">
+			<scroll-view class="wt-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="wt-inner">
+					<view class="wt-head">
+						<view class="wt-income-row">
+							<text class="wt-income-label">该段收入·</text>
+							<text class="wt-income-value">{{ periodIncome }}元</text>
+						</view>
+						<view class="wt-time-filter" @tap="onTimeFilterTap">
+							<text class="wt-time-filter-text">{{ timeFilterLabel }}</text>
+							<cl-icon name="arrow-down-s-line" :size="14" color="#999999"></cl-icon>
+						</view>
+					</view>
+
+					<view class="wt-list">
+						<view class="wt-card" v-for="item in list" :key="item.id">
+							<view class="wt-card-main">
+								<view class="wt-card-left">
+									<text class="wt-card-title">{{ item.title }}</text>
+									<text class="wt-card-desc">{{ item.desc }}</text>
+									<text v-if="item.extra != ''" class="wt-card-extra">{{ item.extra }}</text>
+									<text class="wt-card-time">{{ item.time }}</text>
+								</view>
+								<view class="wt-card-right">
+									<text class="wt-card-amount">{{ item.amount }}</text>
+									<text class="wt-card-status">{{ item.status }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	type TxItem = {
+		id: string;
+		title: string;
+		desc: string;
+		extra: string;
+		time: string;
+		amount: string;
+		status: string;
+	};
+
+	const periodIncome = "8888.88";
+	const timeFilterLabel = "全部时间";
+
+	const list: TxItem[] = [
+		{
+			id: "1",
+			title: "标题名称",
+			desc: "测试测试测试测试",
+			extra: "",
+			time: "2023.12.24 13:00:23",
+			amount: "+8.50",
+			status: "已结算"
+		},
+		{
+			id: "2",
+			title: "啥啥项目",
+			desc: "收益追回",
+			extra: "视频ID·29129103104010410",
+			time: "2023.12.24 13:00:23",
+			amount: "+29999.50",
+			status: "已结算"
+		}
+	];
+
+	function onTimeFilterTap() {
+		uni.showToast({ title: "时间筛选待对接", icon: "none" });
+	}
+</script>
+
+<style lang="scss" scoped>
+	.wt-page {
+		height: 100%;
+		background-color: #f5f7fa;
+
+		.wt-scroll {
+			height: 100%;
+		}
+
+		.wt-inner {
+			padding: 24rpx 30rpx 40rpx;
+			box-sizing: border-box;
+		}
+
+		.wt-head {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 20rpx;
+			padding: 0 4rpx;
+		}
+
+		.wt-income-row {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: row;
+			align-items: baseline;
+		}
+
+		.wt-income-label {
+			font-size: 26rpx;
+			color: #666666;
+			line-height: 36rpx;
+		}
+
+		.wt-income-value {
+			font-size: 26rpx;
+			font-weight: 600;
+			color: #ff6b4e;
+			line-height: 36rpx;
+		}
+
+		.wt-time-filter {
+			flex-shrink: 0;
+			margin-left: 16rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.wt-time-filter-text {
+			margin-right: 2rpx;
+			font-size: 26rpx;
+			color: #999999;
+			line-height: 36rpx;
+		}
+
+		.wt-list {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wt-card {
+			margin-bottom: 16rpx;
+			padding: 28rpx 24rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+		}
+
+		.wt-card-main {
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			justify-content: space-between;
+		}
+
+		.wt-card-left {
+			flex: 1;
+			min-width: 0;
+			padding-right: 20rpx;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wt-card-title {
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #1a1a1a;
+			line-height: 42rpx;
+		}
+
+		.wt-card-desc {
+			margin-top: 8rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.wt-card-extra {
+			margin-top: 4rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.wt-card-time {
+			margin-top: 12rpx;
+			font-size: 24rpx;
+			color: #bbbbbb;
+			line-height: 34rpx;
+		}
+
+		.wt-card-right {
+			flex-shrink: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+		}
+
+		.wt-card-amount {
+			font-size: 30rpx;
+			font-weight: 700;
+			color: #ff6b4e;
+			line-height: 42rpx;
+		}
+
+		.wt-card-status {
+			margin-top: 8rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+	}
+</style>

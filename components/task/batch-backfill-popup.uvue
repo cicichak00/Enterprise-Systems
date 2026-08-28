@@ -1,0 +1,1879 @@
+<!-- 批量添加回填弹窗 · 交互对齐 web-mini pages/pagesh5/backfill -->
+<template>
+	<cl-popup
+		v-model="innerVisible"
+		direction="bottom"
+		:radius="36"
+		:show-header="false"
+		:show-close="false"
+		:mask-closable="true"
+		:padding="0"
+		:pt="{
+			className: 'bbp-popup',
+			inner: { className: 'bbp-popup-inner' },
+			container: { className: 'bbp-popup-container' }
+		}"
+	>
+		<view class="bbp" :style="batchPopStyle">
+			<view class="bbp-head">
+				<view class="bbp-head-left">
+					<text class="bbp-head-title">批量添加回填</text>
+					<text class="bbp-head-limit">上限{{ BATCH_LIMIT }}条</text>
+				</view>
+				<view class="bbp-head-close" @tap="closePopup">
+					<cl-icon name="close-line" :size="18" color="#141b36"></cl-icon>
+				</view>
+			</view>
+
+			<scroll-view class="bbp-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="bbp-body">
+					<view class="bbp-input-card">
+						<scroll-view class="bbp-editor-scroll" scroll-y="true" :show-scrollbar="false">
+							<view class="bbp-editor">
+								<view
+									class="bbp-row"
+									v-for="(item, index) in lineItems"
+									:key="item.key"
+								>
+									<text class="bbp-row-no">{{ index + 1 }}.</text>
+									<textarea
+										class="bbp-row-input"
+										:value="item.text"
+										:focus="focusKey == item.key"
+										:cursor="cursorFor(item)"
+										:auto-height="item.text.length > 0"
+										:style="rowInputStyle(item)"
+										:maxlength="2000"
+										:placeholder="placeholderAt(index)"
+										placeholder-class="bbp-row-ph"
+										:show-confirm-bar="false"
+										:adjust-position="true"
+										@input="onLineInput(index, $event)"
+										@focus="onLineFocus(item.key)"
+										@blur="onLineBlur(item.key)"
+									></textarea>
+								</view>
+							</view>
+						</scroll-view>
+						<view class="bbp-actions">
+							<view class="bbp-scan" @tap.stop="onScan">
+								<cl-icon name="qr-scan-2-line" :size="16" color="#141b36"></cl-icon>
+								<text class="bbp-scan-text">扫一扫</text>
+							</view>
+							<view class="bbp-action-right">
+								<view class="bbp-btn bbp-btn--ghost" @tap.stop="onPaste">
+									<text class="bbp-btn-text bbp-btn-text--ghost">粘贴</text>
+								</view>
+								<view class="bbp-btn bbp-btn--ghost" @tap.stop="onClear">
+									<text class="bbp-btn-text bbp-btn-text--ghost">清空</text>
+								</view>
+								<view
+									class="bbp-btn bbp-btn--primary"
+									:class="{ 'bbp-btn--disabled': recognizing }"
+									@tap.stop="onRecognize"
+								>
+									<text class="bbp-btn-text">{{ recognizing ? "识别中..." : "智能识别" }}</text>
+								</view>
+							</view>
+						</view>
+					</view>
+
+					<view v-if="resultList.length > 0" class="bbp-result">
+						<view class="bbp-result-head">
+							<view class="bbp-result-title-row">
+								<cl-icon name="error-warning-fill" :size="16" color="#0651f8"></cl-icon>
+								<text class="bbp-result-title">识别结果</text>
+							</view>
+							<text
+								v-if="failedCount > 0"
+								class="bbp-result-copy"
+								@tap="onCopyFailed"
+							>批量复制失败链接</text>
+						</view>
+						<view class="bbp-result-list">
+							<view
+								class="bbp-result-item"
+								v-for="(item, index) in resultList"
+								:key="'res-' + item.ok + '-' + item.lineNo + '-' + index"
+							>
+								<text class="bbp-result-url">{{ item.lineNo }}.{{ item.video_url }}</text>
+								<text
+									class="bbp-result-msg"
+									:class="item.ok ? 'bbp-result-msg--ok' : 'bbp-result-msg--err'"
+								>{{ item.msg }}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+			</scroll-view>
+
+			<view class="bbp-footer">
+				<view
+					class="bbp-submit"
+					:class="{
+						'bbp-submit--on': successCount > 0 && !submitting,
+						'bbp-submit--muted': successCount <= 0 || submitting
+					}"
+					@tap.stop="onSubmit"
+				>
+					<text class="bbp-submit-text">{{
+						submitting
+							? "提交中..."
+							: `提交识别成功回填(${successCount})`
+					}}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-popup>
+
+	<!-- #ifdef H5 -->
+	<view v-if="showScanner" class="bbp-scanner-mask">
+		<view class="bbp-scanner-panel">
+			<view class="bbp-scanner-header">
+				<text class="bbp-scanner-title">对准二维码扫描</text>
+				<view class="bbp-scanner-close" @tap.stop="closeScanner">
+					<text class="bbp-scanner-close-text">×</text>
+				</view>
+			</view>
+			<view class="bbp-scanner-body">
+				<view ref="videoContainer" class="bbp-scanner-video-wrap"></view>
+				<view class="bbp-scanner-frame">
+					<view class="bbp-scanner-corner bbp-scanner-corner--tl"></view>
+					<view class="bbp-scanner-corner bbp-scanner-corner--tr"></view>
+					<view class="bbp-scanner-corner bbp-scanner-corner--bl"></view>
+					<view class="bbp-scanner-corner bbp-scanner-corner--br"></view>
+				</view>
+			</view>
+			<text class="bbp-scanner-hint">请将二维码置于框内，保持手机稳定、光线充足</text>
+		</view>
+	</view>
+	<!-- #endif -->
+</template>
+
+<script lang="ts" setup>
+	import { computed, nextTick, ref, watch } from "vue";
+	import { parseVideoUrl } from "@/.cool/api/keyword";
+	import { submitPublish } from "@/.cool/api/task";
+	import { getApiMessage, getSafeAreaHeight, isApiSuccess } from "@/.cool";
+	import type {
+		KeywordSubmitFormItem,
+		ParseVideoUrlItem,
+		ParseVideoUrlResult,
+		Response
+	} from "@/.cool";
+	// #ifdef H5
+	import {
+		createQrReader,
+		isH5CameraSupported,
+		mountNativeVideo,
+		startVideoScan,
+		stopVideoScan
+	} from "@/.cool/utils/qr-decode-h5.js";
+	// #endif
+
+	type LineItem = {
+		key: string;
+		text: string;
+	};
+
+	type ResultRow = {
+		lineNo: number;
+		video_url: string;
+		ok: boolean;
+		msg: string;
+		raw: ParseVideoUrlItem;
+	};
+
+	const props = defineProps({
+		modelValue: { type: Boolean, default: false },
+		projectId: { type: Number, default: 0 },
+		keywordId: { type: Number, default: 0 },
+		/** 批量上限，来自 getFieldList.batch_backfill_limit */
+		limit: { type: Number, default: 30 }
+	});
+
+	const emit = defineEmits(["update:modelValue", "confirm", "success"]);
+
+	const BATCH_LIMIT = computed((): number => {
+		const n = props.limit;
+		return n > 0 ? n : 30;
+	});
+
+	const innerVisible = computed({
+		get: (): boolean => props.modelValue,
+		set: (v: boolean) => {
+			emit("update:modelValue", v);
+		}
+	});
+
+	let lineSeq = 1;
+	function createLine(text: string = ""): LineItem {
+		const key = `bl-${lineSeq}`;
+		lineSeq += 1;
+		return { key, text };
+	}
+
+	const lineItems = ref<LineItem[]>([createLine("")]);
+	const linkInput = ref("");
+	const focusKey = ref("");
+	let focusLock = false;
+	let focusTimer: number | null = null;
+
+	const recognizing = ref(false);
+	const submitting = ref(false);
+	const resultList = ref<ResultRow[]>([]);
+	const successItems = ref<ParseVideoUrlItem[]>([]);
+
+	const successCount = computed(() => successItems.value.length);
+	const failedCount = computed(() => {
+		let n = 0;
+		for (let i = 0; i < resultList.value.length; i++) {
+			if (!resultList.value[i].ok) {
+				n += 1;
+			}
+		}
+		return n;
+	});
+
+	const popTopGapPx = ref(24);
+	const batchPopStyle = computed((): UTSJSONObject => {
+		const gap = popTopGapPx.value;
+		return {
+			height: `calc(100vh - ${gap}px)`,
+			maxHeight: `calc(100vh - ${gap}px)`
+		} as UTSJSONObject;
+	});
+
+	function refreshPopTopGap() {
+		// #ifdef MP-WEIXIN
+		try {
+			const menu = uni.getMenuButtonBoundingClientRect();
+			if (menu != null && menu.bottom > 0) {
+				popTopGapPx.value = Math.ceil(menu.bottom) + 8;
+				return;
+			}
+		} catch (_e) {}
+		// #endif
+		const top = getSafeAreaHeight("top");
+		popTopGapPx.value = top > 0 ? Math.ceil(top) + 12 : 24;
+	}
+
+	// #ifdef H5
+	const videoContainer = ref<any>(null);
+	const showScanner = ref(false);
+	const scanning = ref(false);
+	let qrReader: any | null = null;
+	let videoEl: any | null = null;
+	// #endif
+
+	watch(
+		() => props.modelValue,
+		(v: boolean) => {
+			if (v) {
+				refreshPopTopGap();
+				resetState();
+				const first = lineItems.value[0];
+				if (first != null) {
+					focusLine(first.key);
+				}
+			} else {
+				// #ifdef H5
+				closeScanner();
+				// #endif
+			}
+		}
+	);
+
+	function syncInputFromLines() {
+		linkInput.value = lineItems.value.map((item) => item.text).join("\n");
+	}
+
+	function tipLimitReached() {
+		uni.showToast({ title: `批量回填最多识别${BATCH_LIMIT.value}条`, icon: "none" });
+	}
+
+	function clampLinesByLimit(items: LineItem[], notify: boolean): LineItem[] {
+		const kept: LineItem[] = [];
+		let truncated = false;
+		let hasTrailingEmpty = false;
+		for (let i = 0; i < items.length; i++) {
+			const it = items[i];
+			const empty = it.text.trim().length == 0;
+			if (empty) {
+				if (i == items.length - 1) {
+					hasTrailingEmpty = true;
+				}
+				continue;
+			}
+			if (kept.length >= BATCH_LIMIT.value) {
+				truncated = true;
+				break;
+			}
+			kept.push(it);
+		}
+		if (truncated && notify) {
+			tipLimitReached();
+		}
+		if (kept.length == 0) {
+			kept.push(createLine(""));
+			return kept;
+		}
+		if (kept.length < BATCH_LIMIT.value && hasTrailingEmpty) {
+			kept.push(createLine(""));
+		}
+		return kept;
+	}
+
+	function setLinesFromText(text: string, notifyLimit = false) {
+		const normalized = `${text ?? ""}`.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+		let parts: string[] = [];
+		if (normalized.length == 0) {
+			parts = [""];
+		} else {
+			parts = extractHttpUrls(normalized);
+			if (parts.length == 0) {
+				parts = [""];
+			}
+		}
+		const items: LineItem[] = [];
+		for (let i = 0; i < parts.length; i++) {
+			items.push(createLine(parts[i] ?? ""));
+		}
+		if (items.length == 0) {
+			items.push(createLine(""));
+		}
+		lineItems.value = clampLinesByLimit(items, notifyLimit);
+		syncInputFromLines();
+	}
+
+	function cursorFor(item: LineItem): number {
+		return item.text.length;
+	}
+
+	function rowInputStyle(item: LineItem): UTSJSONObject {
+		if (item.text.length == 0) {
+			return {
+				height: "42rpx",
+				minHeight: "42rpx"
+			} as UTSJSONObject;
+		}
+		return {
+			minHeight: "42rpx"
+		} as UTSJSONObject;
+	}
+
+	function focusLine(key: string) {
+		focusLock = true;
+		if (focusTimer != null) {
+			clearTimeout(focusTimer);
+			focusTimer = null;
+		}
+		focusKey.value = "";
+		nextTick(() => {
+			focusKey.value = key;
+			focusTimer = setTimeout(() => {
+				focusKey.value = "";
+				nextTick(() => {
+					focusKey.value = key;
+					focusTimer = setTimeout(() => {
+						focusLock = false;
+						focusTimer = null;
+					}, 200) as unknown as number;
+				});
+			}, 50) as unknown as number;
+		});
+	}
+
+	function placeholderAt(index: number): string {
+		if (
+			index == 0 &&
+			lineItems.value.length == 1 &&
+			lineItems.value[0].text.length == 0
+		) {
+			return `请粘贴或输入作品链接（换行批量，上限${BATCH_LIMIT.value}条）`;
+		}
+		return "";
+	}
+
+	function onLineFocus(key: string) {
+		focusKey.value = key;
+	}
+
+	function onLineBlur(key: string) {
+		if (focusLock) {
+			return;
+		}
+		if (focusKey.value == key) {
+			focusKey.value = "";
+		}
+	}
+
+	function removeLineAt(index: number, focusToward: "prev" | "next" = "prev") {
+		const list = lineItems.value.slice();
+		if (index < 0 || index >= list.length) {
+			return;
+		}
+		if (list.length <= 1) {
+			list[0] = createLine("");
+			lineItems.value = list;
+			syncInputFromLines();
+			focusLine(list[0].key);
+			return;
+		}
+		list.splice(index, 1);
+		lineItems.value = list;
+		syncInputFromLines();
+		let focusIdx = focusToward == "next" ? index : index - 1;
+		if (focusIdx < 0) {
+			focusIdx = 0;
+		}
+		if (focusIdx >= list.length) {
+			focusIdx = list.length - 1;
+		}
+		const focusItem = list[focusIdx];
+		if (focusItem != null) {
+			focusLine(focusItem.key);
+		}
+	}
+
+	function expandLineParts(line: string): string[] {
+		const text = `${line ?? ""}`;
+		if (text.length == 0) {
+			return [""];
+		}
+		const httpUrls = extractHttpUrls(text);
+		if (httpUrls.length > 1) {
+			return httpUrls;
+		}
+		// 单行含 http 时仍保留用户原文（避免回车后空行被截掉）
+		return [text];
+	}
+
+	function onLineInput(index: number, e: any) {
+		const raw = `${e.detail?.value ?? ""}`;
+		const list = lineItems.value.slice();
+		if (index < 0 || index >= list.length) {
+			return;
+		}
+		resultList.value = [];
+		successItems.value = [];
+
+		const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+		const newlineParts = normalized.split("\n");
+		let parts: string[] = [];
+
+		if (newlineParts.length > 1) {
+			// 换行：保留末尾空行，立刻出现新序号
+			for (let i = 0; i < newlineParts.length; i++) {
+				const expanded = expandLineParts(newlineParts[i] ?? "");
+				for (let j = 0; j < expanded.length; j++) {
+					parts.push(expanded[j]);
+				}
+			}
+		} else {
+			// 单行：粘连/空格分隔的多个 http 才拆段
+			const text = newlineParts[0] ?? "";
+			if (text.length == 0) {
+				parts = [""];
+			} else {
+				const httpUrls = extractHttpUrls(text);
+				parts = httpUrls.length > 1 ? httpUrls : [text];
+			}
+		}
+
+		if (parts.length <= 1) {
+			const text = parts[0] ?? "";
+			if (text.length == 0 && list.length > 1) {
+				removeLineAt(index, "prev");
+				return;
+			}
+			const cur = list[index];
+			list[index] = { key: cur.key, text };
+			lineItems.value = list;
+			syncInputFromLines();
+			return;
+		}
+
+		const nextItems: LineItem[] = [];
+		for (let i = 0; i < index; i++) {
+			nextItems.push(list[i]);
+		}
+		for (let p = 0; p < parts.length; p++) {
+			nextItems.push(createLine(parts[p] ?? ""));
+		}
+		for (let i = index + 1; i < list.length; i++) {
+			nextItems.push(list[i]);
+		}
+		const compact: LineItem[] = [];
+		for (let i = 0; i < nextItems.length; i++) {
+			const it = nextItems[i];
+			const isLast = i == nextItems.length - 1;
+			if (it.text.length == 0 && !isLast) {
+				continue;
+			}
+			compact.push(it);
+		}
+		if (compact.length == 0) {
+			compact.push(createLine(""));
+		}
+		const limited = clampLinesByLimit(compact, true);
+		lineItems.value = limited;
+		syncInputFromLines();
+		const focusItem = limited[limited.length - 1];
+		if (focusItem != null) {
+			focusLine(focusItem.key);
+		}
+	}
+
+	function resetState() {
+		setLinesFromText("");
+		focusKey.value = "";
+		resultList.value = [];
+		successItems.value = [];
+		recognizing.value = false;
+		submitting.value = false;
+	}
+
+	function closePopup() {
+		innerVisible.value = false;
+	}
+
+	/** 从 from 起查找下一个 http:// 或 https:// 起始下标 */
+	function findNextHttpIndex(text: string, from: number): number {
+		const rest = text.substring(from).toLowerCase();
+		const httpsIdx = rest.indexOf("https://");
+		const httpIdx = rest.indexOf("http://");
+		if (httpsIdx < 0 && httpIdx < 0) {
+			return -1;
+		}
+		if (httpsIdx < 0) {
+			return from + httpIdx;
+		}
+		if (httpIdx < 0) {
+			return from + httpsIdx;
+		}
+		return from + (httpsIdx <= httpIdx ? httpsIdx : httpIdx);
+	}
+
+	function trimUrlEdge(url: string): string {
+		return `${url ?? ""}`.replace(/^[\s，,。；;、]+/, "").replace(/[\s，,。；;、]+$/, "");
+	}
+
+	/**
+	 * 单行内拆分：仅当同一行出现多个 http(s) / 粘连链接时拆段；
+	 * 无 http 的纯文本行（如数字）保持为独立一条。
+	 */
+	function splitSingleLine(line: string): string[] {
+		const raw = `${line ?? ""}`;
+		const trimmed = raw.trim();
+		if (trimmed.length == 0) {
+			return [];
+		}
+		const starts: number[] = [];
+		let pos = 0;
+		while (pos < raw.length) {
+			const idx = findNextHttpIndex(raw, pos);
+			if (idx < 0) {
+				break;
+			}
+			starts.push(idx);
+			pos = idx + 4;
+		}
+		if (starts.length <= 1) {
+			// 0 个 http：整行一条；1 个 http：也整行一条（保留行内原文）
+			return [trimmed];
+		}
+		const urls: string[] = [];
+		for (let i = 0; i < starts.length; i++) {
+			const start = starts[i];
+			const end = i + 1 < starts.length ? starts[i + 1] : raw.length;
+			const url = trimUrlEdge(raw.substring(start, end));
+			if (url.length > 0) {
+				urls.push(url);
+			}
+		}
+		return urls;
+	}
+
+	/**
+	 * 先按换行拆成多行，再在单行内处理粘连 http。
+	 * 避免「数字行」被并进上一条 http 链接。
+	 */
+	function extractHttpUrls(text: string): string[] {
+		const raw = `${text ?? ""}`.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+		const lines = raw.split("\n");
+		const urls: string[] = [];
+		for (let i = 0; i < lines.length; i++) {
+			const parts = splitSingleLine(lines[i] ?? "");
+			for (let j = 0; j < parts.length; j++) {
+				urls.push(parts[j]);
+			}
+		}
+		return urls;
+	}
+
+	function splitUrls(text: string): string[] {
+		return extractHttpUrls(text);
+	}
+
+	/** 识别时以界面行列表为准，带上行号，与页面序号一一对应 */
+	function collectRecognizeEntries(): { lineNo: number; text: string }[] {
+		const entries: { lineNo: number; text: string }[] = [];
+		for (let i = 0; i < lineItems.value.length; i++) {
+			const parts = splitSingleLine(lineItems.value[i].text ?? "");
+			for (let j = 0; j < parts.length; j++) {
+				entries.push({
+					lineNo: i + 1,
+					text: parts[j]
+				});
+			}
+		}
+		return entries;
+	}
+
+	function collectRecognizeUrls(): string[] {
+		const entries = collectRecognizeEntries();
+		const urls: string[] = [];
+		for (let i = 0; i < entries.length; i++) {
+			urls.push(entries[i].text);
+		}
+		return urls;
+	}
+
+	function appendText(text: string): boolean {
+		const parts = extractHttpUrls(text);
+		if (parts.length == 0) {
+			return false;
+		}
+		const val = parts.join("\n");
+		const cur = linkInput.value.trim();
+		const beforeCount = splitUrls(cur).length;
+		const merged = cur.length > 0 ? `${cur}\n${val}` : val;
+		setLinesFromText(merged, true);
+		const afterCount = splitUrls(linkInput.value).length;
+		if (beforeCount >= BATCH_LIMIT.value && afterCount >= BATCH_LIMIT.value) {
+			tipLimitReached();
+		}
+		resultList.value = [];
+		successItems.value = [];
+		const last = lineItems.value[lineItems.value.length - 1];
+		if (last != null) {
+			focusLine(last.key);
+		}
+		return true;
+	}
+
+	function onClear() {
+		setLinesFromText("");
+		resultList.value = [];
+		successItems.value = [];
+		const first = lineItems.value[0];
+		if (first != null) {
+			focusLine(first.key);
+		}
+	}
+
+	function readClipboardByUni(): Promise<string> {
+		return new Promise((resolve, reject) => {
+			uni.getClipboardData({
+				success: (res) => {
+					resolve(`${res.data ?? ""}`);
+				},
+				fail: () => {
+					reject();
+				}
+			});
+		});
+	}
+
+	// #ifdef H5
+	function readClipboardByNavigator(): Promise<string> {
+		return new Promise((resolve, reject) => {
+			if (typeof navigator == "undefined" || navigator.clipboard == null) {
+				reject();
+				return;
+			}
+			navigator.clipboard.readText().then((text) => {
+				resolve(`${text ?? ""}`);
+			}).catch(() => {
+				reject();
+			});
+		});
+	}
+
+	function openManualPastePrompt() {
+		if (typeof window != "undefined" && window.prompt != null) {
+			const pasted = window.prompt("浏览器限制读取剪贴板，请手动粘贴链接后确定", "");
+			if (pasted != null && appendText(pasted)) {
+				uni.showToast({ title: "粘贴成功", icon: "none" });
+				return;
+			}
+		}
+		uni.showModal({
+			title: "无法读取剪贴板",
+			content: "请长按输入框手动粘贴链接",
+			showCancel: false
+		});
+	}
+
+	function tryAlternatePaste() {
+		readClipboardByNavigator()
+			.then((text) => {
+				if (appendText(text)) {
+					uni.showToast({ title: "粘贴成功", icon: "none" });
+					return;
+				}
+				openManualPastePrompt();
+			})
+			.catch(() => {
+				openManualPastePrompt();
+			});
+	}
+	// #endif
+
+	// #ifndef H5
+	function tryAlternatePaste() {
+		uni.showToast({ title: "读取剪贴板失败", icon: "none" });
+	}
+	// #endif
+
+	function onPaste() {
+		readClipboardByUni()
+			.then((text) => {
+				if (appendText(text)) {
+					return;
+				}
+				tryAlternatePaste();
+			})
+			.catch(() => {
+				tryAlternatePaste();
+			});
+	}
+
+	function onScan() {
+		// #ifdef H5
+		if (scanning.value) {
+			return;
+		}
+		if (!isH5CameraSupported()) {
+			uni.showModal({
+				title: "提示",
+				content: "当前环境不支持相机，请手动粘贴链接",
+				showCancel: false
+			});
+			return;
+		}
+		showScanner.value = true;
+		scanning.value = true;
+		nextTick(() => {
+			setTimeout(() => {
+				initCameraScan();
+			}, 400);
+		});
+		// #endif
+
+		// #ifndef H5
+		uni.scanCode({
+			onlyFromCamera: false,
+			scanType: ["qrCode", "barCode"],
+			success: (res) => {
+				const ok = appendText(`${res.result ?? ""}`);
+				if (!ok) {
+					uni.showToast({ title: "未识别到有效内容", icon: "none" });
+					return;
+				}
+				uni.showToast({ title: "扫描成功，已填入链接", icon: "none" });
+			},
+			fail: (err) => {
+				const msg = `${(err as any)?.errMsg ?? ""}`;
+				if (msg.indexOf("cancel") != -1 || msg.indexOf("取消") != -1) {
+					return;
+				}
+				uni.showToast({ title: "扫码失败，请重试", icon: "none" });
+			}
+		});
+		// #endif
+	}
+
+	// #ifdef H5
+	function getVideoContainer(): any | null {
+		return videoContainer.value;
+	}
+
+	function initCameraScan() {
+		const container = getVideoContainer();
+		const mountedVideo = mountNativeVideo(container);
+		if (mountedVideo == null) {
+			scanning.value = false;
+			showScanner.value = false;
+			uni.showToast({ title: "相机初始化失败", icon: "none" });
+			return;
+		}
+		videoEl = mountedVideo;
+		qrReader = createQrReader();
+		startVideoScan(qrReader, videoEl, (text: string) => {
+			onDecodeSuccess(text);
+		}).catch((err: any) => {
+			scanning.value = false;
+			showScanner.value = false;
+			forceStopCamera();
+			const msg = err != null && err.message != null ? `${err.message}` : "无法打开相机";
+			uni.showModal({
+				title: "相机不可用",
+				content: msg,
+				showCancel: false
+			});
+		});
+	}
+
+	function forceStopCamera() {
+		const currentVideo = videoEl;
+		if (currentVideo != null) {
+			try {
+				currentVideo.pause();
+			} catch (e) {}
+			try {
+				currentVideo.removeAttribute("src");
+			} catch (e) {}
+			try {
+				currentVideo.load();
+			} catch (e) {}
+		}
+		try {
+			stopVideoScan(qrReader, currentVideo);
+		} catch (e) {}
+		qrReader = null;
+		videoEl = null;
+	}
+
+	function closeScanner() {
+		showScanner.value = false;
+		scanning.value = false;
+		try {
+			forceStopCamera();
+		} catch (e) {}
+		try {
+			const container = getVideoContainer();
+			if (container != null) {
+				const el = (container as UTSJSONObject)["$el"] ?? container;
+				if (el != null && typeof (el as any).innerHTML == "string") {
+					(el as any).innerHTML = "";
+				}
+			}
+		} catch (e) {}
+	}
+
+	function onDecodeSuccess(text: string) {
+		const value = `${text}`.trim();
+		if (value == "") {
+			return;
+		}
+		appendText(value);
+		uni.showToast({ title: "识别成功", icon: "none" });
+		closeScanner();
+	}
+	// #endif
+
+	function isItemSuccess(item: ParseVideoUrlItem): boolean {
+		if (item.success === true || item.success === 1) {
+			return true;
+		}
+		if (item.success === false || item.success === 0) {
+			return false;
+		}
+		const result = `${item.result ?? ""}`.trim();
+		if (result == "成功" || result.toLowerCase() == "success") {
+			return true;
+		}
+		if (result == "失败" || result.toLowerCase() == "fail" || result.toLowerCase() == "error") {
+			return false;
+		}
+		const status = `${item.status ?? ""}`.trim();
+		if (status.indexOf("识别成功") >= 0 || status.indexOf("成功") >= 0) {
+			return true;
+		}
+		if (status.indexOf("错误") >= 0 || status.indexOf("失败") >= 0) {
+			return false;
+		}
+		const err = `${item.error ?? item.msg ?? item.message ?? ""}`.trim();
+		return err == "";
+	}
+
+	function buildSuccessMsg(item: ParseVideoUrlItem): string {
+		const status = `${item.status ?? ""}`.trim();
+		if (status != "") {
+			return status.indexOf("识别成功") >= 0 ? status : `识别成功：${status}`;
+		}
+		const platform = `${
+			item.publish_platform ?? item.platform_name ?? item.platform ?? ""
+		}`.trim();
+		const account = `${item.account_name ?? item.account_title ?? ""}`.trim();
+		if (platform != "" && account != "") {
+			return `识别成功：【${platform}】${account}`;
+		}
+		if (platform != "") {
+			return `识别成功：【${platform}】`;
+		}
+		if (account != "") {
+			return `识别成功：${account}`;
+		}
+		const publishTime = `${item.publish_time ?? ""}`.trim();
+		if (publishTime != "") {
+			return `识别成功：${publishTime}`;
+		}
+		const videoId = `${item.video_id ?? ""}`.trim();
+		if (videoId != "") {
+			return `识别成功：${videoId}`;
+		}
+		return "识别成功";
+	}
+
+	function buildErrorMsg(item: ParseVideoUrlItem): string {
+		const status = `${item.status ?? ""}`.trim();
+		if (status != "" && (status.indexOf("错误") >= 0 || status.indexOf("失败") >= 0)) {
+			return status.indexOf("错误提醒") >= 0 ? status : `错误提醒：${status}`;
+		}
+		const err = `${item.error ?? item.msg ?? item.message ?? item.status ?? ""}`.trim();
+		return err != "" ? `错误提醒：${err}` : "错误提醒：识别失败";
+	}
+
+	function normalizeUrlKey(url: string): string {
+		return `${url ?? ""}`.trim().replace(/\/+$/, "").toLowerCase();
+	}
+
+	/** 从整行文本中抽出首个 http(s) 链接（无则返回原文本） */
+	function extractFirstHttpUrl(text: string): string {
+		const raw = `${text ?? ""}`;
+		const idx = findNextHttpIndex(raw, 0);
+		if (idx < 0) {
+			return raw.trim();
+		}
+		let end = raw.length;
+		for (let i = idx + 4; i < raw.length; i++) {
+			const ch = raw.charAt(i);
+			if (ch == " " || ch == "\t" || ch == "\n" || ch == "\r") {
+				end = i;
+				break;
+			}
+			// 中文/全角分隔，截断链接
+			const code = raw.charCodeAt(i);
+			if (code > 0x7f) {
+				end = i;
+				break;
+			}
+		}
+		return trimUrlEdge(raw.substring(idx, end));
+	}
+
+	/** 输入行与接口返回的 video_url 比对（兼容分享口令整行） */
+	function urlsMatch(inputLine: string, resultUrl: string): boolean {
+		const a = `${inputLine ?? ""}`.trim();
+		const b = `${resultUrl ?? ""}`.trim();
+		if (a.length == 0 || b.length == 0) {
+			return false;
+		}
+		if (a == b) {
+			return true;
+		}
+		if (normalizeUrlKey(a) == normalizeUrlKey(b)) {
+			return true;
+		}
+		if (a.indexOf(b) >= 0 || b.indexOf(a) >= 0) {
+			return true;
+		}
+		const inputHttp = extractFirstHttpUrl(a);
+		if (inputHttp.length == 0) {
+			return false;
+		}
+		if (normalizeUrlKey(inputHttp) == normalizeUrlKey(b)) {
+			return true;
+		}
+		if (inputHttp.indexOf(b) >= 0 || b.indexOf(inputHttp) >= 0) {
+			return true;
+		}
+		return false;
+	}
+
+	function asItemList(value: any | null): ParseVideoUrlItem[] {
+		if (value == null) {
+			return [];
+		}
+		if (value instanceof Array) {
+			return value as ParseVideoUrlItem[];
+		}
+		return [];
+	}
+
+	function markParseItems(list: ParseVideoUrlItem[], ok: boolean): ParseVideoUrlItem[] {
+		const out: ParseVideoUrlItem[] = [];
+		for (let i = 0; i < list.length; i++) {
+			const item = list[i];
+			const marked: ParseVideoUrlItem = {
+				video_url: item.video_url,
+				url: item.url,
+				video_id: item.video_id,
+				success: item.success != null ? item.success : ok,
+				result: item.result,
+				status: item.status,
+				msg: item.msg,
+				message: item.message,
+				error: item.error,
+				platform_name: item.platform_name,
+				platform: item.platform,
+				publish_platform: item.publish_platform,
+				account_name: item.account_name,
+				account_title: item.account_title,
+				account_id: item.account_id,
+				platform_account: item.platform_account,
+				publish_time: item.publish_time,
+				index: item.index
+			};
+			out.push(marked);
+		}
+		return out;
+	}
+
+	/** request 返回整包 { code, msg, data }，此处取出业务 data */
+	function unwrapParsePayload(res: any | null): ParseVideoUrlResult | ParseVideoUrlItem[] | null {
+		if (res == null) {
+			return null;
+		}
+		if (res instanceof Array) {
+			return res as ParseVideoUrlItem[];
+		}
+		const envelope = res as UTSJSONObject;
+		const nested = envelope["data"];
+		if (nested != null && (nested instanceof Array || typeof nested == "object")) {
+			return nested as ParseVideoUrlResult | ParseVideoUrlItem[];
+		}
+		return res as ParseVideoUrlResult;
+	}
+
+	function normalizeResult(
+		data: ParseVideoUrlResult | ParseVideoUrlItem[] | null,
+		entries: { lineNo: number; text: string }[]
+	): ResultRow[] {
+		let rawList: ParseVideoUrlItem[] = [];
+		if (data == null) {
+			return [];
+		}
+		if (data instanceof Array) {
+			rawList = data as ParseVideoUrlItem[];
+		} else {
+			const obj = data as UTSJSONObject;
+			const list = asItemList(obj["list"]);
+			const okList = asItemList(obj["success"] ?? obj["success_list"]);
+			const errList = asItemList(obj["failed"] ?? obj["error_list"]);
+			if (list.length > 0) {
+				rawList = list;
+			} else if (okList.length > 0 || errList.length > 0) {
+				rawList = markParseItems(okList, true).concat(markParseItems(errList, false));
+			}
+		}
+		const rows: ResultRow[] = [];
+		const okItems: ParseVideoUrlItem[] = [];
+		const usedResult: boolean[] = [];
+		for (let r = 0; r < rawList.length; r++) {
+			usedResult.push(false);
+		}
+		// 按输入行顺序匹配，序号取左侧行号
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i];
+			let matchedIdx = -1;
+			for (let j = 0; j < rawList.length; j++) {
+				if (usedResult[j]) {
+					continue;
+				}
+				const resultUrl = `${rawList[j].video_url ?? rawList[j].url ?? ""}`.trim();
+				if (urlsMatch(entry.text, resultUrl)) {
+					matchedIdx = j;
+					break;
+				}
+			}
+			if (matchedIdx < 0) {
+				continue;
+			}
+			usedResult[matchedIdx] = true;
+			const item = rawList[matchedIdx];
+			const url = `${item.video_url ?? item.url ?? ""}`.trim();
+			const ok = isItemSuccess(item);
+			const lineNo = entry.lineNo;
+			const displayUrl = url.length > 0 ? url : entry.text;
+			const normalized: ParseVideoUrlItem = {
+				video_url: displayUrl,
+				url: displayUrl,
+				video_id: item.video_id,
+				success: item.success,
+				result: item.result,
+				status: item.status,
+				msg: item.msg,
+				message: item.message,
+				error: item.error,
+				platform_name: item.platform_name ?? item.platform,
+				platform: item.platform,
+				publish_platform: item.publish_platform,
+				account_name: item.account_name ?? item.account_title,
+				account_title: item.account_title,
+				account_id: item.account_id,
+				platform_account: item.platform_account,
+				publish_time: item.publish_time,
+				index: lineNo
+			};
+			rows.push({
+				lineNo: lineNo,
+				video_url: displayUrl.length > 0 ? displayUrl : "-",
+				ok: ok,
+				msg: ok ? buildSuccessMsg(item) : buildErrorMsg(item),
+				raw: normalized
+			});
+			if (ok && displayUrl != "") {
+				okItems.push(normalized);
+			}
+		}
+		// 未匹配到的结果兜底
+		const usedLineNos: number[] = [];
+		for (let i = 0; i < rows.length; i++) {
+			usedLineNos.push(rows[i].lineNo);
+		}
+		for (let j = 0; j < rawList.length; j++) {
+			if (usedResult[j]) {
+				continue;
+			}
+			const item = rawList[j];
+			const url = `${item.video_url ?? item.url ?? ""}`.trim();
+			const ok = isItemSuccess(item);
+			let lineNo = rows.length + 1;
+			for (let i = 0; i < entries.length; i++) {
+				let taken = false;
+				for (let k = 0; k < usedLineNos.length; k++) {
+					if (usedLineNos[k] == entries[i].lineNo) {
+						taken = true;
+						break;
+					}
+				}
+				if (!taken && urlsMatch(entries[i].text, url)) {
+					lineNo = entries[i].lineNo;
+					usedLineNos.push(lineNo);
+					break;
+				}
+			}
+			const normalized: ParseVideoUrlItem = {
+				video_url: url,
+				url: url,
+				video_id: item.video_id,
+				success: item.success,
+				result: item.result,
+				status: item.status,
+				msg: item.msg,
+				message: item.message,
+				error: item.error,
+				platform_name: item.platform_name ?? item.platform,
+				platform: item.platform,
+				publish_platform: item.publish_platform,
+				account_name: item.account_name ?? item.account_title,
+				account_title: item.account_title,
+				account_id: item.account_id,
+				platform_account: item.platform_account,
+				publish_time: item.publish_time,
+				index: lineNo
+			};
+			rows.push({
+				lineNo: lineNo,
+				video_url: url.length > 0 ? url : "-",
+				ok: ok,
+				msg: ok ? buildSuccessMsg(item) : buildErrorMsg(item),
+				raw: normalized
+			});
+			if (ok && url != "") {
+				okItems.push(normalized);
+			}
+		}
+		rows.sort((a, b) => a.lineNo - b.lineNo);
+		successItems.value = okItems;
+		return rows;
+	}
+
+	function onRecognize() {
+		if (recognizing.value) {
+			return;
+		}
+		if (props.projectId <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		let entries = collectRecognizeEntries();
+		if (entries.length == 0) {
+			uni.showToast({ title: "请粘贴或输入作品链接", icon: "none" });
+			return;
+		}
+		if (entries.length > BATCH_LIMIT.value) {
+			tipLimitReached();
+			const kept: string[] = [];
+			for (let i = 0; i < BATCH_LIMIT.value; i++) {
+				kept.push(entries[i].text);
+			}
+			setLinesFromText(kept.join("\n"), false);
+			entries = collectRecognizeEntries();
+		}
+		const urls: string[] = [];
+		for (let i = 0; i < entries.length; i++) {
+			urls.push(entries[i].text);
+		}
+		recognizing.value = true;
+		uni.showLoading({ title: "识别中...", mask: true });
+		parseVideoUrl({
+			project_id: props.projectId,
+			video_url: urls
+		})
+			.then((res) => {
+				const envelope = res as UTSJSONObject | null;
+				const code = envelope != null ? envelope["code"] : null;
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "识别失败"), icon: "none" });
+					return;
+				}
+				const data = unwrapParsePayload(res);
+				resultList.value = normalizeResult(data, entries);
+				if (resultList.value.length == 0) {
+					uni.showToast({ title: "暂无识别结果", icon: "none" });
+				} else if (successCount.value == 0) {
+					uni.showToast({ title: "识别失败，请查看失败列表", icon: "none" });
+				} else {
+					uni.showToast({ title: `识别成功 ${successCount.value} 条`, icon: "none" });
+				}
+			})
+			.catch((err) => {
+				const r = err as Response;
+				uni.showToast({ title: getApiMessage(r, "识别失败"), icon: "none" });
+			})
+			.finally(() => {
+				recognizing.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function onCopyFailed() {
+		const failed: string[] = [];
+		for (let i = 0; i < resultList.value.length; i++) {
+			const row = resultList.value[i];
+			if (!row.ok && row.video_url != "" && row.video_url != "-") {
+				failed.push(row.video_url);
+			}
+		}
+		if (failed.length == 0) {
+			uni.showToast({ title: "暂无失败链接", icon: "none" });
+			return;
+		}
+		uni.setClipboardData({
+			data: failed.join("\n"),
+			success: () => {
+				uni.showToast({ title: "已复制失败链接", icon: "none" });
+			},
+			fail: () => {
+				uni.showToast({ title: "复制失败", icon: "none" });
+			}
+		});
+	}
+
+	function pushFormItem(
+		result: KeywordSubmitFormItem[],
+		name: string,
+		field: string,
+		value: string
+	) {
+		const text = value.trim();
+		if (text == "") {
+			return;
+		}
+		result.push({
+			name: name,
+			field: field,
+			value: text
+		});
+	}
+
+	function buildFormInfoFromSuccessItems(items: ParseVideoUrlItem[]): KeywordSubmitFormItem[][] {
+		const batches: KeywordSubmitFormItem[][] = [];
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			if (item.form_info != null && item.form_info instanceof Array) {
+				const nested = item.form_info as KeywordSubmitFormItem[];
+				if (nested.length > 0) {
+					batches.push(nested);
+					continue;
+				}
+			}
+			const row: KeywordSubmitFormItem[] = [];
+			const videoUrl = `${item.video_url ?? item.url ?? ""}`.trim();
+			const publishTime = `${item.publish_time ?? ""}`.trim();
+			const videoId = `${item.video_id ?? ""}`.trim();
+			const platform = `${
+				item.publish_platform ?? item.platform_name ?? item.platform ?? ""
+			}`.trim();
+			// 平台ID 取识别结果的 platform_account（如 83191103246），不要回退成账号名
+			const platformAccount = `${
+				item.platform_account ?? item.account_id ?? ""
+			}`.trim();
+			const accountName = `${item.account_name ?? item.account_title ?? ""}`.trim();
+			pushFormItem(row, "视频链接", "video_url", videoUrl);
+			pushFormItem(row, "发布日期", "publish_time", publishTime);
+			pushFormItem(row, "视频ID", "video_id", videoId);
+			pushFormItem(row, "发布平台", "publish_platform", platform);
+			pushFormItem(row, "平台ID", "account_id_id", platformAccount);
+			if (accountName != "") {
+				pushFormItem(row, "账号名称", "account_name", accountName);
+			}
+			if (row.length > 0) {
+				batches.push(row);
+			}
+		}
+		return batches;
+	}
+
+	function onSubmit() {
+		if (submitting.value) {
+			return;
+		}
+		if (successCount.value == 0) {
+			uni.showToast({ title: "请先智能识别成功后再提交", icon: "none" });
+			return;
+		}
+		if (props.projectId <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		if (props.keywordId <= 0) {
+			uni.showToast({ title: "缺少关键词记录 ID", icon: "none" });
+			return;
+		}
+		const items = successItems.value.slice();
+		const formInfo = buildFormInfoFromSuccessItems(items);
+		if (formInfo.length == 0) {
+			uni.showToast({ title: "暂无识别成功的数据", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中...", mask: true });
+		submitPublish({
+			project_id: props.projectId,
+			keyword_id: props.keywordId,
+			form_info: formInfo
+		})
+			.then((res) => {
+				const envelope = res as UTSJSONObject | null;
+				const code = envelope != null ? envelope["code"] : null;
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "提交失败"), icon: "none" });
+					submitting.value = false;
+					return;
+				}
+				uni.showToast({ title: getApiMessage(res, "提交成功"), icon: "success" });
+				emit("confirm", items);
+				emit("success", items);
+				closePopup();
+				// 成功后保持 submitting，避免关闭动画期间再次点击
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+				submitting.value = false;
+			})
+			.finally(() => {
+				uni.hideLoading();
+			});
+	}
+</script>
+
+<style lang="scss" scoped>
+	.bbp {
+		display: flex;
+		flex-direction: column;
+		background-color: #f6f7fb;
+		overflow: hidden;
+		box-sizing: border-box;
+
+		.bbp-head {
+			flex-shrink: 0;
+			padding: 32rpx 28rpx 20rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			box-sizing: border-box;
+
+			.bbp-head-left {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				flex: 1;
+				min-width: 0;
+				padding-right: 16rpx;
+
+				.bbp-head-title {
+					font-size: 32rpx;
+					font-weight: 700;
+					color: #141b36;
+					line-height: 44rpx;
+					flex-shrink: 0;
+				}
+
+				.bbp-head-limit {
+					margin-left: 12rpx;
+					font-size: 24rpx;
+					font-weight: 400;
+					color: #ff6033;
+					line-height: 34rpx;
+					flex-shrink: 0;
+				}
+			}
+
+			.bbp-head-close {
+				width: 48rpx;
+				height: 48rpx;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+				flex-shrink: 0;
+			}
+		}
+
+		.bbp-scroll {
+			flex: 1;
+			height: 0;
+			min-height: 0;
+			box-sizing: border-box;
+
+			.bbp-body {
+				padding: 0 28rpx 8rpx;
+				box-sizing: border-box;
+			}
+		}
+
+		.bbp-input-card {
+			height: 800rpx;
+			min-height: 800rpx;
+			max-height: 800rpx;
+			padding: 24rpx 24rpx 20rpx;
+			background-color: #fafbff;
+			border-radius: 12rpx;
+			border-width: 1rpx;
+			border-style: solid;
+			border-color: #e0e2e7;
+			margin-bottom: 24rpx;
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+
+			.bbp-editor-scroll {
+				flex: 1;
+				height: 0;
+				min-height: 0;
+				width: 100%;
+
+				.bbp-editor {
+					display: flex;
+					flex-direction: column;
+					width: 100%;
+					box-sizing: border-box;
+
+					.bbp-row {
+						display: flex;
+						flex-direction: row;
+						align-items: flex-start;
+						width: 100%;
+						min-height: 42rpx;
+						margin-bottom: 8rpx;
+						box-sizing: border-box;
+
+						&:last-child {
+							margin-bottom: 0;
+						}
+
+						.bbp-row-no {
+							flex-shrink: 0;
+							width: 44rpx;
+							font-size: 26rpx;
+							line-height: 42rpx;
+							height: 42rpx;
+							color: #141b36;
+							text-align: left;
+							box-sizing: border-box;
+						}
+
+						.bbp-row-input {
+							flex: 1;
+							width: 0;
+							min-height: 42rpx;
+							font-size: 26rpx;
+							line-height: 42rpx;
+							color: #141b36;
+							box-sizing: border-box;
+							background-color: transparent;
+							border-width: 0;
+							padding: 0;
+							margin: 0;
+						}
+
+						:deep(uni-textarea),
+						:deep(.uni-textarea-wrapper),
+						:deep(.uni-textarea-textarea) {
+							width: 100%;
+							background-color: transparent !important;
+							border-width: 0 !important;
+							border-style: none !important;
+							box-shadow: none !important;
+							outline: none !important;
+						}
+
+						:deep(.uni-textarea-compute) {
+							opacity: 0;
+						}
+					}
+				}
+			}
+
+			.bbp-actions {
+				flex-shrink: 0;
+				margin-top: 16rpx;
+				width: 100%;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+
+				.bbp-scan {
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					padding: 8rpx 4rpx;
+
+					.bbp-scan-text {
+						margin-left: 8rpx;
+						font-size: 26rpx;
+						color: #141b36;
+						line-height: 36rpx;
+					}
+				}
+
+				.bbp-action-right {
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+
+					.bbp-btn {
+						height: 64rpx;
+						padding: 0 28rpx;
+						border-radius: 16rpx;
+						display: flex;
+						flex-direction: row;
+						align-items: center;
+						justify-content: center;
+						margin-left: 12rpx;
+						box-sizing: border-box;
+
+						// &--ghost {
+						// 	background-color: #ffffff;
+						// 	border-width: 1rpx;
+						// 	border-style: solid;
+						// 	border-color: #0651f8;
+						// }
+
+						&--primary {
+							background-color: #0651f8;
+							border-width: 1rpx;
+							border-style: solid;
+							border-color: #0651f8;
+						}
+
+						&--disabled {
+							opacity: 0.6;
+						}
+
+						.bbp-btn-text {
+							font-size: 26rpx;
+							font-weight: 600;
+							color: #ffffff;
+							line-height: 36rpx;
+
+							&--ghost {
+								color: #333;
+								font-weight: 500;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		.bbp-result {
+			margin-bottom: 16rpx;
+
+			.bbp-result-head {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 16rpx;
+
+				.bbp-result-title-row {
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+
+					.bbp-result-title {
+						margin-left: 8rpx;
+						font-size: 28rpx;
+						font-weight: 600;
+						color: #141b36;
+						line-height: 40rpx;
+					}
+				}
+
+				.bbp-result-copy {
+					font-size: 24rpx;
+					color: #0651f8;
+					line-height: 34rpx;
+				}
+			}
+
+			.bbp-result-list {
+				padding: 20rpx 24rpx;
+				background-color: #ffffff;
+				border-radius: 12rpx;
+				border-width: 1rpx;
+				border-style: solid;
+				border-color: #e0e2e7;
+				box-sizing: border-box;
+
+				.bbp-result-item {
+					margin-top: 16rpx;
+					display: flex;
+					flex-direction: column;
+
+					&:first-child {
+						margin-top: 0;
+					}
+
+					.bbp-result-url {
+						font-size: 24rpx;
+						color: #141b36;
+						line-height: 34rpx;
+						word-break: break-all;
+					}
+
+					.bbp-result-msg {
+						margin-top: 6rpx;
+						font-size: 24rpx;
+						line-height: 34rpx;
+
+						&--ok {
+							color: #19c37d;
+						}
+
+						&--err {
+							color: #ff3333;
+						}
+					}
+				}
+			}
+		}
+
+		.bbp-footer {
+			flex-shrink: 0;
+			padding: 16rpx 28rpx 24rpx;
+			box-sizing: border-box;
+
+			.bbp-submit {
+				height: 96rpx;
+				border-radius: 16rpx;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+
+				&--on {
+					background-color: #0651f8;
+				}
+
+				&--muted {
+					background-color: #0651f8;
+					opacity: 0.6;
+				}
+
+				.bbp-submit-text {
+					font-size: 32rpx;
+					font-weight: 600;
+					color: #ffffff;
+					line-height: 44rpx;
+				}
+			}
+		}
+	}
+
+</style>
+
+<!-- #ifdef H5 -->
+<style lang="scss">
+	.bbp-scanner-mask {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 99999;
+		background-color: #000000;
+		overflow: hidden;
+	}
+
+	.bbp-scanner-panel {
+		width: 100%;
+		height: 100%;
+		position: relative;
+		background-color: #000000;
+		overflow: hidden;
+	}
+
+	.bbp-scanner-header {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 10;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding: calc(env(safe-area-inset-top) + 24rpx) 30rpx 24rpx;
+		background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+		box-sizing: border-box;
+	}
+
+	.bbp-scanner-title {
+		color: #ffffff;
+		font-size: 30rpx;
+		font-weight: 600;
+	}
+
+	.bbp-scanner-close {
+		width: 80rpx;
+		height: 80rpx;
+		background-color: rgba(255, 255, 255, 0.12);
+		border-radius: 999rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.bbp-scanner-close-text {
+		color: #ffffff;
+		font-size: 48rpx;
+		line-height: 1;
+	}
+
+	.bbp-scanner-body {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		background-color: #000000;
+		overflow: hidden;
+	}
+
+	.bbp-scanner-video-wrap {
+		width: 100%;
+		height: 100%;
+		position: absolute;
+		top: 0;
+		left: 0;
+	}
+
+	.bbp-scanner-video-wrap .scanner-video-native {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.bbp-scanner-frame {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 58vw;
+		height: 58vw;
+		max-width: 520rpx;
+		max-height: 520rpx;
+		transform: translate(-50%, -50%);
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	.bbp-scanner-corner {
+		position: absolute;
+		width: 40rpx;
+		height: 40rpx;
+		border-color: #0651f8;
+		border-style: solid;
+
+		&--tl {
+			top: 0;
+			left: 0;
+			border-width: 6rpx 0 0 6rpx;
+		}
+
+		&--tr {
+			top: 0;
+			right: 0;
+			border-width: 6rpx 6rpx 0 0;
+		}
+
+		&--bl {
+			bottom: 0;
+			left: 0;
+			border-width: 0 0 6rpx 6rpx;
+		}
+
+		&--br {
+			bottom: 0;
+			right: 0;
+			border-width: 0 6rpx 6rpx 0;
+		}
+	}
+
+	.bbp-scanner-hint {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: calc(env(safe-area-inset-bottom) + 36rpx);
+		z-index: 10;
+		padding: 0 30rpx;
+		text-align: center;
+		color: rgba(255, 255, 255, 0.82);
+		font-size: 24rpx;
+		line-height: 1.5;
+		box-sizing: border-box;
+	}
+</style>
+<!-- #endif -->
+
+<style lang="scss">
+	.bbp-popup {
+		background-color: transparent !important;
+		box-shadow: none !important;
+
+		.bbp-popup-inner {
+			border-radius: 36rpx 36rpx 0 0 !important;
+			overflow: hidden;
+		}
+
+		.bbp-popup-container {
+			overflow: hidden;
+		}
+	}
+
+	.bbp-row-ph {
+		color: #c0c4cc;
+		font-size: 26rpx;
+		line-height: 42rpx;
+	}
+</style>

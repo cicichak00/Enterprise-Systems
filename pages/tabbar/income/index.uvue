@@ -1,0 +1,1249 @@
+<template>
+	<cl-page :pt="{ className: 'inc-page' }" :back-top="false">
+		<view class="inc-page">
+			<scroll-view class="inc-scroll" scroll-y="true" :show-scrollbar="false" :lower-threshold="120"
+				@scrolltolower="onOrderScrollToLower">
+				<view class="inc-scroll-inner">
+					<view class="inc-summary-card">
+						<view class="inc-summary-top">
+							<view class="inc-summary-label-row">
+								<view class="inc-summary-dot"></view>
+								<text class="inc-summary-label">累计收益(元)</text>
+							</view>
+							<view v-if="canWithdraw == 1" class="inc-wallet-entry" @tap.stop="toWallet">
+								<text class="inc-wallet-entry-text">进入钱包</text>
+								<cl-icon name="arrow-right-s-line" :size="14" color="rgba(255,255,255,0.75)"></cl-icon>
+							</view>
+						</view>
+						<text class="inc-summary-amount">{{ staffSummary.total_revenue || '0.00' }}</text>
+						<view class="inc-summary-stats">
+							<view class="inc-summary-stat">
+								<text class="inc-summary-stat-label">待结算</text>
+								<text class="inc-summary-stat-value">{{ staffSummary.pending_settlement || '0.00' }}元</text>
+							</view>
+							<view class="inc-summary-stat inc-summary-stat--divider">
+								<text class="inc-summary-stat-label">已结算</text>
+								<text class="inc-summary-stat-value">{{ staffSummary.settled_revenue || '0.00' }}元</text>
+							</view>
+						</view>
+					</view>
+
+					<view class="inc-panel">
+						<view class="inc-period-bar">
+							<view class="inc-period-row">
+								<view v-for="(item, index) in periodTabs" :key="index" class="inc-period-item"
+									:class="{ 'inc-period-item--active': activePeriod == index && !isCustomRange }"
+									@tap="selectPeriod(index)">
+									<text class="inc-period-text">{{ item }}</text>
+								</view>
+							</view>
+							<view class="inc-period-cal" :class="{ 'inc-period-cal--active': isCustomRange }"
+								@tap="onCalendarTap">
+								<cl-icon name="calendar-line" :size="16"
+									:color="isCustomRange ? '#ffffff' : '#666666'"></cl-icon>
+							</view>
+						</view>
+
+						<view v-if="isCustomRange" class="inc-range-bar">
+							<view class="inc-range-main">
+								<cl-icon name="calendar-line" :size="14" color="#2b59c3"></cl-icon>
+								<text class="inc-range-label">区间</text>
+								<text class="inc-range-value">{{ rangeStart }} 至 {{ rangeEnd }}</text>
+							</view>
+							<text class="inc-range-edit" @tap="openRangePopup(true)">修改</text>
+						</view>
+					</view>
+
+					<view class="inc-body">
+						<view class="inc-section-head">
+							<text class="inc-section-title">订单收益</text>
+						</view>
+
+						<view v-if="listLoading && orderList.length == 0" class="inc-list-state">
+							<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+							<text class="inc-list-state-text">加载中...</text>
+						</view>
+						<view v-else-if="orderList.length == 0" class="inc-list-state">
+							<text class="inc-list-state-text">暂无收益数据</text>
+						</view>
+						<view v-else class="inc-order-list">
+							<view class="inc-order-card" v-for="item in orderList" :key="item.id">
+								<view class="inc-order-head">
+									<text class="inc-order-title">{{ item.project_title }}</text>
+									<view v-if="item.payment_status_text && item.is_virtual != 1" class="inc-order-status"
+										:class="'inc-order-status--' + resolveStatusTone(`${item.payment_status_text}`)">
+										<text class="inc-order-status-text">{{ item.payment_status_text }}</text>
+									</view>
+								</view>
+
+								<view class="inc-order-divider"></view>
+
+								<view class="inc-order-body">
+									<view class="inc-order-field">
+										<text class="inc-order-field-label">关键词</text>
+										<text class="inc-order-field-value">{{ item.keyword }}</text>
+									</view>
+									<view class="inc-order-field">
+										<text class="inc-order-field-label">订单日期</text>
+										<text class="inc-order-field-value">{{ item.import_time }}</text>
+									</view>
+									<view class="inc-order-field">
+										<text class="inc-order-field-label">收益</text>
+										<text
+											class="inc-order-field-value inc-order-field-value--profit">{{ item.user_profit }}</text>
+									</view>
+								</view>
+								<!-- <view v-if="item.remark && item.remark != '虚拟订单' && item.is_virtual != 1" class="inc-order-remark">
+									<text class="inc-order-remark-label">备注</text>
+									<text class="inc-order-remark-value">{{ item.remark }}</text>
+								</view> -->
+							</view>
+							<view v-if="orderList.length > 0" class="inc-list-footer" @tap="onOrderLoadMoreTap">
+								<cl-loadmore :loading="listLoadingMore" :finish="!hasMore" finish-text="没有更多了"
+									loading-text="加载中..."></cl-loadmore>
+								<text v-if="orderTotal > 0" class="inc-list-footer-count">
+									已加载 {{ orderList.length }} / {{ orderTotal }} 条
+								</text>
+								<text v-else-if="hasMore && !listLoadingMore"
+									class="inc-list-footer-text">上拉或点击加载更多</text>
+							</view>
+						</view>
+					</view>
+				</view>
+			</scroll-view>
+
+			<custom-tabbar :show-spacer="true"></custom-tabbar>
+
+			<cl-popup v-model="rangePopupVisible" direction="bottom" :show-header="false" :show-close="false"
+				:pt="{ className: 'inc-range-popup-wrap', inner: { className: 'inc-range-popup-inner' } }"
+				:swipeClose="false">
+				<view class="inc-range-popup">
+					<view class="inc-range-popup-head">
+						<text class="inc-range-popup-cancel" @tap="closeRangePopup">取消</text>
+						<text class="inc-range-popup-title">选择时间区间</text>
+						<text class="inc-range-popup-apply" @tap="applyRangePopup">应用</text>
+					</view>
+
+					<text class="inc-range-popup-section">快捷选择</text>
+					<view class="inc-range-popup-quick">
+						<view class="inc-range-popup-quick-row">
+							<view class="inc-range-popup-quick-item"
+								:class="{ 'inc-range-popup-quick-item--active': draftQuickKey == item.key }"
+								v-for="(item, index) in quickRangesPrimary" :key="index" @tap="pickQuick(item)">
+								<text class="inc-range-popup-quick-text">{{ item.label }}</text>
+							</view>
+						</view>
+						<view class="inc-range-popup-quick-row">
+							<view class="inc-range-popup-quick-item"
+								:class="{ 'inc-range-popup-quick-item--active': draftQuickKey == item.key }"
+								v-for="(item, index) in quickRangesSecondary" :key="index" @tap="pickQuick(item)">
+								<text class="inc-range-popup-quick-text">{{ item.label }}</text>
+							</view>
+						</view>
+					</view>
+
+					<text class="inc-range-popup-section">自定义区间</text>
+					<view class="inc-range-popup-custom">
+						<view class="inc-range-popup-date" @tap="pickDraftStart">
+							<text class="inc-range-popup-date-label">开始</text>
+							<text class="inc-range-popup-date-value">{{ formatSlash(draftStart) }}</text>
+							<cl-icon name="calendar-line" :size="16" color="#999999"></cl-icon>
+						</view>
+						<text class="inc-range-popup-arrow">→</text>
+						<view class="inc-range-popup-date" @tap="pickDraftEnd">
+							<text class="inc-range-popup-date-label">结束</text>
+							<text class="inc-range-popup-date-value">{{ formatSlash(draftEnd) }}</text>
+							<cl-icon name="calendar-line" :size="16" color="#999999"></cl-icon>
+						</view>
+					</view>
+
+					<view class="inc-range-popup-summary">
+						<cl-icon name="check-line" :size="14" color="#1a2744"></cl-icon>
+						<text class="inc-range-popup-summary-text">共 {{ rangeDays }} 天</text>
+					</view>
+
+					<view class="inc-range-popup-btn" @tap="applyRangePopup">
+						<text class="inc-range-popup-btn-text">应用区间</text>
+					</view>
+				</view>
+			</cl-popup>
+
+			<cl-calendar-select ref="draftStartSelectRef" :show-trigger="false" :swipe-close="false" mode="single"
+				v-model="draftStart" :end="draftEnd" title="选择开始日期" @change="onDraftStartChange"></cl-calendar-select>
+			<cl-calendar-select ref="draftEndSelectRef" :show-trigger="false" :swipe-close="false" mode="single"
+				v-model="draftEnd" :start="draftStart" title="选择结束日期" @change="onDraftEndChange"></cl-calendar-select>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="uts">
+	export default {
+		onShow() {
+			uni.setNavigationBarColor({
+				frontColor: "#000000",
+				backgroundColor: "#f7f8fa"
+			});
+		}
+	};
+</script>
+
+<script lang="ts" setup>
+	import { computed, nextTick, ref } from "vue";
+	import { getStaff } from "@/.cool/api/staff";
+	import { getOrderList } from "@/.cool/api/order";
+	import { getUserProfile } from "@/.cool/api/login";
+	import { dayUts, getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { OrderListItem, OrderListParams, OrderListPayload } from "@/.cool/types/order";
+	import type { StaffListData, StaffListItem, StaffStats } from "@/.cool/types/staff";
+	import CustomTabbar from "@/components/tabbar.uvue";
+	import { syncTabbarRoutePath } from "@/.cool/store/tabbar";
+
+	type QuickRangeKey = "last_7_days" | "last_30_days" | "this_month" | "last_month" | "this_year";
+	type QuickRange = { label : string; key : QuickRangeKey };
+	type OrderStatusTone = "success" | "pending" | "danger" | "default";
+
+	const staffSummary = ref<StaffStats>({});
+	/** profile.can_withdraw：1 才展示进入钱包 */
+	const canWithdraw = ref(0);
+	const orderList = ref<OrderListItem[]>([]);
+	const orderPage = ref(1);
+	const orderTotal = ref(0);
+	const ORDER_LIMIT = 15;
+	const hasMore = ref(true);
+	const listLoading = ref(false);
+	const listLoadingMore = ref(false);
+	const staffSummaryLoading = ref(false);
+	let orderListSeq = 0;
+
+	const activePeriod = ref<number>(4);
+	const isCustomRange = ref<boolean>(false);
+	const rangePopupVisible = ref<boolean>(false);
+	const draftQuickKey = ref<QuickRangeKey | "">("");
+	const draftStartSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
+	const draftEndSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
+	const periodTabs = ["今日", "昨日", "近7天", "近30天", "累计"];
+
+	function getDefaultCustomRange() : { start : string; end : string } {
+		const today = dayUts();
+		const todayStr = today.format("YYYY-MM-DD");
+		return {
+			start: today.subtract(6, "day").format("YYYY-MM-DD"),
+			end: todayStr
+		};
+	}
+
+	const defaultCustomRange = getDefaultCustomRange();
+	const rangeStart = ref<string>(defaultCustomRange.start);
+	const rangeEnd = ref<string>(defaultCustomRange.end);
+	const draftStart = ref<string>(defaultCustomRange.start);
+	const draftEnd = ref<string>(defaultCustomRange.end);
+
+	const quickRanges : QuickRange[] = [
+		{ label: "近7天", key: "last_7_days" },
+		{ label: "近30天", key: "last_30_days" },
+		{ label: "本月", key: "this_month" },
+		{ label: "上月", key: "last_month" },
+		{ label: "本年", key: "this_year" }
+	];
+	const quickRangesPrimary = quickRanges.slice(0, 3);
+	const quickRangesSecondary = quickRanges.slice(3, 5);
+
+	const rangeDays = computed(() => calcDays(draftStart.value, draftEnd.value));
+
+	function calcDays(start : string, end : string) : number {
+		const s = new Date(start.replace(/-/g, "/"));
+		const e = new Date(end.replace(/-/g, "/"));
+		return Math.floor((e.getTime() - s.getTime()) / 86400000) + 1;
+	}
+
+	function formatSlash(date : string) : string {
+		return date.replace(/-/g, "/");
+	}
+
+	function resolveStatusTone(statusText : string) : OrderStatusTone {
+		if (statusText == "—" || statusText == "") {
+			return "default";
+		}
+		if (
+			statusText.indexOf("已") >= 0 ||
+			statusText.indexOf("完成") >= 0 ||
+			statusText.indexOf("通过") >= 0
+		) {
+			return "success";
+		}
+		if (
+			statusText.indexOf("驳") >= 0 ||
+			statusText.indexOf("拒") >= 0 ||
+			statusText.indexOf("失败") >= 0 ||
+			statusText.indexOf("异常") >= 0
+		) {
+			return "danger";
+		}
+		if (
+			statusText.indexOf("待") >= 0 ||
+			statusText.indexOf("中") >= 0 ||
+			statusText.indexOf("未") >= 0
+		) {
+			return "pending";
+		}
+		return "default";
+	}
+
+	function getPeriodKey() : string {
+		if (isCustomRange.value) {
+			return "custom";
+		}
+		const keys = ["today", "yesterday", "last_7_days", "last_30_days", "total"];
+		const idx = activePeriod.value;
+		if (idx >= 0 && idx < keys.length) {
+			return keys[idx];
+		}
+		return "total";
+	}
+
+	function buildOrderListParams(page : number) : OrderListParams {
+		const params : OrderListParams = {
+			page: page,
+			limit: ORDER_LIMIT,
+			period: getPeriodKey()
+		};
+		if (isCustomRange.value) {
+			params.start_date = rangeStart.value;
+			params.end_date = rangeEnd.value;
+		}
+		return params;
+	}
+
+	function parseOrderListPayload(res : any | null) : OrderListPayload | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			return null;
+		}
+		const raw = envelope["data"] ?? envelope;
+		if (raw == null) {
+			return null;
+		}
+		if (raw instanceof Array) {
+			return { list: raw as OrderListPayload["list"] };
+		}
+		return raw as OrderListPayload;
+	}
+
+	function updateOrderHasMore(rawListLength : number, count : number, page : number) {
+		if (count > 0) {
+			orderTotal.value = count;
+			hasMore.value = page * ORDER_LIMIT < count;
+			return;
+		}
+		hasMore.value = rawListLength >= ORDER_LIMIT;
+	}
+
+	function fetchOrderList(reset : boolean) {
+		if (reset) {
+			orderListSeq++;
+			listLoading.value = true;
+			orderList.value = [];
+			orderPage.value = 1;
+			orderTotal.value = 0;
+			hasMore.value = true;
+		} else {
+			if (listLoadingMore.value || !hasMore.value || listLoading.value) {
+				return;
+			}
+			listLoadingMore.value = true;
+		}
+		const currentSeq = orderListSeq;
+		const reqPage = reset ? 1 : orderPage.value + 1;
+		getOrderList(buildOrderListParams(reqPage))
+			.then((res) => {
+				if (reset && currentSeq != orderListSeq) {
+					return;
+				}
+				const payload = parseOrderListPayload(res);
+				if (payload == null) {
+					if (res != null) {
+						const code = (res as UTSJSONObject)["code"];
+						if (code != null && !isApiSuccess(code)) {
+							uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+						}
+					}
+					if (reset) {
+						orderList.value = [];
+					}
+					hasMore.value = false;
+					return;
+				}
+				const listRaw = payload.list ?? [];
+				if (reset) {
+					orderList.value = listRaw as OrderListItem[];
+				} else {
+					orderList.value = orderList.value.concat(listRaw as OrderListItem[]);
+				}
+				orderPage.value = reqPage;
+				const totalVal = payload.count;
+				let count = 0;
+				if (totalVal != null && !isNaN(parseInt(`${totalVal}`, 10))) {
+					count = parseInt(`${totalVal}`, 10);
+				}
+				updateOrderHasMore(listRaw.length, count, reqPage);
+			})
+			.catch((err) => {
+				if (reset && currentSeq != orderListSeq) {
+					return;
+				}
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				if (reset) {
+					if (currentSeq != orderListSeq) {
+						return;
+					}
+					listLoading.value = false;
+					return;
+				}
+				listLoadingMore.value = false;
+			});
+	}
+
+	function loadOrderList() {
+		fetchOrderList(true);
+	}
+
+	function loadMoreOrderList() {
+		fetchOrderList(false);
+	}
+
+	function onOrderScrollToLower() {
+		if (!hasMore.value || listLoadingMore.value || listLoading.value) {
+			return;
+		}
+		loadMoreOrderList();
+	}
+
+	function onOrderLoadMoreTap() {
+		onOrderScrollToLower();
+	}
+
+	function selectPeriod(index : number) {
+		isCustomRange.value = false;
+		activePeriod.value = index;
+		loadOrderList();
+	}
+
+	function matchQuickKey(start : string, end : string) : QuickRangeKey | "" {
+		for (let i = 0; i < quickRanges.length; i++) {
+			const key = quickRanges[i].key;
+			const range = resolveQuickRange(key);
+			if (range.start == start && range.end == end) {
+				return key;
+			}
+		}
+		return "";
+	}
+
+	function resolveQuickRange(key : QuickRangeKey) : { start : string; end : string } {
+		const today = dayUts();
+		const todayStr = today.format("YYYY-MM-DD");
+		if (key == "last_7_days") {
+			return { start: today.subtract(6, "day").format("YYYY-MM-DD"), end: todayStr };
+		}
+		if (key == "last_30_days") {
+			return { start: today.subtract(29, "day").format("YYYY-MM-DD"), end: todayStr };
+		}
+		if (key == "this_month") {
+			return { start: today.startOf("month").format("YYYY-MM-DD"), end: todayStr };
+		}
+		if (key == "last_month") {
+			const lastMonth = today.subtract(1, "month");
+			return {
+				start: lastMonth.startOf("month").format("YYYY-MM-DD"),
+				end: lastMonth.endOf("month").format("YYYY-MM-DD")
+			};
+		}
+		return { start: today.startOf("year").format("YYYY-MM-DD"), end: todayStr };
+	}
+
+	function applyQuickDraft(key : QuickRangeKey) {
+		const range = resolveQuickRange(key);
+		draftStart.value = range.start;
+		draftEnd.value = range.end;
+		draftQuickKey.value = key;
+		ensureDraftRangeOrder();
+	}
+
+	function compareDate(start : string, end : string) : number {
+		const s = new Date(start.replace(/-/g, "/"));
+		const e = new Date(end.replace(/-/g, "/"));
+		return s.getTime() - e.getTime();
+	}
+
+	function ensureDraftRangeOrder() {
+		if (compareDate(draftStart.value, draftEnd.value) > 0) {
+			draftEnd.value = draftStart.value;
+		}
+	}
+
+	function ensureDraftDates() {
+		const todayStr = dayUts().format("YYYY-MM-DD");
+		if (draftStart.value.trim() == "") {
+			draftStart.value = todayStr;
+		}
+		if (draftEnd.value.trim() == "") {
+			draftEnd.value = todayStr;
+		}
+		ensureDraftRangeOrder();
+	}
+
+	function pickDraftStart() {
+		ensureDraftDates();
+		nextTick(() => {
+			draftStartSelectRef.value?.open(null);
+		});
+	}
+
+	function pickDraftEnd() {
+		ensureDraftDates();
+		nextTick(() => {
+			draftEndSelectRef.value?.open(null);
+		});
+	}
+
+	function onDraftStartChange(value : string) {
+		draftStart.value = value;
+		ensureDraftRangeOrder();
+		draftQuickKey.value = matchQuickKey(draftStart.value, draftEnd.value);
+	}
+
+	function onDraftEndChange(value : string) {
+		draftEnd.value = value;
+		ensureDraftRangeOrder();
+		draftQuickKey.value = matchQuickKey(draftStart.value, draftEnd.value);
+	}
+
+	function openRangePopup(preserveApplied : boolean = false) {
+		if (preserveApplied) {
+			draftStart.value = rangeStart.value;
+			draftEnd.value = rangeEnd.value;
+			draftQuickKey.value = matchQuickKey(draftStart.value, draftEnd.value);
+		} else {
+			applyQuickDraft("last_7_days");
+		}
+		rangePopupVisible.value = true;
+	}
+
+	function closeRangePopup() {
+		rangePopupVisible.value = false;
+	}
+
+	function applyRangePopup() {
+		if (compareDate(draftStart.value, draftEnd.value) > 0) {
+			uni.showToast({ title: "开始日期不能晚于结束日期", icon: "none" });
+			return;
+		}
+		isCustomRange.value = true;
+		activePeriod.value = -1;
+		rangeStart.value = draftStart.value;
+		rangeEnd.value = draftEnd.value;
+		rangePopupVisible.value = false;
+		loadOrderList();
+	}
+
+	function pickQuick(item : QuickRange) {
+		applyQuickDraft(item.key);
+	}
+
+	function onCalendarTap() {
+		isCustomRange.value = true;
+		activePeriod.value = -1;
+		openRangePopup();
+	}
+
+	function toWallet() {
+		if (canWithdraw.value != 1) {
+			return;
+		}
+		router.push({ path: "/pages/wallet/index" });
+	}
+
+	function loadCanWithdraw() {
+		getUserProfile()
+			.then((res) => {
+				if (res == null) {
+					canWithdraw.value = 0;
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					canWithdraw.value = 0;
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const flag = data["can_withdraw"];
+				if (flag == null) {
+					canWithdraw.value = 0;
+					return;
+				}
+				const n = parseInt(`${flag}`);
+				canWithdraw.value = isNaN(n) ? 0 : n;
+			})
+			.catch(() => {
+				canWithdraw.value = 0;
+			});
+	}
+
+	function applyStaffSummaryFromItem(item : StaffListItem) {
+		staffSummary.value = item.stats ?? {};
+	}
+
+	function parseStaffSummaryPayload(res : any | null) : StaffListData | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			return null;
+		}
+		const raw = envelope["data"] ?? envelope;
+		if (raw == null) {
+			return null;
+		}
+		if (raw instanceof Array) {
+			return { list: raw as StaffListData["list"] };
+		}
+		return raw as StaffListData;
+	}
+
+	function loadStaffSummary() {
+		if (staffSummaryLoading.value) {
+			return;
+		}
+		staffSummaryLoading.value = true;
+		getStaff()
+			.then((res) => {
+				const payload = parseStaffSummaryPayload(res);
+				if (payload == null) {
+					if (res != null) {
+						const code = (res as UTSJSONObject)["code"];
+						if (code != null && !isApiSuccess(code)) {
+							uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+						}
+					}
+					return;
+				}
+				const list = payload.list ?? [];
+				if (list.length > 0) {
+					applyStaffSummaryFromItem(list[0] as StaffListItem);
+				}
+			})
+			.catch(() => { })
+			.finally(() => {
+				staffSummaryLoading.value = false;
+			});
+	}
+
+	onShow(() => {
+		syncTabbarRoutePath();
+		loadCanWithdraw();
+		loadStaffSummary();
+		loadOrderList();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.inc-page {
+		height: 100vh;
+		width: 100%;
+		max-width: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		box-sizing: border-box;
+		background-color: #f7f8fa;
+	}
+
+	.inc-scroll {
+		flex: 1;
+		height: 0;
+		width: 100%;
+	}
+
+	.inc-scroll-inner {
+		padding-top: calc(16rpx + env(safe-area-inset-top));
+		padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+		box-sizing: border-box;
+	}
+
+	.inc-summary-card {
+		margin: 0 30rpx 20rpx;
+		padding: 32rpx 28rpx 28rpx;
+		border-radius: 24rpx;
+		background-image: linear-gradient(135deg, #1a1f3a 0%, #2b3a6b 55%, #3a3268 100%);
+		box-shadow: 0 12rpx 32rpx rgba(26, 31, 58, 0.18);
+	}
+
+	.inc-summary-top {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.inc-summary-label-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.inc-wallet-entry {
+		flex-shrink: 0;
+		margin-left: 16rpx;
+		padding: 8rpx 16rpx 8rpx 18rpx;
+		border-radius: 999rpx;
+		background-color: rgba(255, 255, 255, 0.14);
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.inc-wallet-entry-text {
+		margin-left: 8rpx;
+		margin-right: 2rpx;
+		font-size: 24rpx;
+		color: #ffffff;
+		line-height: 34rpx;
+	}
+
+	.inc-summary-dot {
+		width: 12rpx;
+		height: 12rpx;
+		border-radius: 999rpx;
+		background-color: #7dd3fc;
+		margin-right: 12rpx;
+	}
+
+	.inc-summary-label {
+		font-size: 24rpx;
+		color: rgba(255, 255, 255, 0.72);
+		line-height: 34rpx;
+	}
+
+	.inc-summary-amount {
+		margin-top: 16rpx;
+		font-size: 56rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 72rpx;
+		min-height: 72rpx;
+	}
+
+	.inc-summary-stats {
+		margin-top: 28rpx;
+		padding-top: 24rpx;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: rgba(255, 255, 255, 0.12);
+		display: flex;
+		flex-direction: row;
+		align-items: stretch;
+	}
+
+	.inc-summary-stat {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-start;
+		min-height: 84rpx;
+
+		&--divider {
+			border-left-width: 1rpx;
+			border-left-style: solid;
+			border-left-color: rgba(255, 255, 255, 0.12);
+			padding-left: 24rpx;
+		}
+	}
+
+	.inc-summary-stat-label {
+		font-size: 22rpx;
+		color: rgba(255, 255, 255, 0.55);
+		line-height: 30rpx;
+		min-height: 30rpx;
+	}
+
+	.inc-summary-stat-value {
+		margin-top: 8rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 38rpx;
+		min-height: 38rpx;
+	}
+
+	.inc-panel {
+		margin: 0 30rpx 20rpx;
+		padding: 20rpx 20rpx 20rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.04);
+	}
+
+	.inc-period-bar {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.inc-period-row {
+		flex: 1;
+		height: 68rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 6rpx;
+		box-sizing: border-box;
+		border-radius: 16rpx;
+		background-color: #f3f4f6;
+	}
+
+	.inc-period-item {
+		flex: 1;
+		padding: 12rpx 0;
+		border-radius: 12rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background-color: #ffffff;
+			box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+		}
+	}
+
+	.inc-period-text {
+		font-size: 24rpx;
+		color: #666666;
+		white-space: nowrap;
+	}
+
+	.inc-period-item--active .inc-period-text {
+		color: #333333;
+		font-weight: 600;
+	}
+
+	.inc-period-cal {
+		flex-shrink: 0;
+		width: 68rpx;
+		height: 68rpx;
+		margin-left: 16rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #eeeeee;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background-color: #2b59c3;
+			border-color: #2b59c3;
+		}
+	}
+
+	.inc-range-bar {
+		margin-top: 20rpx;
+		padding: 20rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #eef3fc;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.inc-range-main {
+		flex: 1;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-right: 16rpx;
+	}
+
+	.inc-range-label {
+		margin-left: 8rpx;
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 34rpx;
+	}
+
+	.inc-range-value {
+		margin-left: 12rpx;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 36rpx;
+	}
+
+	.inc-range-edit {
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 34rpx;
+	}
+
+	.inc-body {
+		padding: 0 30rpx;
+	}
+
+	.inc-section-head {
+		margin-bottom: 16rpx;
+	}
+
+	.inc-section-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.inc-list-state {
+		padding: 80rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.inc-list-state-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.inc-order-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.inc-order-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.04);
+		margin-bottom: 20rpx;
+		overflow: hidden;
+
+		.inc-order-head {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			padding: 24rpx 24rpx 20rpx;
+		}
+
+		.inc-order-title {
+			flex: 1;
+			min-width: 0;
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #333333;
+			line-height: 42rpx;
+			word-break: break-all;
+			padding-right: 16rpx;
+		}
+
+		.inc-order-status {
+			flex-shrink: 0;
+			padding: 4rpx 12rpx;
+			border-radius: 8rpx;
+			background-color: #eef3fc;
+
+			&--success {
+				background-color: #ecfdf3;
+
+				.inc-order-status-text {
+					color: #16a34a;
+				}
+			}
+
+			&--pending {
+				background-color: #fff7ed;
+
+				.inc-order-status-text {
+					color: #ea580c;
+				}
+			}
+
+			&--danger {
+				background-color: #fef2f2;
+
+				.inc-order-status-text {
+					color: #dc2626;
+				}
+			}
+
+			&--default {
+				background-color: #eef3fc;
+
+				.inc-order-status-text {
+					color: #2b59c3;
+				}
+			}
+		}
+
+		.inc-order-status-text {
+			font-size: 20rpx;
+			font-weight: 600;
+			color: #2b59c3;
+			line-height: 28rpx;
+		}
+
+		.inc-order-divider {
+			height: 1rpx;
+			background-color: #f0f0f0;
+		}
+
+		.inc-order-body {
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			padding: 20rpx 16rpx 24rpx;
+		}
+
+		.inc-order-field {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: flex-start;
+			box-sizing: border-box;
+			position: relative;
+
+			&:not(:last-child)::after {
+				content: "";
+				position: absolute;
+				right: 0;
+				top: 0;
+				bottom: 0;
+				width: 1rpx;
+				background-color: #eeeeee;
+			}
+		}
+
+		.inc-order-remark {
+			margin: 0 24rpx 20rpx;
+			padding: 16rpx 20rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+			background-color: #f7f8fa;
+			border-radius: 12rpx;
+		}
+
+		.inc-order-remark-label {
+			flex-shrink: 0;
+			font-size: 22rpx;
+			color: #999999;
+			line-height: 34rpx;
+			margin-right: 12rpx;
+		}
+
+		.inc-order-remark-value {
+			flex: 1;
+			min-width: 0;
+			font-size: 24rpx;
+			color: #666666;
+			line-height: 34rpx;
+			word-break: break-all;
+		}
+
+		.inc-order-field-label {
+			font-size: 22rpx;
+			color: #999999;
+			line-height: 30rpx;
+			text-align: center;
+		}
+
+		.inc-order-field-value {
+			margin-top: 8rpx;
+			font-size: 26rpx;
+			font-weight: 600;
+			color: #333333;
+			line-height: 36rpx;
+			word-break: break-all;
+			text-align: center;
+
+			&--profit {
+				color: #2b59c3;
+			}
+		}
+	}
+
+	.inc-list-footer {
+		padding: 16rpx 0 32rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.inc-list-footer-count {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.inc-list-footer-text {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.inc-range-popup {
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		border-radius: 24rpx 24rpx 0 0;
+	}
+
+	.inc-range-popup-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 28rpx;
+	}
+
+	.inc-range-popup-cancel,
+	.inc-range-popup-apply {
+		font-size: 28rpx;
+		color: #2b59c3;
+		line-height: 40rpx;
+	}
+
+	.inc-range-popup-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.inc-range-popup-section {
+		display: block;
+		margin-bottom: 16rpx;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 36rpx;
+	}
+
+	.inc-range-popup-quick-row {
+		display: flex;
+		flex-direction: row;
+		margin-bottom: 12rpx;
+	}
+
+	.inc-range-popup-quick-item {
+		flex: 1;
+		margin-right: 12rpx;
+		padding: 16rpx 0;
+		border-radius: 12rpx;
+		background-color: #f3f4f6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&:last-child {
+			margin-right: 0;
+		}
+
+		&--active {
+			background-color: #eef3fc;
+			border: 1rpx solid #2b59c3;
+		}
+	}
+
+	.inc-range-popup-quick-text {
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.inc-range-popup-quick-item--active .inc-range-popup-quick-text {
+		color: #2b59c3;
+		font-weight: 600;
+	}
+
+	.inc-range-popup-custom {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 20rpx;
+	}
+
+	.inc-range-popup-date {
+		flex: 1;
+		padding: 20rpx;
+		border-radius: 16rpx;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.inc-range-popup-date-label {
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 30rpx;
+	}
+
+	.inc-range-popup-date-value {
+		margin: 8rpx 0;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.inc-range-popup-arrow {
+		margin: 0 12rpx;
+		font-size: 28rpx;
+		color: #999999;
+	}
+
+	.inc-range-popup-summary {
+		margin-bottom: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.inc-range-popup-summary-text {
+		margin-left: 8rpx;
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.inc-range-popup-btn {
+		height: 88rpx;
+		border-radius: 16rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.inc-range-popup-btn-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 42rpx;
+	}
+</style>

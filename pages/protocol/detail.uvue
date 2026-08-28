@@ -1,0 +1,213 @@
+<template>
+	<cl-page :pt="{ className: 'pd-page' }">
+		<view class="pd-page">
+			<view v-if="pageLoading" class="pd-loading-mask">
+				<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+				<text class="pd-loading-text">加载中...</text>
+			</view>
+			<scroll-view v-if="!pageLoading" class="pd-scroll" scroll-y="true" :show-scrollbar="false">
+				<view v-if="richHtml == ''" class="pd-state pd-state--full">
+					<text class="pd-state-text">暂无协议内容</text>
+				</view>
+				<view v-else class="pd-body">
+					<text class="pd-main-title">{{ pageTitle }}</text>
+					<rich-text class="pd-rich" :nodes="richHtml"></rich-text>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getAppProtocolDetail } from "@/.cool/api/protocol";
+	import { getApiMessage } from "@/.cool";
+	import type { AppProtocolDetail, Response } from "@/.cool";
+
+	const pageTitle = ref("协议");
+	const richHtml = ref("");
+	const pageLoading = ref(false);
+
+	function normalizeProtocolHtml(html: string): string {
+		return html
+			.replace(/<br\s*\/?>/gi, "")
+			.replace(/<\/p>\s*<p[^>]*>/gi, "")
+			.replace(/<p[^>]*>/gi, '<p style="margin:0;padding:0;line-height:1.6;">');
+	}
+
+	function toProtocolRichHtml(text: string): string {
+		const trimmed = text.trim();
+		if (trimmed == "") {
+			return "";
+		}
+		if (trimmed.indexOf("<") >= 0 && trimmed.indexOf(">") > trimmed.indexOf("<")) {
+			return normalizeProtocolHtml(trimmed);
+		}
+		const plain = trimmed.replace(/\s*\n+\s*/g, "");
+		const escaped = plain
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
+		return `<div style="font-size:14px;color:#666;line-height:1.6;word-break:break-word;">${escaped}</div>`;
+	}
+
+	function buildRichHtml(item: AppProtocolDetail): string {
+		const extra = item.content_extra ?? null;
+		if (extra != null) {
+			const html = extra.html ?? extra.content ?? "";
+			if (`${html}`.trim() != "") {
+				return normalizeProtocolHtml(`${html}`);
+			}
+			const summary = extra.summary ?? "";
+			if (`${summary}`.trim() != "") {
+				return toProtocolRichHtml(`${summary}`);
+			}
+		}
+		const content = item.content ?? "";
+		if (`${content}`.trim() != "") {
+			return toProtocolRichHtml(`${content}`);
+		}
+		const summary = item.summary ?? "";
+		if (`${summary}`.trim() != "") {
+			return toProtocolRichHtml(`${summary}`);
+		}
+		return "";
+	}
+
+	function parseProtocolDetail(res: any | null): AppProtocolDetail | null {
+		if (res == null) {
+			return null;
+		}
+		if (Array.isArray(res)) {
+			const arr = res as AppProtocolDetail[];
+			return arr.length > 0 ? arr[0] : null;
+		}
+		const envelope = res as UTSJSONObject;
+		const data = envelope["data"];
+		if (data != null) {
+			return data as AppProtocolDetail;
+		}
+		return res as AppProtocolDetail;
+	}
+
+	function applyProtocolDetail(item: AppProtocolDetail) {
+		const title = item.title ?? "";
+		if (title != "") {
+			pageTitle.value = `${title}`;
+		}
+		richHtml.value = buildRichHtml(item);
+	}
+
+	function loadProtocolDetail(id: string, pageKey: string) {
+		if (pageLoading.value) {
+			return;
+		}
+		if (id == "" && pageKey == "") {
+			uni.showToast({ title: "缺少协议参数", icon: "none" });
+			return;
+		}
+		pageLoading.value = true;
+		getAppProtocolDetail({
+			id: id,
+			page_key: pageKey
+		}).then((res) => {
+            const detail = parseProtocolDetail(res);
+            if (detail == null) {
+                uni.showToast({ title: "协议内容为空", icon: "none" });
+                return;
+            }
+            applyProtocolDetail(detail);
+        })
+        .catch((err) => {
+            const res = err as Response;
+            uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+        })
+        .finally(() => {
+            pageLoading.value = false;
+        });
+	}
+
+	onLoad((options) => {
+		const idVal = options["id"] ?? options["protocol_id"];
+		const id = idVal != null ? `${idVal}`.trim() : "";
+		const pageKeyVal = options["page_key"] ?? options["key"];
+		const pageKey = pageKeyVal != null ? `${pageKeyVal}`.trim() : "";
+		loadProtocolDetail(id, pageKey);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.pd-page {
+		position: relative;
+		min-height: 100vh;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.pd-loading-mask {
+		position: fixed;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		z-index: 999;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		background-color: #f7f8fa;
+	}
+
+	.pd-loading-text {
+		margin-top: 20rpx;
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.pd-scroll {
+		flex: 1;
+		height: 0;
+		background-color: #f7f8fa;
+	}
+
+	.pd-state {
+		padding: 120rpx 30rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.pd-state--full {
+		min-height: 100%;
+		box-sizing: border-box;
+	}
+
+	.pd-state-text {
+		margin-top: 20rpx;
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.pd-body {
+		padding: 24rpx 30rpx 40rpx;
+	}
+
+	.pd-main-title {
+		font-size: 40rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 56rpx;
+		text-align: center;
+	}
+
+	.pd-rich {
+		margin-top: 32rpx;
+		line-height: 1.6;
+	}
+</style>

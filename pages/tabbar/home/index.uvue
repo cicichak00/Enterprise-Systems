@@ -1,0 +1,2148 @@
+<template>
+	<cl-page :pt="{ className: 'ov-page' }">
+		<view class="ov-page">
+			<view class="ov-header">
+				<cl-safe-area type="top"></cl-safe-area>
+
+				<view class="ov-hero">
+					<view class="ov-hero-copy">
+						<text class="ov-hero-kicker">企业主工作台</text>
+						<text class="ov-hero-title">{{ enterpriseName }}</text>
+						<text v-if="enterpriseIntro != ''" class="ov-hero-sub">{{ enterpriseIntro }}</text>
+					</view>
+					<view class="ov-hero-notice-wrap" @tap="toNotice">
+						<view class="ov-hero-notice">
+							<cl-icon name="notification-4-line" :size="20" color="#333333"></cl-icon>
+						</view>
+						<view class="ov-hero-badge" v-if="messageUnreadCount > 0">
+							<text class="ov-hero-badge-text">{{ messageUnreadBadgeText }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+
+            <view class="ov-card">
+                <view class="ov-card-head">
+					<text class="ov-card-title">数据总览</text>
+                </view>
+                <view class="ov-card-divider"></view>
+
+                <view class="ov-card-content">
+					<view class="ov-metric-layout">
+						<view class="ov-metric-row ov-metric-row--primary">
+							<view class="ov-metric-cell ov-metric-cell--full ov-metric-cell--hero">
+								<text class="ov-metric-primary-label">企业主总收益（元）</text>
+								<view class="ov-metric-money">
+									<text class="ov-metric-unit">¥</text>
+									<text class="ov-metric-primary-value">{{ headlineMetrics[1].value }}</text>
+								</view>
+							</view>
+						</view>
+						<view class="ov-metric-row">
+							<view class="ov-metric-cell ov-metric-cell--stack">
+								<text class="ov-metric-label">推广总收益（元）</text>
+								<view class="ov-metric-money">
+									<text class="ov-metric-unit">¥</text>
+									<text class="ov-metric-value">{{ headlineMetrics[0].value }}</text>
+								</view>
+							</view>
+							<view class="ov-metric-cell ov-metric-cell--stack">
+								<text class="ov-metric-label">员工总收益（元）</text>
+								<view class="ov-metric-money">
+									<text class="ov-metric-unit">¥</text>
+									<text class="ov-metric-value">{{ topMetrics[3].value }}</text>
+								</view>
+							</view>
+						</view>
+						<view class="ov-metric-row" @tap="onMetricTap(topMetrics[0])">
+							<view class="ov-metric-cell ov-metric-cell--full">
+								<view class="ov-metric-label-with-arrow">
+									<text class="ov-metric-label">总员工</text>
+									<text class="ov-metric-caption">在职/全部</text>
+									<cl-icon name="arrow-right-s-line" :size="12" color="#a6adbb"></cl-icon>
+								</view>
+								<text class="ov-metric-value">{{ topMetrics[0].value }}</text>
+							</view>
+						</view>
+						<view class="ov-metric-row ov-metric-row--last">
+							<view class="ov-metric-cell ov-metric-cell--stack">
+								<text class="ov-metric-label">推广任务总量</text>
+								<text class="ov-metric-value">{{ topMetrics[1].value }}</text>
+							</view>
+							<view class="ov-metric-cell ov-metric-cell--stack">
+								<text class="ov-metric-label">回填总量</text>
+								<text class="ov-metric-value">{{ topMetrics[2].value }}</text>
+							</view>
+						</view>
+					</view>
+
+					<view class="ov-detail-head" @tap="toggleDetailStats">
+						<view class="ov-detail-copy">
+							<text class="ov-detail-title">明细统计</text>
+							<text class="ov-detail-hint">{{ detailStatsExpanded ? "点击员工类型可筛选订单" : "按员工类型查看经营数据" }}</text>
+						</view>
+						<view class="ov-detail-toggle">
+							<text class="ov-detail-toggle-text">{{ detailStatsExpanded ? "收起" : "展开" }}</text>
+							<cl-icon
+								:name="detailStatsExpanded ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+								:size="16"
+								color="#596174"
+							></cl-icon>
+						</view>
+                    </view>
+					<view v-if="detailStatsExpanded" class="ov-stat-table">
+                        <view class="ov-stat-row ov-stat-row--head">
+                            <text class="ov-stat-cell ov-stat-cell--role">员工类型</text>
+                            <text class="ov-stat-cell">成员</text>
+                            <text class="ov-stat-cell">员工收益</text>
+                            <text class="ov-stat-cell">推广任务</text>
+                            <text class="ov-stat-cell">回填数量</text>
+                        </view>
+                        <view
+                            class="ov-stat-row"
+							:class="{ 'ov-stat-row--active': activeRoleKey == item.key }"
+                            v-for="(item, index) in roleStats"
+                            :key="'role-' + index"
+							@tap="onRoleStatTap(item.key)"
+                        >
+                            <text class="ov-stat-cell ov-stat-cell--role">{{ item.label }}</text>
+                            <text class="ov-stat-cell">{{ item.memberCount }}</text>
+                            <text class="ov-stat-cell">{{ item.staffRevenue }}</text>
+                            <text class="ov-stat-cell">{{ item.keywordCount }}</text>
+                            <text class="ov-stat-cell">{{ item.backfillCount }}</text>
+                        </view>
+                    </view>
+                </view>
+            </view>
+			<view class="ov-body">
+				<view class="ov-overview-filter">
+					<view class="ov-period-bar">
+						<view class="ov-period-row">
+							<view
+								v-for="(item, index) in periodTabs"
+								:key="index"
+								class="ov-period-item"
+								:class="{ 'ov-period-item--active': activePeriod == index && !isCustomRange }"
+								@tap="selectPeriod(index)"
+							>
+								<text class="ov-period-text">{{ item }}</text>
+							</view>
+						</view>
+						<view
+							class="ov-period-cal"
+							:class="{ 'ov-period-cal--active': isCustomRange }"
+							@tap="onCalendarTap"
+						>
+							<cl-icon name="calendar-line" :size="16" :color="isCustomRange ? '#ffffff' : '#666666'"></cl-icon>
+						</view>
+					</view>
+					<view v-if="isCustomRange" class="ov-range-bar">
+						<view class="ov-range-main">
+							<cl-icon name="calendar-line" :size="14" color="#2b59c3"></cl-icon>
+							<text class="ov-range-value">{{ rangeStart }} 至 {{ rangeEnd }}</text>
+						</view>
+						<text class="ov-range-edit" @tap="openRangePopup(true)">修改</text>
+					</view>
+				</view>
+                <view class="ov-filter-panel">
+                    <view class="ov-sort-row">
+						<text class="ov-filter-label">明细筛选</text>
+                        <picker
+                            class="ov-sort-picker"
+                            mode="selector"
+                            :range="orderSortOptions"
+                            :value="orderSortIndex"
+                            @change="onOrderSortChange"
+                        >
+                            <view class="ov-sort-trigger">
+                                <text class="ov-sort-text">{{ orderSortOptions[orderSortIndex] }}</text>
+                                <cl-icon name="arrow-down-s-line" :size="14" color="#596174"></cl-icon>
+                            </view>
+                        </picker>
+                        <picker
+                            class="ov-sort-picker"
+                            mode="selector"
+                            :range="staffFilterOptions"
+                            :value="staffFilterIndex"
+                            @change="onStaffFilterChange"
+                        >
+                            <view class="ov-sort-trigger">
+                                <text class="ov-sort-text">{{ staffFilterOptions[staffFilterIndex] }}</text>
+                                <cl-icon name="arrow-down-s-line" :size="14" color="#596174"></cl-icon>
+                            </view>
+                        </picker>
+                    </view>
+                </view>
+				<view class="ov-section-head">
+					<text class="ov-section-title">订单收益</text>
+					<text v-if="orderList.length > 0" class="ov-section-meta">{{ orderListMeta }}</text>
+					<view class="ov-section-link-row" @tap="toBusiness" v-if="false">
+						<text class="ov-section-link">看全部</text>
+						<cl-icon name="arrow-right-s-line" :size="12" color="#999999"></cl-icon>
+					</view>
+				</view>
+
+				<view v-if="listLoading && orderList.length == 0" class="ov-list-state">
+					<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+					<text class="ov-list-state-text">加载中...</text>
+				</view>
+				<view v-else-if="displayOrderList.length == 0" class="ov-list-state">
+					<text class="ov-list-state-text">暂无收益数据</text>
+				</view>
+				<view v-else>
+				<view class="ov-emp-card" v-for="item in displayOrderList" :key="item.id">
+					<view class="ov-emp-top">
+						<view class="ov-emp-avatar">
+							<text class="ov-emp-avatar-text">{{ resolveOrderAvatar(item) }}</text>
+						</view>
+						<view class="ov-emp-info">
+                            <view class="ov-emp-name-row">
+							    <text class="ov-emp-name">{{ item.user_nickname }}</text>
+                                <text
+                                    v-if="resolveEmploymentStatus(item) != ''"
+                                    class="ov-emp-badge ov-emp-badge--status"
+									:class="{ 'ov-emp-badge--departed': resolveEmploymentStatus(item) == '离职' }"
+                                >
+                                    {{ resolveEmploymentStatus(item) }}
+                                </text>
+                                <text
+                                    v-if="resolveStaffRoleLabel(item) != ''"
+                                    class="ov-emp-badge ov-emp-badge--role"
+                                >
+                                    {{ resolveStaffRoleLabel(item) }}
+                                </text>
+                            </view>
+							<text class="ov-emp-id">ID: {{ item.user_sn || item.user_id }}</text>
+						</view>
+                        <view class="ov-emp-main" v-if="item.is_virtual == 1">
+							<text class="ov-emp-amount">{{ item.user_profit }}</text>
+							<text class="ov-emp-amount-label">员工收益</text>
+						</view>
+						<view class="ov-emp-main" v-else>
+							<text class="ov-emp-amount">{{ item.enterprise_profit }}</text>
+							<text class="ov-emp-amount-label">企业收益</text>
+						</view>
+					</view>
+					<view class="ov-emp-divider"></view>
+					<view class="ov-emp-grid">
+						<template v-if="item.is_virtual == 1">
+							<view class="ov-emp-cell ov-emp-cell--keyword">
+								<text class="ov-emp-cell-label">关键词</text>
+								<text class="ov-emp-cell-value ov-emp-cell-value--wrap">{{ item.keyword }}</text>
+							</view>
+							<view class="ov-emp-cell ov-emp-cell--date">
+								<text class="ov-emp-cell-label">创建日期</text>
+								<text class="ov-emp-cell-value">{{ item.import_time }}</text>
+							</view>
+						</template>
+						<template v-else>
+							<view class="ov-emp-cell">
+								<text class="ov-emp-cell-label">推广收益</text>
+								<text class="ov-emp-cell-value">{{ item.share_profit }}</text>
+							</view>
+							<view class="ov-emp-cell">
+								<text class="ov-emp-cell-label">员工收益</text>
+								<text class="ov-emp-cell-value">{{ item.user_profit }}</text>
+							</view>
+							<view class="ov-emp-cell">
+								<text class="ov-emp-cell-label">结算日期</text>
+								<text class="ov-emp-cell-value">{{ item.audit_time }}</text>
+							</view>
+							<view class="ov-emp-cell">
+								<text class="ov-emp-cell-label">分佣比例</text>
+								<text class="ov-emp-cell-value ov-emp-cell-value--blue">{{ item.user_rate }}</text>
+							</view>
+						</template>
+						<!-- <view v-if="item.remark" class="ov-emp-cell ov-emp-cell--full">
+							<text class="ov-emp-cell-label">备注</text>
+							<text class="ov-emp-cell-value">{{ item.remark }}</text>
+						</view> -->
+					</view>
+				</view>
+				<view v-if="orderList.length > 0" class="ov-list-footer">
+					<cl-loadmore
+						:loading="listLoadingMore"
+						:finish="!hasMore"
+						finish-text="没有更多了"
+						loading-text="加载中..."
+					></cl-loadmore>
+					<text v-if="hasMore && !listLoadingMore" class="ov-list-footer-text">上拉加载更多</text>
+				</view>
+				</view>
+			</view>
+		</view>
+
+		<custom-tabbar></custom-tabbar>
+
+		<cl-popup
+			v-model="rangePopupVisible"
+			direction="bottom"
+			:show-header="false"
+			:show-close="false"
+			:pt="{ className: 'ov-range-popup-wrap', inner: { className: 'ov-range-popup-inner' } }"
+            :swipeClose="false"
+		>
+			<view class="ov-range-popup">
+				<view class="ov-range-popup-head">
+					<text class="ov-range-popup-cancel" @tap="closeRangePopup">取消</text>
+					<text class="ov-range-popup-title">选择时间区间</text>
+					<text class="ov-range-popup-apply" @tap="applyRangePopup">应用</text>
+				</view>
+
+				<text class="ov-range-popup-section">快捷选择</text>
+				<view class="ov-range-popup-quick">
+					<view class="ov-range-popup-quick-row">
+						<view
+							class="ov-range-popup-quick-item"
+							:class="{ 'ov-range-popup-quick-item--active': draftQuickKey == item.key }"
+							v-for="(item, index) in quickRangesPrimary"
+							:key="index"
+							@tap="pickQuick(item)"
+						>
+							<text class="ov-range-popup-quick-text">{{ item.label }}</text>
+						</view>
+					</view>
+					<view class="ov-range-popup-quick-row">
+						<view
+							class="ov-range-popup-quick-item"
+							:class="{ 'ov-range-popup-quick-item--active': draftQuickKey == item.key }"
+							v-for="(item, index) in quickRangesSecondary"
+							:key="index"
+							@tap="pickQuick(item)"
+						>
+							<text class="ov-range-popup-quick-text">{{ item.label }}</text>
+						</view>
+					</view>
+				</view>
+
+				<text class="ov-range-popup-section">自定义区间</text>
+				<view class="ov-range-popup-custom">
+					<view class="ov-range-popup-date" @tap="pickDraftStart">
+						<text class="ov-range-popup-date-label">开始</text>
+						<text class="ov-range-popup-date-value">{{ formatSlash(draftStart) }}</text>
+						<cl-icon name="calendar-line" :size="16" color="#999999"></cl-icon>
+					</view>
+					<text class="ov-range-popup-arrow">→</text>
+					<view class="ov-range-popup-date" @tap="pickDraftEnd">
+						<text class="ov-range-popup-date-label">结束</text>
+						<text class="ov-range-popup-date-value">{{ formatSlash(draftEnd) }}</text>
+						<cl-icon name="calendar-line" :size="16" color="#999999"></cl-icon>
+					</view>
+				</view>
+
+				<view class="ov-range-popup-summary">
+					<cl-icon name="check-line" :size="14" color="#1a2744"></cl-icon>
+					<text class="ov-range-popup-summary-text">共 {{ rangeDays }} 天</text>
+				</view>
+
+				<view class="ov-range-popup-btn" @tap="applyRangePopup">
+					<text class="ov-range-popup-btn-text">应用区间</text>
+				</view>
+			</view>
+		</cl-popup>
+
+		<cl-calendar-select
+			ref="draftStartSelectRef"
+			:show-trigger="false"
+			:swipe-close="false"
+			mode="single"
+			v-model="draftStart"
+			:end="draftEnd"
+			title="选择开始日期"
+			@change="onDraftStartChange"
+		></cl-calendar-select>
+		<cl-calendar-select
+			ref="draftEndSelectRef"
+			:show-trigger="false"
+			:swipe-close="false"
+			mode="single"
+			v-model="draftEnd"
+			:start="draftStart"
+			title="选择结束日期"
+			@change="onDraftEndChange"
+		></cl-calendar-select>
+	</cl-page>
+</template>
+
+<script lang="uts">
+	export default {
+		onShow() {
+			uni.setNavigationBarColor({
+				frontColor: "#000000",
+				backgroundColor: "#ffffff"
+			});
+		}
+	};
+</script>
+
+<script lang="ts" setup>
+	import { computed, nextTick, onMounted, ref } from "vue";
+	import { getAppSystem } from "@/.cool/api/app";
+	import { getEnterpriseInfo } from "@/.cool/api/enterprise";
+	import { fetchMessageUnreadCount, formatMessageUnreadBadgeText } from "@/.cool/utils/message";
+	import { getOrderList } from "@/.cool/api/order";
+	import type { OrderListItem } from "@/.cool/types/order";
+	import {
+		getAllowedEntryPath,
+		parseAppSystemRouteState,
+		shouldBlockHomeOverview
+	} from "@/.cool/navigation/appSystemNavigation";
+	import { dayUts, isApiSuccess, getApiMessage, router, useStore } from "@/.cool";
+	import type { EnterpriseInfo, Response } from "@/.cool";
+	import CustomTabbar from "@/components/tabbar.uvue";
+	import { applyAppSystemResponse, pushToMenuPath, syncTabbarRoutePath } from "@/.cool/store/tabbar";
+
+	const { user } = useStore();
+
+	const DEFAULT_ENTERPRISE_NAME = "企业号";
+	const DEFAULT_ENTERPRISE_INTRO = "";
+	const enterpriseName = ref(DEFAULT_ENTERPRISE_NAME);
+	const enterpriseIntro = ref(DEFAULT_ENTERPRISE_INTRO);
+	const enterpriseInfoLoading = ref(false);
+	const messageUnreadCount = ref(0);
+	const messageUnreadLoading = ref(false);
+
+	const messageUnreadBadgeText = computed((): string => {
+		return formatMessageUnreadBadgeText(messageUnreadCount.value);
+	});
+
+	type QuickRangeKey = "last_7_days" | "last_30_days" | "this_month" | "last_month" | "this_year";
+	type QuickRange = { label: string; key: QuickRangeKey };
+
+	const activePeriod = ref<number>(2);
+	const detailStatsExpanded = ref<boolean>(false);
+	const isCustomRange = ref<boolean>(false);
+	const rangePopupVisible = ref<boolean>(false);
+	const draftQuickKey = ref<QuickRangeKey | "">("");
+	const draftStartSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
+	const draftEndSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
+	const periodTabs = ["今日", "昨日", "近7天", "近30天", "累计"];
+	const listLoading = ref(false);
+	const currentPeriodLabel = computed((): string => {
+		if (isCustomRange.value) {
+			return `${rangeStart.value} 至 ${rangeEnd.value}`;
+		}
+		const idx = activePeriod.value;
+		if (idx >= 0 && idx < periodTabs.length) {
+			return periodTabs[idx];
+		}
+		return "近7天";
+	});
+
+	function getDefaultCustomRange(): { start: string; end: string } {
+		const today = dayUts();
+		const todayStr = today.format("YYYY-MM-DD");
+		return {
+			start: today.subtract(6, "day").format("YYYY-MM-DD"),
+			end: todayStr
+		};
+	}
+
+	const defaultCustomRange = getDefaultCustomRange();
+	const rangeStart = ref<string>(defaultCustomRange.start);
+	const rangeEnd = ref<string>(defaultCustomRange.end);
+	const draftStart = ref<string>(defaultCustomRange.start);
+	const draftEnd = ref<string>(defaultCustomRange.end);
+	const capsuleLayoutKey = ref(0);
+
+	const quickRanges: QuickRange[] = [
+		{ label: "近7天", key: "last_7_days" },
+		{ label: "近30天", key: "last_30_days" },
+		{ label: "本月", key: "this_month" },
+		{ label: "上月", key: "last_month" },
+		{ label: "本年", key: "this_year" }
+	];
+
+	const quickRangesPrimary = quickRanges.slice(0, 3);
+	const quickRangesSecondary = quickRanges.slice(3, 5);
+
+	function matchQuickKey(start: string, end: string): QuickRangeKey | "" {
+		for (let i = 0; i < quickRanges.length; i++) {
+			const key = quickRanges[i].key;
+			const range = resolveQuickRange(key);
+			if (range.start == start && range.end == end) {
+				return key;
+			}
+		}
+		return "";
+	}
+
+	function applyQuickDraft(key: QuickRangeKey) {
+		const range = resolveQuickRange(key);
+		draftStart.value = range.start;
+		draftEnd.value = range.end;
+		draftQuickKey.value = key;
+		ensureDraftRangeOrder();
+	}
+
+	function resolveQuickRange(key: QuickRangeKey): { start: string; end: string } {
+		const today = dayUts();
+		const todayStr = today.format("YYYY-MM-DD");
+		if (key == "last_7_days") {
+			return {
+				start: today.subtract(6, "day").format("YYYY-MM-DD"),
+				end: todayStr
+			};
+		}
+		if (key == "last_30_days") {
+			return {
+				start: today.subtract(29, "day").format("YYYY-MM-DD"),
+				end: todayStr
+			};
+		}
+		if (key == "this_month") {
+			return {
+				start: today.startOf("month").format("YYYY-MM-DD"),
+				end: todayStr
+			};
+		}
+		if (key == "last_month") {
+			const lastMonth = today.subtract(1, "month");
+			return {
+				start: lastMonth.startOf("month").format("YYYY-MM-DD"),
+				end: lastMonth.endOf("month").format("YYYY-MM-DD")
+			};
+		}
+		return {
+			start: today.startOf("year").format("YYYY-MM-DD"),
+			end: todayStr
+		};
+	}
+
+	const rangeDays = computed(() => calcDays(draftStart.value, draftEnd.value));
+
+	function calcDays(start: string, end: string): number {
+		const s = new Date(start.replace(/-/g, "/"));
+		const e = new Date(end.replace(/-/g, "/"));
+		const diff = e.getTime() - s.getTime();
+		return Math.floor(diff / 86400000) + 1;
+	}
+
+	function formatSlash(date: string): string {
+		return date.replace(/-/g, "/");
+	}
+
+	function fieldText(raw: any | null): string {
+		if (raw == null) {
+			return "";
+		}
+		const text = `${raw}`.trim();
+		if (text == "" || text == "undefined" || text == "null") {
+			return "";
+		}
+		return text;
+	}
+	function formatMoney(raw: any | null): string {
+		const text = fieldText(raw);
+		if (text == "") {
+			return "0.00";
+		}
+		if (text.indexOf("¥") >= 0) {
+			return text.replace("¥", "").trim();
+		}
+		const n = parseFloat(text);
+		if (isNaN(n)) {
+			return text;
+		}
+		return n.toFixed(2);
+	}
+	function formatCount(raw: any | null): string {
+		const text = fieldText(raw);
+		if (text == "") {
+			return "0";
+		}
+		const n = parseInt(text);
+		if (isNaN(n)) {
+			return text;
+		}
+		return `${n}`;
+	}
+	function formatStaffRatio(summary: UTSJSONObject | null): string {
+		if (summary == null) {
+			return "0/0";
+		}
+		const staffCountText = fieldText(summary["staff_count"]);
+		if (staffCountText.indexOf("/") >= 0) {
+			return staffCountText;
+		}
+		const total = formatCount(
+			summary["total_staff_count"] ??
+				summary["staff_total_count"] ??
+				summary["staff_count"]
+		);
+		const activeRaw =
+			summary["active_staff_count"] ??
+			summary["on_job_staff_count"] ??
+			summary["employed_staff_count"] ??
+			summary["staff_active_count"];
+		const active = fieldText(activeRaw) == "" ? total : formatCount(activeRaw);
+		return `${active}/${total}`;
+	}
+	function resolveOrderAvatar(item: OrderListItem): string {
+		const name = `${item.user_nickname ?? ""}`.trim();
+		return name != "" ? name.charAt(0) : "员";
+	}
+	function getPeriodKey(): string {
+		if (isCustomRange.value) {
+			return "custom";
+		}
+		const keys = ["today", "yesterday", "last_7_days", "last_30_days", "total"];
+		const idx = activePeriod.value;
+		if (idx >= 0 && idx < keys.length) {
+			return keys[idx];
+		}
+		return "total";
+	}
+
+	type RoleStatRow = {
+		key: string;
+		label: string;
+		memberCount: string;
+		staffRevenue: string;
+		keywordCount: string;
+		backfillCount: string;
+	};
+
+	type RoleStatConfig = {
+		key: string;
+		label: string;
+		countKeys: string[];
+		revenueKeys: string[];
+		keywordKeys: string[];
+		backfillKeys: string[];
+	};
+
+	const ROLE_STAT_CONFIGS: RoleStatConfig[] = [
+		{
+			key: "normal",
+			label: "普通员工",
+			countKeys: ["normal_staff_count", "normal_count", "employee_count"],
+			revenueKeys: ["normal_staff_revenue", "normal_revenue", "employee_revenue"],
+			keywordKeys: ["normal_keyword_count", "normal_task_count", "employee_keyword_count"],
+			backfillKeys: ["normal_backfill_count", "employee_backfill_count"]
+		},
+		{
+			key: "leader",
+			label: "员工组长",
+			countKeys: ["leader_count", "group_leader_count", "team_leader_count"],
+			revenueKeys: ["leader_staff_revenue", "leader_revenue", "group_leader_revenue"],
+			keywordKeys: ["leader_keyword_count", "leader_task_count", "group_leader_keyword_count"],
+			backfillKeys: ["leader_backfill_count", "group_leader_backfill_count"]
+		},
+		{
+			key: "member",
+			label: "员工组员",
+			countKeys: ["member_count", "group_member_count", "team_member_count"],
+			revenueKeys: ["member_staff_revenue", "member_revenue", "group_member_revenue"],
+			keywordKeys: ["member_keyword_count", "member_task_count", "group_member_keyword_count"],
+			backfillKeys: ["member_backfill_count", "group_member_backfill_count"]
+		}
+	];
+
+	function pickFirstValue(source: UTSJSONObject | null, keys: string[]): any | null {
+		if (source == null) {
+			return null;
+		}
+		for (let i = 0; i < keys.length; i++) {
+			const value = source[keys[i]];
+			if (fieldText(value) != "") {
+				return value;
+			}
+		}
+		return null;
+	}
+
+	function normalizeRoleKey(raw: any | null): string {
+		const text = fieldText(raw).toLowerCase();
+		if (
+			text == "1" ||
+			text.indexOf("leader") >= 0 ||
+			text.indexOf("组长") >= 0
+		) {
+			return "leader";
+		}
+		if (
+			text == "2" ||
+			text.indexOf("member") >= 0 ||
+			text.indexOf("组员") >= 0
+		) {
+			return "member";
+		}
+		if (
+			text == "0" ||
+			text.indexOf("normal") >= 0 ||
+			text.indexOf("ordinary") >= 0 ||
+			text.indexOf("普通") >= 0
+		) {
+			return "normal";
+		}
+		return "";
+	}
+
+	function findRoleStatSource(summary: UTSJSONObject, roleKey: string): UTSJSONObject | null {
+		const raw =
+			summary["role_stats"] ??
+			summary["staff_role_stats"] ??
+			summary["detail_stats"] ??
+			summary["staff_stats"];
+		if (raw == null || !Array.isArray(raw)) {
+			return null;
+		}
+		const rows = raw as UTSJSONObject[];
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const key = normalizeRoleKey(
+				row["role_key"] ??
+					row["role"] ??
+					row["role_name"] ??
+					row["staff_type"] ??
+					row["staff_type_text"]
+			);
+			if (key == roleKey) {
+				return row;
+			}
+		}
+		return null;
+	}
+
+	function buildRoleStats(summary: UTSJSONObject | null): RoleStatRow[] {
+		const result: RoleStatRow[] = [];
+		for (let i = 0; i < ROLE_STAT_CONFIGS.length; i++) {
+			const config = ROLE_STAT_CONFIGS[i];
+			const nested = summary != null ? findRoleStatSource(summary, config.key) : null;
+			const countRaw =
+				pickFirstValue(nested, ["member_count", "staff_count", "count"]) ??
+				pickFirstValue(summary, config.countKeys);
+			const revenueRaw =
+				pickFirstValue(nested, ["staff_revenue", "revenue", "amount"]) ??
+				pickFirstValue(summary, config.revenueKeys);
+			const keywordRaw =
+				pickFirstValue(nested, ["keyword_count", "task_count", "promo_count"]) ??
+				pickFirstValue(summary, config.keywordKeys);
+			const backfillRaw =
+				pickFirstValue(nested, ["backfill_count", "fill_count"]) ??
+				pickFirstValue(summary, config.backfillKeys);
+			result.push({
+				key: config.key,
+				label: config.label,
+				memberCount: formatCount(countRaw),
+				staffRevenue: formatMoney(revenueRaw),
+				keywordCount: formatCount(keywordRaw),
+				backfillCount: formatCount(backfillRaw)
+			});
+		}
+		return result;
+	}
+
+	function applySummary(summary: UTSJSONObject | null) {
+		if (summary == null) {
+			headlineMetrics.value = [
+				{ label: "推广总收益（元）", value: "0.00" },
+				{ label: "企业主总收益（元）", value: "0.00" }
+			];
+			topMetrics.value = [
+				{ label: "总员工", value: "0/0", resourceTab: "employee" },
+				{ label: "推广任务总量", value: "0", resourceTab: "" },
+				{ label: "回填总量", value: "0", resourceTab: "" },
+				{ label: "员工总收益", value: "0.00", resourceTab: "" }
+			];
+			roleStats.value = buildRoleStats(null);
+			return;
+		}
+		headlineMetrics.value = [
+			{ label: "推广总收益（元）", value: formatMoney(summary["promo_revenue"]) },
+			{ label: "企业主总收益（元）", value: formatMoney(summary["enterprise_revenue"]) }
+		];
+		topMetrics.value = [
+			{ label: "总员工", value: formatStaffRatio(summary), resourceTab: "employee" },
+			{ label: "推广任务总量", value: formatCount(summary["keyword_count"]), resourceTab: "" },
+			{ label: "回填总量", value: formatCount(summary["backfill_count"]), resourceTab: "" },
+			{ label: "员工总收益", value: formatMoney(summary["staff_revenue"]), resourceTab: "" }
+		];
+		roleStats.value = buildRoleStats(summary);
+	}
+	function fetchOrderList(reset: boolean) {
+		if (reset) {
+			if (listLoading.value) {
+				return;
+			}
+			listLoading.value = true;
+			orderList.value = [];
+			orderPage.value = 1;
+			hasMore.value = true;
+		} else {
+			if (listLoadingMore.value || !hasMore.value || listLoading.value) {
+				return;
+			}
+			listLoadingMore.value = true;
+		}
+		const reqPage = reset ? 1 : orderPage.value;
+		getOrderList({
+			page: reqPage,
+			limit: ORDER_LIMIT,
+			period: getPeriodKey(),
+			start_date: isCustomRange.value ? rangeStart.value : "",
+			end_date: isCustomRange.value ? rangeEnd.value : ""
+		})
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				if (reset) {
+					applySummary(data["summary"] as UTSJSONObject | null);
+				}
+				const listRaw = data["list"] as OrderListItem[] | null;
+				const rows = listRaw != null ? listRaw : ([] as OrderListItem[]);
+				if (reset) {
+					orderList.value = rows;
+				} else {
+					orderList.value = orderList.value.concat(rows);
+				}
+				hasMore.value = rows.length >= ORDER_LIMIT;
+				if (hasMore.value) {
+					orderPage.value = reqPage + 1;
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				listLoading.value = false;
+				listLoadingMore.value = false;
+			});
+	}
+	function loadOrderList() {
+		fetchOrderList(true);
+	}
+	function loadMoreOrderList() {
+		fetchOrderList(false);
+	}
+	function selectPeriod(index: number) {
+		isCustomRange.value = false;
+		activePeriod.value = index;
+		loadOrderList();
+	}
+
+	function onCalendarTap() {
+		isCustomRange.value = true;
+		activePeriod.value = -1;
+		openRangePopup();
+	}
+
+	function compareDate(start: string, end: string): number {
+		const s = new Date(start.replace(/-/g, "/"));
+		const e = new Date(end.replace(/-/g, "/"));
+		return s.getTime() - e.getTime();
+	}
+
+	function ensureDraftRangeOrder() {
+		if (compareDate(draftStart.value, draftEnd.value) > 0) {
+			draftEnd.value = draftStart.value;
+		}
+	}
+
+	function ensureDraftDates() {
+		const todayStr = dayUts().format("YYYY-MM-DD");
+		if (draftStart.value.trim() == "") {
+			draftStart.value = todayStr;
+		}
+		if (draftEnd.value.trim() == "") {
+			draftEnd.value = todayStr;
+		}
+		ensureDraftRangeOrder();
+	}
+
+	function pickDraftStart() {
+		ensureDraftDates();
+		nextTick(() => {
+			draftStartSelectRef.value?.open(null);
+		});
+	}
+
+	function pickDraftEnd() {
+		ensureDraftDates();
+		nextTick(() => {
+			draftEndSelectRef.value?.open(null);
+		});
+	}
+
+	function onDraftStartChange(value: string) {
+		draftStart.value = value;
+		ensureDraftRangeOrder();
+		draftQuickKey.value = matchQuickKey(draftStart.value, draftEnd.value);
+	}
+
+	function onDraftEndChange(value: string) {
+		draftEnd.value = value;
+		ensureDraftRangeOrder();
+		draftQuickKey.value = matchQuickKey(draftStart.value, draftEnd.value);
+	}
+
+	function openRangePopup(preserveApplied: boolean = false) {
+		if (preserveApplied) {
+			draftStart.value = rangeStart.value;
+			draftEnd.value = rangeEnd.value;
+			draftQuickKey.value = matchQuickKey(draftStart.value, draftEnd.value);
+		} else {
+			applyQuickDraft("last_7_days");
+		}
+		rangePopupVisible.value = true;
+	}
+
+	function closeRangePopup() {
+		rangePopupVisible.value = false;
+	}
+
+	function applyRangePopup() {
+		if (compareDate(draftStart.value, draftEnd.value) > 0) {
+			uni.showToast({ title: "开始日期不能晚于结束日期", icon: "none" });
+			return;
+		}
+		isCustomRange.value = true;
+		activePeriod.value = -1;
+		rangeStart.value = draftStart.value;
+		rangeEnd.value = draftEnd.value;
+		rangePopupVisible.value = false;
+		loadOrderList();
+	}
+
+	function pickQuick(item: QuickRange) {
+		applyQuickDraft(item.key);
+	}
+
+	function toNotice() {
+		router.push({ path: "/pages/notice/index" });
+	}
+
+	function toBusinessTab(resourceTab: string) {
+		uni.setStorageSync("businessResourceTab", resourceTab);
+		uni.switchTab({
+			url: "/pages/tabbar/business/index"
+		});
+	}
+
+	function toBusiness() {
+		toBusinessTab("employee");
+	}
+
+	function onMetricTap(item: TopMetric) {
+		if (item.resourceTab == "employee") {
+			toBusinessTab("employee");
+			return;
+		}
+		if (item.resourceTab == "account") {
+			toBusinessTab("employee");
+		}
+	}
+
+	type TopMetric = {
+		label: string;
+		value: string;
+		resourceTab: string;
+	};
+
+	type HeadlineMetric = {
+		label: string;
+		value: string;
+	};
+
+	const headlineMetrics = ref<HeadlineMetric[]>([
+		{ label: "推广总收益（元）", value: "0.00" },
+		{ label: "企业主总收益（元）", value: "0.00" }
+	]);
+	const topMetrics = ref<TopMetric[]>([
+		{ label: "总员工", value: "0/0", resourceTab: "employee" },
+		{ label: "推广任务总量", value: "0", resourceTab: "" },
+		{ label: "回填总量", value: "0", resourceTab: "" },
+		{ label: "员工总收益", value: "0.00", resourceTab: "" }
+	]);
+	const roleStats = ref<RoleStatRow[]>(buildRoleStats(null));
+	const orderList = ref<OrderListItem[]>([]);
+	const orderPage = ref(1);
+	const ORDER_LIMIT = 10;
+	const hasMore = ref(true);
+	const listLoadingMore = ref(false);
+
+	const orderSortOptions = ["订单排序", "由近到远", "由远到近", "收益从高到低", "收益从低到高"];
+	const staffFilterOptions = ["全部员工", "普通员工", "员工组长", "员工组员"];
+	const orderSortIndex = ref(0);
+	const staffFilterIndex = ref(0);
+	const activeRoleKey = computed((): string => {
+		if (staffFilterIndex.value == 1) return "normal";
+		if (staffFilterIndex.value == 2) return "leader";
+		if (staffFilterIndex.value == 3) return "member";
+		return "";
+	});
+	const orderListMeta = computed((): string => {
+		const label = staffFilterOptions[staffFilterIndex.value] ?? "全部员工";
+		return `${label} · ${displayOrderList.value.length} 条`;
+	});
+
+	function resolvePickerIndex(event: UniPickerChangeEvent): number {
+		const value = event.detail.value;
+		const parsed = parseInt(`${value}`);
+		return isNaN(parsed) ? 0 : parsed;
+	}
+
+	function onOrderSortChange(event: UniPickerChangeEvent) {
+		orderSortIndex.value = resolvePickerIndex(event);
+	}
+
+	function onStaffFilterChange(event: UniPickerChangeEvent) {
+		staffFilterIndex.value = resolvePickerIndex(event);
+	}
+
+	function onRoleStatTap(roleKey: string) {
+		const target = roleKey == "normal" ? 1 : roleKey == "leader" ? 2 : roleKey == "member" ? 3 : 0;
+		staffFilterIndex.value = staffFilterIndex.value == target ? 0 : target;
+	}
+
+	function toggleDetailStats() {
+		detailStatsExpanded.value = !detailStatsExpanded.value;
+	}
+
+	function resolveStaffRoleKey(item: OrderListItem): string {
+		return normalizeRoleKey(
+			item.staff_role ??
+				item.staff_role_text ??
+				item.staff_type ??
+				item.staff_type_text ??
+				item["role"] ??
+				item["role_name"]
+		);
+	}
+
+	function resolveStaffRoleLabel(item: OrderListItem): string {
+		const key = resolveStaffRoleKey(item);
+		if (key == "leader") {
+			return "员工组长";
+		}
+		if (key == "member") {
+			return "员工组员";
+		}
+		if (key == "normal") {
+			return "普通员工";
+		}
+		return fieldText(item.staff_role_text ?? item.staff_type_text ?? item["role_name"]);
+	}
+
+	function resolveEmploymentStatus(item: OrderListItem): string {
+		const direct = fieldText(
+			item.employment_status_text ??
+				item.user_status_text ??
+				item["staff_status_text"] ??
+				item["status_text"]
+		);
+		if (direct != "") {
+			return direct;
+		}
+		const snapshot = item.employment_status_snapshot ?? item.employment_status;
+		if (`${snapshot}` == "1") {
+			return "在职";
+		}
+		if (`${snapshot}` == "0") {
+			return "离职";
+		}
+		const active = item["is_active"] ?? item["is_employed"];
+		if (`${active}` == "1" || `${active}` == "true") {
+			return "在职";
+		}
+		return "";
+	}
+
+	function resolveOrderTime(item: OrderListItem): number {
+		const raw = fieldText(item.audit_time ?? item.payment_time ?? item.import_time);
+		if (raw == "") {
+			return 0;
+		}
+		const time = new Date(raw.replace(/-/g, "/")).getTime();
+		return isNaN(time) ? 0 : time;
+	}
+
+	function resolveOrderRevenue(item: OrderListItem): number {
+		const raw =
+			item.is_virtual == 1
+				? fieldText(item.user_profit)
+				: fieldText(item.enterprise_profit ?? item.user_profit);
+		const value = parseFloat(raw.replace("¥", ""));
+		return isNaN(value) ? 0 : value;
+	}
+
+	const displayOrderList = computed((): OrderListItem[] => {
+		const targetRole =
+			staffFilterIndex.value == 1
+				? "normal"
+				: staffFilterIndex.value == 2
+					? "leader"
+					: staffFilterIndex.value == 3
+						? "member"
+						: "";
+		const rows: OrderListItem[] = [];
+		for (let i = 0; i < orderList.value.length; i++) {
+			const item = orderList.value[i];
+			if (targetRole == "" || resolveStaffRoleKey(item) == targetRole) {
+				rows.push(item);
+			}
+		}
+		if (orderSortIndex.value == 0 || orderSortIndex.value == 1) {
+			rows.sort((a, b) => resolveOrderTime(b) - resolveOrderTime(a));
+		} else if (orderSortIndex.value == 2) {
+			rows.sort((a, b) => resolveOrderTime(a) - resolveOrderTime(b));
+		} else if (orderSortIndex.value == 3) {
+			rows.sort((a, b) => resolveOrderRevenue(b) - resolveOrderRevenue(a));
+		} else if (orderSortIndex.value == 4) {
+			rows.sort((a, b) => resolveOrderRevenue(a) - resolveOrderRevenue(b));
+		}
+		return rows;
+	});
+
+	function parseEnterpriseInfo(res: any | null): EnterpriseInfo | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		return data as EnterpriseInfo;
+	}
+
+	function applyEnterpriseInfo(info: EnterpriseInfo) {
+		const name = `${info.name ?? ""}`.trim();
+		const intro = `${info.intro ?? ""}`.trim();
+		enterpriseName.value = name != "" ? name : DEFAULT_ENTERPRISE_NAME;
+		enterpriseIntro.value = intro;
+	}
+
+	function loadEnterpriseInfo() {
+		if (enterpriseInfoLoading.value) {
+			return;
+		}
+		enterpriseInfoLoading.value = true;
+		getEnterpriseInfo()
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					return;
+				}
+				const info = parseEnterpriseInfo(res);
+				if (info == null) {
+					return;
+				}
+				applyEnterpriseInfo(info);
+			})
+			.catch((_err) => {})
+			.finally(() => {
+				enterpriseInfoLoading.value = false;
+			});
+	}
+
+	function loadMessageUnreadCount() {
+		if (messageUnreadLoading.value) {
+			return;
+		}
+		messageUnreadLoading.value = true;
+		fetchMessageUnreadCount()
+			.then((count) => {
+				messageUnreadCount.value = count;
+			})
+			.finally(() => {
+				messageUnreadLoading.value = false;
+			});
+	}
+
+	function guardHomeOverviewAccess() {
+		if (!user.isLoggedIn() || user.isInLoginGrace()) {
+			return;
+		}
+		getAppSystem()
+			.then((res) => {
+				applyAppSystemResponse(res);
+				const state = parseAppSystemRouteState(res);
+				if (!shouldBlockHomeOverview(state)) {
+					return;
+				}
+				pushToMenuPath(getAllowedEntryPath(state));
+			})
+			.catch(() => {});
+	}
+
+	onMounted(() => {
+		setTimeout(() => {
+			capsuleLayoutKey.value += 1;
+		}, 50);
+		loadOrderList();
+	});
+	onShow(() => {
+		guardHomeOverviewAccess();
+		syncTabbarRoutePath();
+		loadEnterpriseInfo();
+		loadMessageUnreadCount();
+		loadOrderList();
+	});
+	onReachBottom(() => {
+		loadMoreOrderList();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ov-page {
+		min-height: 100vh;
+		width: 100%;
+		max-width: 100%;
+		overflow-x: hidden;
+		box-sizing: border-box;
+		background-color: #f7f8fa;
+	}
+
+	.ov-header {
+		flex-shrink: 0;
+		overflow: visible;
+		background-color: #ffffff;
+		border-bottom: 1rpx solid #eeeeee;
+
+		:deep(.cl-safe-area) {
+			background-color: transparent;
+		}
+	}
+
+	.ov-hero {
+		box-sizing: content-box;
+		padding: 16rpx 30rpx 84rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: space-between;
+		position: relative;
+		z-index: 0;
+		overflow: visible;
+
+		.ov-hero-copy {
+			flex: 1;
+			min-width: 0;
+			padding-right: 16rpx;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.ov-hero-kicker {
+			margin-bottom: 4rpx;
+			font-size: 22rpx;
+			font-weight: 600;
+			color: #2b59c3;
+			line-height: 32rpx;
+		}
+
+		.ov-hero-title {
+			font-size: 40rpx;
+			font-weight: 700;
+			color: #333333;
+			line-height: 56rpx;
+			width: 100%;
+			word-break: break-all;
+		}
+
+		.ov-hero-sub {
+			margin-top: 8rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+			width: 100%;
+			word-break: break-all;
+		}
+
+		.ov-hero-notice-wrap {
+			position: relative;
+			width: 72rpx;
+			height: 72rpx;
+			flex-shrink: 0;
+			overflow: visible;
+		}
+
+		.ov-hero-notice {
+			width: 72rpx;
+			height: 72rpx;
+			border-radius: 36rpx;
+			background-color: #f5f6fa;
+			border: 1rpx solid #eeeeee;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.ov-hero-badge {
+			position: absolute;
+			top: -6rpx;
+			right: -6rpx;
+			min-width: 32rpx;
+			height: 32rpx;
+			padding: 0 8rpx;
+			border-radius: 16rpx;
+			background-color: #ff4d4f;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #ffffff;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			z-index: 2;
+		}
+
+		.ov-hero-badge-text {
+			font-size: 20rpx;
+			font-weight: 600;
+			color: #ffffff;
+			line-height: 28rpx;
+		}
+	}
+
+	.ov-body {
+		padding: 18rpx 30rpx 16rpx;
+		background-color: #f7f8fa;
+		position: relative;
+	}
+	.ov-list-state {
+		padding: 32rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+	.ov-list-state-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+	.ov-list-footer {
+		padding: 24rpx 0 32rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+	.ov-list-footer-text {
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ov-card {
+		padding: 0;
+		border-radius: 20rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #edf0f5;
+		box-shadow: 0 8rpx 24rpx rgba(30, 47, 84, 0.08);
+		position: relative;
+		top: -48rpx;
+		z-index: 2;
+		margin: 0 30rpx -36rpx;
+		box-sizing: border-box;
+		overflow: hidden;
+
+		.ov-card-head {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			padding: 20rpx 24rpx 16rpx;
+		}
+
+		.ov-card-divider {
+			height: 1rpx;
+			background-color: #f0f0f0;
+		}
+
+		.ov-card-content {
+			padding: 14rpx 20rpx 16rpx;
+		}
+
+		.ov-card-title {
+			font-size: 30rpx;
+			font-weight: 700;
+			color: #202336;
+			line-height: 44rpx;
+		}
+
+	}
+
+	.ov-overview-filter {
+		padding: 20rpx 24rpx;
+		border-radius: 20rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #edf0f5;
+		box-shadow: 0 4rpx 16rpx rgba(30, 47, 84, 0.05);
+		margin-bottom: 16rpx;
+	}
+
+	.ov-metric-layout {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ov-metric-row {
+		display: flex;
+		flex-direction: row;
+		border-bottom: 1rpx solid #eef0f5;
+	}
+
+	.ov-metric-row--last {
+		border-bottom-width: 0;
+	}
+
+	.ov-metric-cell {
+		width: 50%;
+		min-width: 0;
+		padding: 13rpx 14rpx;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		border-right: 1rpx solid #eef0f5;
+
+		&:last-child {
+			border-right-width: 0;
+		}
+	}
+
+	.ov-metric-cell--full {
+		width: 100%;
+		border-right-width: 0;
+	}
+
+	.ov-metric-cell--hero {
+		padding: 16rpx 14rpx 18rpx;
+		flex-direction: column;
+		align-items: flex-start;
+		justify-content: flex-start;
+	}
+
+	.ov-metric-cell--stack {
+		min-height: 88rpx;
+		padding: 12rpx 14rpx;
+		flex-direction: column;
+		align-items: flex-start;
+		justify-content: center;
+	}
+
+	.ov-metric-cell--hero .ov-metric-money,
+	.ov-metric-cell--stack .ov-metric-money,
+	.ov-metric-cell--stack > .ov-metric-value {
+		margin-top: 4rpx;
+	}
+
+	.ov-metric-primary-label {
+		font-size: 24rpx;
+		font-weight: 500;
+		color: #7f8798;
+		line-height: 34rpx;
+	}
+
+	.ov-metric-primary-value {
+		font-size: 48rpx;
+		font-weight: 800;
+		color: #2b59c3;
+		line-height: 56rpx;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -1rpx;
+	}
+
+	.ov-metric-label {
+		font-size: 23rpx;
+		font-weight: 400;
+		color: #858c9e;
+		line-height: 34rpx;
+	}
+
+	.ov-metric-label-with-arrow {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ov-metric-caption {
+		margin-left: 10rpx;
+		margin-right: 2rpx;
+		font-size: 19rpx;
+		font-weight: 400;
+		color: #b0b5c0;
+		line-height: 28rpx;
+	}
+
+	.ov-metric-money {
+		display: flex;
+		flex-direction: row;
+		align-items: baseline;
+	}
+
+	.ov-metric-unit {
+		margin-right: 4rpx;
+		font-size: 23rpx;
+		font-weight: 700;
+		color: #2b59c3;
+		line-height: 34rpx;
+	}
+
+	.ov-metric-cell--hero .ov-metric-unit {
+		font-size: 27rpx;
+		line-height: 38rpx;
+	}
+
+	.ov-metric-value {
+		margin-left: 0;
+		font-size: 29rpx;
+		font-weight: 700;
+		color: #252a3d;
+		line-height: 40rpx;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.ov-detail-head {
+		margin-top: 12rpx;
+		min-height: 60rpx;
+		padding: 0 4rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.ov-detail-copy {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ov-detail-title {
+		font-size: 26rpx;
+		font-weight: 700;
+		color: #2b3042;
+		line-height: 36rpx;
+	}
+
+	.ov-detail-hint {
+		margin-top: 2rpx;
+		font-size: 21rpx;
+		color: #a1a7b5;
+		line-height: 30rpx;
+	}
+
+	.ov-detail-toggle {
+		margin-left: 20rpx;
+		padding: 10rpx 14rpx;
+		border-radius: 999rpx;
+		background-color: #f5f6fa;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ov-detail-toggle-text {
+		margin-right: 4rpx;
+		font-size: 22rpx;
+		font-weight: 600;
+		color: #596174;
+		line-height: 30rpx;
+	}
+
+	.ov-stat-table {
+		margin-top: 16rpx;
+		border: 1rpx solid #e9ebf1;
+		border-radius: 14rpx;
+		overflow: hidden;
+	}
+
+	.ov-stat-row {
+		min-height: 64rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: stretch;
+		border-top: 1rpx solid #eceef3;
+
+		&:first-child {
+			border-top-width: 0;
+		}
+
+		&--head {
+			background-color: #f6f7fa;
+		}
+
+		&--active {
+			background-color: #eef3fc;
+		}
+	}
+
+	.ov-stat-cell {
+		flex: 1;
+		min-width: 0;
+		padding: 12rpx 4rpx;
+		border-left: 1rpx solid #eceef3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		font-size: 20rpx;
+		color: #51586b;
+		line-height: 28rpx;
+		box-sizing: border-box;
+
+		&:first-child {
+			border-left-width: 0;
+		}
+
+		&--role {
+			flex: 1.18;
+			font-weight: 600;
+			color: #303649;
+		}
+	}
+
+	.ov-stat-row--head .ov-stat-cell {
+		font-weight: 600;
+		color: #777f91;
+	}
+
+	.ov-filter-panel {
+		margin-bottom: 20rpx;
+		padding: 18rpx 20rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #edf0f5;
+	}
+
+	.ov-period-bar {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 0;
+	}
+
+	.ov-period-row {
+		flex: 1;
+        height: 68rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 6rpx;
+        box-sizing: border-box;
+		border-radius: 12rpx;
+		background-color: #eef1f5;
+	}
+
+	.ov-period-item {
+		flex: 1;
+		padding: 12rpx 0;
+		border-radius: 9rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background-color: #2b59c3;
+			box-shadow: none;
+		}
+	}
+
+	.ov-period-text {
+		font-size: 24rpx;
+		color: #666666;
+		white-space: nowrap;
+	}
+
+	.ov-period-item--active .ov-period-text {
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.ov-period-cal {
+		flex-shrink: 0;
+		width: 64rpx;
+		height: 64rpx;
+		margin-left: 16rpx;
+		border-radius: 12rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #eeeeee;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background-color: #2b59c3;
+			border-color: #2b59c3;
+		}
+	}
+
+	.ov-range-bar {
+		margin-top: 18rpx;
+		margin-bottom: 0;
+		padding: 16rpx 18rpx;
+		border-radius: 12rpx;
+		background-color: #eef3fc;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+
+		.ov-range-main {
+			flex: 1;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			margin-right: 16rpx;
+		}
+
+		.ov-range-label {
+			margin-left: 8rpx;
+			font-size: 24rpx;
+			color: #2b59c3;
+			line-height: 34rpx;
+		}
+
+		.ov-range-value {
+			margin-left: 12rpx;
+			font-size: 26rpx;
+			font-weight: 600;
+			color: #333333;
+			line-height: 36rpx;
+		}
+
+		.ov-range-edit {
+			font-size: 24rpx;
+			color: #2b59c3;
+			line-height: 34rpx;
+		}
+	}
+
+	.ov-sort-row {
+		margin-top: 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 14rpx;
+	}
+
+	.ov-filter-label {
+		margin-right: auto;
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #596174;
+	}
+
+	.ov-sort-picker {
+		min-width: 0;
+	}
+
+	.ov-sort-trigger {
+		height: 58rpx;
+		padding: 0 18rpx;
+		border-radius: 14rpx;
+		background-color: #f5f6fa;
+		border: 1rpx solid #e7e9f0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ov-sort-text {
+		margin-right: 8rpx;
+		font-size: 23rpx;
+		font-weight: 600;
+		color: #4f5668;
+		line-height: 32rpx;
+	}
+
+	.ov-metric-label-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ov-section-head {
+		margin: 8rpx 0 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.ov-section-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.ov-section-meta {
+		font-size: 22rpx;
+		color: #999999;
+	}
+
+	.ov-section-link-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ov-section-link {
+		font-size: 24rpx;
+		color: #999999;
+	}
+
+	.ov-emp-card {
+		padding: 22rpx 0;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #edf0f5;
+		box-shadow: none;
+		margin-bottom: 16rpx;
+
+		.ov-emp-top {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			padding: 0 24rpx 24rpx;
+		}
+
+		.ov-emp-divider {
+			height: 1rpx;
+			background-color: #f0f0f0;
+		}
+
+		.ov-emp-avatar {
+			width: 72rpx;
+			height: 72rpx;
+			border-radius: 36rpx;
+			background-color: #eef3fc;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			margin-right: 16rpx;
+		}
+
+		.ov-emp-avatar-text {
+			font-size: 28rpx;
+			color: #2b59c3;
+			font-weight: 600;
+		}
+
+		.ov-emp-info {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.ov-emp-name {
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #333333;
+		}
+
+		.ov-emp-name-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			flex-wrap: wrap;
+		}
+
+		.ov-emp-badge {
+			margin-left: 8rpx;
+			padding: 3rpx 9rpx;
+			border-radius: 6rpx;
+			font-size: 19rpx;
+			font-weight: 600;
+			line-height: 26rpx;
+
+			&--status {
+				color: #1b9850;
+				background-color: #eaf8ef;
+			}
+
+			&--departed {
+				color: #b45309;
+				background-color: #fff7ed;
+			}
+
+			&--role {
+				color: #3261cb;
+				background-color: #edf2ff;
+			}
+		}
+
+		.ov-emp-id {
+			margin-top: 4rpx;
+			font-size: 22rpx;
+			color: #999999;
+		}
+
+		.ov-emp-main {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+		}
+
+		.ov-emp-amount {
+			font-size: 36rpx;
+			font-weight: 700;
+			color: #2b59c3;
+		}
+
+		.ov-emp-amount-label {
+			margin-top: 4rpx;
+			font-size: 22rpx;
+			color: #999999;
+		}
+
+		.ov-emp-grid {
+			display: flex;
+			flex-direction: row;
+			flex-wrap: wrap;
+			padding: 24rpx 24rpx 0;
+		}
+
+		.ov-emp-cell {
+			width: 50%;
+			padding: 12rpx 0;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			box-sizing: border-box;
+
+			&--full {
+				width: 100%;
+			}
+
+			&--keyword {
+				align-items: flex-start;
+				padding-right: 12rpx;
+			}
+
+			&--date {
+				align-items: flex-start;
+				padding-left: 12rpx;
+			}
+		}
+
+		.ov-emp-cell-label {
+			flex-shrink: 0;
+			margin-right: 8rpx;
+			font-size: 22rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.ov-emp-cell-value {
+			flex: 1;
+			min-width: 0;
+			font-size: 26rpx;
+			color: #333333;
+			font-weight: 600;
+			line-height: 34rpx;
+
+			&--blue {
+				color: #2b59c3;
+			}
+
+			&--wrap {
+				word-break: break-all;
+			}
+		}
+	}
+</style>
+
+<style lang="scss">
+.ov-range-popup-wrap {
+	border-top-left-radius: 24rpx;
+	border-top-right-radius: 24rpx;
+	overflow: hidden;
+}
+
+.ov-range-popup-inner {
+	border-top-left-radius: 24rpx;
+	border-top-right-radius: 24rpx;
+	overflow: hidden;
+	background-color: #ffffff;
+}
+
+.ov-range-popup {
+	padding: 0 30rpx 40rpx;
+	background-color: #ffffff;
+	border-top-left-radius: 24rpx;
+	border-top-right-radius: 24rpx;
+	overflow: hidden;
+
+	.ov-range-popup-head {
+		height: 96rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.ov-range-popup-cancel {
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.ov-range-popup-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.ov-range-popup-apply {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #2b59c3;
+		line-height: 40rpx;
+	}
+
+	.ov-range-popup-section {
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ov-range-popup-quick {
+		margin-top: 16rpx;
+	}
+
+	.ov-range-popup-quick-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 16rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.ov-range-popup-quick-item {
+		flex-shrink: 0;
+		width: calc((100% - 32rpx) / 3);
+		margin-right: 16rpx;
+		padding: 20rpx 0;
+		border-radius: 16rpx;
+		background-color: #f3f4f6;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background-color: #2b59c3;
+		}
+
+		&:last-child {
+			margin-right: 0;
+		}
+	}
+
+	.ov-range-popup-quick-text {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+	}
+
+	.ov-range-popup-quick-item--active .ov-range-popup-quick-text {
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.ov-range-popup-custom {
+		margin-top: 16rpx;
+		padding: 24rpx 20rpx;
+		border-radius: 16rpx;
+		background-color: #f3f4f6;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ov-range-popup-date {
+		flex: 1;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		min-width: 0;
+		padding: 4rpx 0;
+	}
+
+	.ov-range-popup-date-label {
+		flex-shrink: 0;
+		margin-right: 12rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ov-range-popup-date-value {
+		flex: 1;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.ov-range-popup-arrow {
+		flex-shrink: 0;
+		margin: 0 12rpx;
+		font-size: 28rpx;
+		color: #cccccc;
+		line-height: 40rpx;
+	}
+
+	.ov-range-popup-summary {
+		margin-top: 20rpx;
+		padding: 18rpx 20rpx;
+		border-radius: 12rpx;
+		background-color: #e8edf5;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ov-range-popup-summary-text {
+		margin-left: 8rpx;
+		font-size: 24rpx;
+		font-weight: 500;
+		color: #1a2744;
+		line-height: 34rpx;
+	}
+
+	.ov-range-popup-btn {
+		margin-top: 28rpx;
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ov-range-popup-btn-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 42rpx;
+	}
+}
+</style>

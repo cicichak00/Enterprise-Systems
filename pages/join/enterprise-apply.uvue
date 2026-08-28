@@ -1,0 +1,222 @@
+<template>
+	<cl-page :back-top="false">
+		<view v-if="pageGate == 'loading'" class="ea-gate-loading">
+			<cl-loading :loading="true"></cl-loading>
+		</view>
+
+		<view v-else-if="pageGate == 'auth'" class="ea-auth-shell">
+			<enterprise-auth
+				:app-name="oauthClientName"
+				:logo-url="oauthClientLogo"
+				:protocols="oauthProtocolList"
+				@authorize="onAuthAuthorize"
+			></enterprise-auth>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="uts" setup>
+	import { ref } from "vue";
+	import EnterpriseAuth from "@/components/join/enterprise-auth.uvue";
+	import { confirmOAuthAuthorize, getOAuthAuthorize } from "@/.cool/api/oauth";
+	import { navigateAfterAppSystem } from "@/.cool/navigation/appSystemNavigation";
+	import {
+		getApiMessage,
+		isApiSuccess,
+		random,
+		router,
+		TABBAR_HOME_PATH,
+		useStore,
+		type OAuthAuthorizeData,
+		type OAuthAuthorizeEnvelope,
+		type OAuthAuthorizeProtocolItem,
+		type OAuthConfirmEnvelope,
+		type Response
+	} from "@/.cool";
+
+	const { user } = useStore();
+	type PageGate = "loading" | "auth";
+
+	const pageGate = ref<PageGate>("loading");
+	const oauthChecked = ref(false);
+	const oauthStateParam = ref("");
+	const oauthMobileParam = ref("");
+	const client_id = ref("61dMQKM09YseJ7eP");
+	const client_user_id = ref("");
+	const sign = ref("");
+	const oauthClientName = ref("企业号");
+	const oauthClientLogo = ref("");
+	const oauthProtocolList = ref<OAuthAuthorizeProtocolItem[]>([]);
+	const oauthPayload = ref<OAuthAuthorizeData | null>(null);
+	const oauthAuthorizing = ref(false);
+
+	function showOAuthAuthorizeError(message: string) {
+		uni.showToast({ title: message, icon: "none" });
+	}
+
+	function goHome() {
+		router.push({
+			path: TABBAR_HOME_PATH,
+			mode: "switchTab"
+		});
+	}
+
+	function fetchOAuthAuthorize() {
+		if (oauthChecked.value) {
+			return;
+		}
+		oauthChecked.value = true;
+		getOAuthAuthorize({
+			client_id: client_id.value,
+			client_user_id: client_user_id.value,
+			sign: sign.value,
+			state: oauthStateParam.value,
+			mobile: oauthMobileParam.value
+		})
+			.then((res) => {
+				if (res == null) {
+					showOAuthAuthorizeError("授权检查失败");
+					return;
+				}
+				const envelope = res as OAuthAuthorizeEnvelope;
+				if (envelope.code != null && !isApiSuccess(envelope.code)) {
+					showOAuthAuthorizeError(getApiMessage(envelope, "授权检查失败"));
+					return;
+				}
+				const data = (envelope.data ?? res) as OAuthAuthorizeData | null;
+				if (data == null) {
+					showOAuthAuthorizeError(getApiMessage(envelope, "授权检查失败"));
+					return;
+				}
+				oauthPayload.value = data;
+				user.applyOAuthAuthorizeResponse(envelope);
+				const systemInfo = data.system_info;
+				const clientName = systemInfo?.system?.title ?? data.client_name ?? "";
+				if (clientName != "") {
+					oauthClientName.value = clientName;
+				}
+				const systemLogo = systemInfo?.system?.logo ?? "";
+				if (systemLogo != "") {
+					oauthClientLogo.value = systemLogo;
+				}
+				const protocolRaw = systemInfo?.protocol ?? null;
+				if (protocolRaw != null && protocolRaw.length > 0) {
+					oauthProtocolList.value = protocolRaw;
+				}
+
+				if (data.need_confirm == true && data.enterprise_id == 0) {
+					pageGate.value = "auth";
+				} else {
+					goHome();
+				}
+			})
+			.catch((err) => {
+				showOAuthAuthorizeError(getApiMessage(err, "授权检查失败"));
+			});
+	}
+
+	function onAuthAuthorize() {
+		const payload = oauthPayload.value;
+		const authCode = payload?.code ?? "";
+		if (authCode == "") {
+			uni.showToast({ title: "授权码无效，请重新进入", icon: "none" });
+			return;
+		}
+		if (oauthAuthorizing.value) {
+			return;
+		}
+		oauthAuthorizing.value = true;
+		uni.showLoading({ title: "授权中..." });
+		confirmOAuthAuthorize({
+			client_id: client_id.value,
+			code: authCode,
+			state: payload?.state ?? oauthStateParam.value,
+			mobile: oauthMobileParam.value
+		})
+			.then((res) => {
+				if (res == null) {
+					uni.showToast({ title: "授权失败", icon: "none" });
+					return Promise.reject(null);
+				}
+				const envelope = res as OAuthConfirmEnvelope;
+				if (envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "授权失败"), icon: "none" });
+					return Promise.reject(null);
+				}
+				if (!user.applyLoginResponse(envelope)) {
+					uni.showToast({ title: "授权失败：未获取到凭证", icon: "none" });
+					return Promise.reject(null);
+				}
+			})
+			.then(() => {
+				return navigateAfterAppSystem(oauthMobileParam.value, true);
+			})
+			.catch((err) => {
+				if (err == null) {
+					return;
+				}
+				const res = err as Response;
+				uni.showToast({ title: res.msg ?? res.message ?? "授权失败", icon: "none" });
+			})
+			.finally(() => {
+				oauthAuthorizing.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	onLoad((options) => {
+		const state = options.state as string | null;
+		const routeClientId = options.client_id as string | null;
+		const routeClientUserId = options.client_user_id || options.user_id as string | null;
+		const routeSign = options.sign as string | null;
+		const mobile = options.mobile as string | null;
+		if (state != null) {
+			oauthStateParam.value = state;
+		}
+		if (routeClientId != null) {
+			client_id.value = routeClientId;
+		}
+		if (routeClientUserId != null) {
+			client_user_id.value = routeClientUserId;
+		} else {
+			client_user_id.value = `${random(100000, 999999)}`;
+		}
+		if (routeSign != null) {
+			sign.value = routeSign;
+		}
+		if (mobile != null) {
+			oauthMobileParam.value = mobile.trim();
+		}
+	});
+
+	onShow(() => {
+		if (!oauthChecked.value) {
+			fetchOAuthAuthorize();
+		}
+	});
+</script>
+
+<style lang="scss">
+	page {
+		height: 100%;
+		background-color: #ffffff;
+	}
+</style>
+
+<style lang="scss" scoped>
+	.ea-gate-loading {
+		min-height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: #ffffff;
+	}
+
+	.ea-auth-shell {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		background-color: #ffffff;
+	}
+</style>

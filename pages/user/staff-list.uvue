@@ -1,0 +1,646 @@
+<template>
+	<cl-page :pt="{ className: 'sl-page' }">
+		<view class="sl-page">
+			<view class="sl-search-fixed">
+				<view class="sl-search-box">
+					<view class="sl-search-field">
+						<cl-icon name="search-line" :size="16" color="#999999"></cl-icon>
+						<input
+							class="sl-search-input"
+							v-model="searchKeyword"
+							placeholder="搜索昵称 / 手机号 / 协作ID"
+							placeholder-class="sl-search-placeholder"
+							confirm-type="search"
+							@confirm="onSearch"
+						/>
+					</view>
+					<view class="sl-btn sl-btn--primary" @tap="onSearch">
+						<text class="sl-btn-text sl-btn-text--primary">搜索</text>
+					</view>
+				</view>
+			</view>
+
+			<scroll-view
+				class="sl-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="sl-scroll-inner">
+					<view v-if="loading && staffRows.length == 0" class="sl-state">
+						<cl-loading :loading="true"></cl-loading>
+					</view>
+					<view v-else-if="!loading && staffRows.length == 0" class="sl-state">
+						<text class="sl-state-text">暂无员工</text>
+					</view>
+
+					<view
+						class="sl-item"
+						v-for="item in staffRows"
+						:key="item.id"
+						:class="{ 'sl-item--active': selectedId == item.id }"
+						@tap="onSelectItem(item)"
+					>
+						<view class="sl-radio" :class="{ 'sl-radio--checked': selectedId == item.id }">
+							<view v-if="selectedId == item.id" class="sl-radio-dot"></view>
+						</view>
+						<view class="sl-avatar" :style="{ backgroundColor: item.color }">
+							<image
+								v-if="item.avatarUrl != ''"
+								class="sl-avatar-img"
+								:src="item.avatarUrl"
+								mode="aspectFill"
+							></image>
+							<text v-else class="sl-avatar-text">{{ item.avatarText }}</text>
+						</view>
+						<view class="sl-copy">
+							<view class="sl-name-row">
+								<text class="sl-name">{{ item.name }}</text>
+								<view
+									class="sl-status-tag"
+									:class="item.enabled ? 'sl-status-tag--on' : 'sl-status-tag--off'"
+								>
+									<text class="sl-status-text">{{ item.statusText }}</text>
+								</view>
+							</view>
+							<text class="sl-meta">协作ID: {{ item.collabId }}</text>
+							<text v-if="item.mobile != ''" class="sl-meta">手机: {{ item.mobile }}</text>
+						</view>
+					</view>
+
+					<view v-if="staffRows.length > 0" class="sl-loadmore" @tap="onLoadMoreTap">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</view>
+				</view>
+			</scroll-view>
+
+			<view class="sl-footer">
+				<view
+					class="sl-confirm-btn"
+					:class="{ 'sl-confirm-btn--disabled': confirmDisabled }"
+					@tap="onConfirm"
+				>
+					<text class="sl-confirm-text">{{ confirming ? "提交中..." : confirmBtnText }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { assignKeyword } from "@/.cool/api/keyword";
+	import { getStaffList } from "@/.cool/api/staff";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { Response, StaffListItem } from "@/.cool";
+
+	const KEYWORD_ASSIGN_CONTEXT_KEY = "keywordAssignContext";
+	/** 分配成功提示展示时长（ms），结束后再返回上一页 */
+	const ASSIGN_SUCCESS_TIP_MS = 3000;
+	const AVATAR_COLORS = ["#2b59c3", "#6366f1", "#1e3a5f", "#9ca3af", "#f97316", "#22c55e"];
+
+	type StaffRow = {
+		id: number;
+		userId: number;
+		name: string;
+		mobile: string;
+		collabId: string;
+		statusText: string;
+		enabled: boolean;
+		avatarText: string;
+		avatarUrl: string;
+		color: string;
+	};
+
+	const pageMode = ref<string>("manage");
+	const projectId = ref(0);
+	const keywordIds = ref<number[]>([]);
+	const searchKeyword = ref("");
+	const staffRows = ref<StaffRow[]>([]);
+	const selectedId = ref(0);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const confirming = ref(false);
+	const page = ref(1);
+	const hasMore = ref(true);
+	const pageLimit = 10;
+
+	const pageTitle = computed(() => {
+		return pageMode.value == "batch" ? "批量转赠" : "选择员工";
+	});
+
+	const confirmBtnText = computed(() => {
+		return pageMode.value == "batch" ? "确认转赠" : "确认分配";
+	});
+
+	const confirmDisabled = computed(() => {
+		return selectedId.value <= 0 || confirming.value;
+	});
+
+	function getAvatarText(name: string): string {
+		const text = name.trim();
+		if (text == "") {
+			return "员";
+		}
+		return text.charAt(0);
+	}
+
+	function mapStaffRow(item: StaffListItem, index: number, baseIndex: number = 0): StaffRow {
+		const name = `${item.nickname ?? ""}`.trim();
+		const sn = `${item.sn ?? ""}`.trim();
+		const status = item.status;
+		const enabled = status == null || status == 1;
+		const statusText = `${item.status_text ?? ""}`.trim();
+		const userIdRaw = item.user_id ?? 0;
+		const userId = typeof userIdRaw == "number" ? (userIdRaw as number) : parseInt(`${userIdRaw}`);
+		return {
+			id: item.id ?? 0,
+			userId: isNaN(userId) ? 0 : userId,
+			name: name != "" ? name : "未命名员工",
+			mobile: `${item.mobile ?? ""}`.trim(),
+			collabId: sn != "" ? sn : `${item.user_id ?? ""}`,
+			statusText: statusText != "" ? statusText : enabled ? "在职" : "已离职",
+			enabled: enabled,
+			avatarText: getAvatarText(name),
+			avatarUrl: `${item.avatar ?? ""}`.trim(),
+			color: AVATAR_COLORS[(baseIndex + index) % AVATAR_COLORS.length]
+		};
+	}
+
+	function parseStaffListPayload(res: any | null): { list: StaffListItem[]; count: number } {
+		if (res == null) {
+			return { list: [], count: 0 };
+		}
+		const envelope = res as UTSJSONObject;
+		const data = envelope["data"] ?? envelope;
+		if (Array.isArray(data)) {
+			return { list: data as StaffListItem[], count: data.length };
+		}
+		const obj = data as UTSJSONObject;
+		const list = obj["list"];
+		const rawList =
+			list != null && Array.isArray(list) ? (list as StaffListItem[]) : ([] as StaffListItem[]);
+		const countVal = obj["count"] ?? obj["total"] ?? obj["total_count"];
+		let count = 0;
+		if (countVal != null) {
+			const n = parseInt(`${countVal}`);
+			count = isNaN(n) ? 0 : n;
+		}
+		return { list: rawList, count };
+	}
+
+	function updateHasMore(rawListLength: number, count: number, currentPage: number) {
+		if (count > 0) {
+			hasMore.value = currentPage * pageLimit < count;
+			return;
+		}
+		hasMore.value = rawListLength >= pageLimit;
+	}
+
+	function loadStaffList(more: boolean = false) {
+		if (more) {
+			if (loadingMore.value || !hasMore.value) {
+				return;
+			}
+			loadingMore.value = true;
+		} else {
+			if (loading.value || loadingMore.value) {
+				return;
+			}
+			loading.value = true;
+			staffRows.value = [];
+			page.value = 1;
+			hasMore.value = true;
+		}
+
+		const requestPage = more ? page.value + 1 : 1;
+		getStaffList({
+			page: requestPage,
+			limit: pageLimit,
+			status: 1,
+			keyword: searchKeyword.value.trim()
+		})
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const payload = parseStaffListPayload(res);
+				const baseIndex = more ? staffRows.value.length : 0;
+				const rows = payload.list.map((item, index) => mapStaffRow(item, index, baseIndex));
+				if (more) {
+					staffRows.value = staffRows.value.concat(rows);
+				} else {
+					staffRows.value = rows;
+				}
+				page.value = requestPage;
+				updateHasMore(payload.list.length, payload.count, requestPage);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loading.value = false;
+				loadingMore.value = false;
+			});
+	}
+
+	function onSearch() {
+		selectedId.value = 0;
+		loadStaffList(false);
+	}
+
+	function onSelectItem(item: StaffRow) {
+		selectedId.value = item.id;
+	}
+
+	function onScrollToLower() {
+		if (!hasMore.value || loadingMore.value || loading.value) {
+			return;
+		}
+		loadStaffList(true);
+	}
+
+	function onLoadMoreTap() {
+		onScrollToLower();
+	}
+
+	function findStaffById(id: number): StaffRow | null {
+		const rows = staffRows.value;
+		for (let i = 0; i < rows.length; i++) {
+			if (rows[i].id == id) {
+				return rows[i];
+			}
+		}
+		return null;
+	}
+
+	function parseKeywordIds(raw: any | null): number[] {
+		if (raw == null) {
+			return [];
+		}
+		if (Array.isArray(raw)) {
+			const ids: number[] = [];
+			const arr = raw as any[];
+			for (let i = 0; i < arr.length; i++) {
+				const n = parseInt(`${arr[i]}`);
+				if (!isNaN(n) && n > 0) {
+					ids.push(n);
+				}
+			}
+			return ids;
+		}
+		const n = parseInt(`${raw}`);
+		if (!isNaN(n) && n > 0) {
+			return [n];
+		}
+		return [];
+	}
+
+	function readAssignContext() {
+		const query = router.query();
+		const mode = `${query["mode"] ?? "manage"}`.trim();
+		pageMode.value = mode == "batch" ? "batch" : "manage";
+
+		const pid = parseInt(`${query["project_id"] ?? 0}`);
+		projectId.value = isNaN(pid) ? 0 : pid;
+
+		if (pageMode.value == "batch") {
+			const raw = uni.getStorageSync(KEYWORD_ASSIGN_CONTEXT_KEY);
+			if (raw != null && `${raw}` != "") {
+				const obj = raw as UTSJSONObject;
+				const ids = parseKeywordIds(obj["keyword_ids"]);
+				if (ids.length > 0) {
+					keywordIds.value = ids;
+				}
+				if (projectId.value <= 0) {
+					const ctxPid = parseInt(`${obj["project_id"] ?? 0}`);
+					projectId.value = isNaN(ctxPid) ? 0 : ctxPid;
+				}
+			}
+		} else {
+			const kid = parseInt(`${query["keyword_id"] ?? 0}`);
+			keywordIds.value = !isNaN(kid) && kid > 0 ? [kid] : [];
+		}
+
+		uni.setNavigationBarTitle({ title: pageTitle.value });
+	}
+
+	function onConfirm() {
+		if (selectedId.value <= 0) {
+			uni.showToast({ title: "请选择员工", icon: "none" });
+			return;
+		}
+		const selected = findStaffById(selectedId.value);
+		if (selected == null) {
+			uni.showToast({ title: "请选择员工", icon: "none" });
+			return;
+		}
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目信息", icon: "none" });
+			return;
+		}
+		if (keywordIds.value.length == 0) {
+			uni.showToast({ title: "缺少推广任务信息", icon: "none" });
+			return;
+		}
+		const targetUserId = selected.userId > 0 ? selected.userId : selected.id;
+		if (targetUserId <= 0) {
+			uni.showToast({ title: "员工用户无效", icon: "none" });
+			return;
+		}
+		if (confirming.value) {
+			return;
+		}
+		confirming.value = true;
+		uni.showLoading({ title: "提交中..." });
+		assignKeyword({
+			project_id: projectId.value,
+			keyword_id: keywordIds.value,
+			user_id: targetUserId
+		})
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					confirming.value = false;
+					uni.showToast({ title: getApiMessage(envelope, "分配失败"), icon: "none" });
+					return;
+				}
+				uni.removeStorageSync(KEYWORD_ASSIGN_CONTEXT_KEY);
+				uni.hideLoading();
+				uni.showToast({
+					title: getApiMessage(envelope, "分配成功"),
+					icon: "success",
+					duration: ASSIGN_SUCCESS_TIP_MS
+				});
+				setTimeout(() => {
+					confirming.value = false;
+					router.back();
+				}, ASSIGN_SUCCESS_TIP_MS);
+			})
+			.catch((err) => {
+				confirming.value = false;
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "分配失败"), icon: "none" });
+			})
+			.finally(() => {
+				uni.hideLoading();
+			});
+	}
+
+	function readPageQuery() {
+		readAssignContext();
+	}
+
+	onLoad(() => {
+		readPageQuery();
+		loadStaffList(false);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.sl-page {
+		height: 100vh;
+		overflow: hidden;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+	}
+
+	.sl-search-fixed {
+		flex-shrink: 0;
+		z-index: 20;
+		background-color: #f7f8fa;
+		padding: 20rpx 24rpx 12rpx;
+	}
+
+	.sl-search-box {
+		height: 72rpx;
+		padding: 0 8rpx 0 24rpx;
+		border-radius: 36rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #eeeeee;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.sl-search-field {
+		flex: 1;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-right: 12rpx;
+	}
+
+	.sl-search-input {
+		flex: 1;
+		height: 56rpx;
+		margin-left: 12rpx;
+		font-size: 26rpx;
+		color: #333333;
+	}
+
+	.sl-search-placeholder {
+		color: #cccccc;
+		font-size: 26rpx;
+	}
+
+	.sl-btn {
+		height: 56rpx;
+		padding: 0 28rpx;
+		border-radius: 28rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.sl-btn--primary {
+		background-color: #2b59c3;
+		border: 1rpx solid #2b59c3;
+	}
+
+	.sl-btn-text {
+		font-size: 28rpx;
+		font-weight: 600;
+	}
+
+	.sl-btn-text--primary {
+		color: #ffffff;
+	}
+
+	.sl-scroll {
+		flex: 1;
+		width: 100%;
+		height: 0;
+		min-height: 0;
+	}
+
+	.sl-scroll-inner {
+		padding: 8rpx 24rpx 200rpx;
+	}
+
+	.sl-state {
+		padding: 120rpx 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sl-state-text {
+		font-size: 26rpx;
+		color: #999999;
+	}
+
+	.sl-item {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 24rpx;
+		margin-bottom: 16rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		border: 2rpx solid transparent;
+
+		&--active {
+			border-color: #2b59c3;
+			background-color: #f5f8ff;
+		}
+	}
+
+	.sl-radio {
+		width: 36rpx;
+		height: 36rpx;
+		border-radius: 18rpx;
+		border: 2rpx solid #cccccc;
+		margin-right: 20rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+
+		&--checked {
+			border-color: #2b59c3;
+		}
+	}
+
+	.sl-radio-dot {
+		width: 20rpx;
+		height: 20rpx;
+		border-radius: 10rpx;
+		background-color: #2b59c3;
+	}
+
+	.sl-avatar {
+		width: 88rpx;
+		height: 88rpx;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-right: 20rpx;
+		flex-shrink: 0;
+		overflow: hidden;
+	}
+
+	.sl-avatar-img {
+		width: 88rpx;
+		height: 88rpx;
+	}
+
+	.sl-avatar-text {
+		font-size: 34rpx;
+		color: #ffffff;
+		font-weight: 600;
+	}
+
+	.sl-copy {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.sl-name-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 8rpx;
+	}
+
+	.sl-name {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #333333;
+		margin-right: 12rpx;
+	}
+
+	.sl-status-tag {
+		padding: 4rpx 12rpx;
+		border-radius: 8rpx;
+
+		&--on {
+			background-color: #ecfdf5;
+		}
+
+		&--off {
+			background-color: #f3f4f6;
+		}
+	}
+
+	.sl-status-text {
+		font-size: 20rpx;
+		color: #666666;
+	}
+
+	.sl-meta {
+		display: block;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.sl-loadmore {
+		padding: 8rpx 0 24rpx;
+	}
+
+	.sl-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 100;
+		background-color: #ffffff;
+		border-top: 1rpx solid #eeeeee;
+		box-shadow: 0 -4rpx 24rpx rgba(0, 0, 0, 0.06);
+		padding: 20rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
+	}
+
+	.sl-confirm-btn {
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--disabled {
+			opacity: 0.5;
+		}
+	}
+
+	.sl-confirm-text {
+		font-size: 30rpx;
+		color: #ffffff;
+		font-weight: 600;
+	}
+</style>

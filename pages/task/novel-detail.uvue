@@ -1,0 +1,552 @@
+<template>
+	<cl-page :pt="{ className: 'nd-page' }" :back-top="false">
+		<view class="nd-page">
+			<view class="nd-head">
+				<image
+					v-if="logoUrl != ''"
+					class="nd-top-logo"
+					:src="logoUrl"
+					mode="aspectFill"
+				></image>
+				<text class="nd-top-title">{{ taskTitle }}</text>
+			</view>
+
+			<view class="nd-search-wrap">
+				<view class="nd-search-box">
+					<view class="nd-search-field">
+						<cl-icon name="search-line" :size="16" color="#999999"></cl-icon>
+						<input
+							class="nd-search-input"
+							v-model="searchKeyword"
+							placeholder="请输入名称"
+							placeholder-class="nd-search-placeholder"
+							confirm-type="search"
+							@confirm="onSearch"
+						/>
+					</view>
+					<view class="nd-search-btn" @tap="onSearch">
+						<text class="nd-search-btn-text">搜索</text>
+					</view>
+				</view>
+			</view>
+
+			<view v-if="pageLoading" class="nd-loading">
+				<cl-loading :loading="true" :size="28" color="#0651f8"></cl-loading>
+				<text class="nd-loading-text">加载中...</text>
+			</view>
+
+			<view v-else class="nd-body">
+				<scroll-view
+					class="nd-scroll"
+					scroll-y="true"
+					:show-scrollbar="false"
+					:lower-threshold="120"
+					@scrolltolower="onScrollToLower"
+				>
+					<view class="nd-inner">
+						<view v-if="detailList.length == 0 && !listLoadingMore" class="nd-empty">
+							<text class="nd-empty-text">{{ queryKeyword != "" ? "暂无搜索结果" : "暂无内容" }}</text>
+						</view>
+						<view v-else class="nd-list">
+							<view
+								class="nd-item"
+								v-for="(item, index) in detailList"
+								:key="index"
+								@tap="onListItemTap(item)"
+							>
+								<view class="nd-item-cover">
+									<image
+										v-if="item.book_logo"
+										class="nd-item-logo"
+										:src="item.book_logo"
+										mode="aspectFill"
+									></image>
+									<view v-else class="nd-item-logo nd-item-logo--text">
+										<text class="nd-item-logo-text">{{ item.book_name ?? "" }}</text>
+									</view>
+								</view>
+								<text class="nd-item-title">{{ item.book_name }}</text>
+							</view>
+						</view>
+						<view v-if="detailList.length > 0" class="nd-loadmore">
+							<cl-loadmore
+								:loading="listLoadingMore"
+								:finish="!listHasMore"
+								finish-text="没有更多了"
+								loading-text="加载中..."
+							></cl-loadmore>
+						</view>
+					</view>
+				</scroll-view>
+			</view>
+
+			<view v-if="!pageLoading" class="nd-footer">
+				<view class="nd-footer-btn" @tap="onParticipationRecord">
+					<text class="nd-footer-btn-text">参与记录</text>
+				</view>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getTaskDetail } from "@/.cool/api/task";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { NovelDetailListItem, Response } from "@/.cool";
+
+	const NOVEL_PAGE_LIMIT = 18;
+
+	const taskId = ref(0);
+	const taskTitle = ref("小说详情");
+	const logoUrl = ref("");
+	const urlTitle = ref("");
+	const urlLogo = ref("");
+	const pageLoading = ref(false);
+	const listPage = ref(1);
+	const listHasMore = ref(true);
+	const listLoadingMore = ref(false);
+	const detailList = ref<NovelDetailListItem[]>([]);
+	const searchKeyword = ref("");
+	const queryKeyword = ref("");
+
+	function pickNonEmpty(...values: string[]): string {
+		for (let i = 0; i < values.length; i++) {
+			const text = values[i].trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function readDetailField(data: UTSJSONObject, field: string): string {
+		const direct = data[field];
+		if (direct != null && typeof direct == "string") {
+			const text = `${direct}`.trim();
+			if (text != "" && text != "null" && text != "undefined") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function getResponseRow(res: any | null): UTSJSONObject | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		let data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		if (Array.isArray(data)) {
+			const arr = data as any[];
+			if (arr.length == 0) {
+				return null;
+			}
+			data = arr[0];
+		}
+		return data as UTSJSONObject;
+	}
+
+	function getDetailList(row: UTSJSONObject): NovelDetailListItem[] {
+		const listRaw = row["list"];
+		if (listRaw == null || !Array.isArray(listRaw)) {
+			return [];
+		}
+		return listRaw as NovelDetailListItem[];
+	}
+
+	function parseListCount(row: UTSJSONObject, fallback: number): number {
+		const countVal = row["count"] ?? row["total"];
+		if (countVal == null) {
+			return fallback;
+		}
+		const n = parseInt(`${countVal}`);
+		return isNaN(n) ? fallback : n;
+	}
+
+	function updateListHasMore(listLength: number, count: number, currentPage: number) {
+		if (count > 0) {
+			listHasMore.value = currentPage * NOVEL_PAGE_LIMIT < count;
+			return;
+		}
+		listHasMore.value = listLength >= NOVEL_PAGE_LIMIT;
+	}
+
+	function onListItemTap(item: NovelDetailListItem) {
+		const storyId = item.id;
+		if (storyId == null || parseInt(`${storyId}`) <= 0) {
+			uni.showToast({ title: "缺少故事 ID", icon: "none" });
+			return;
+		}
+		const query: UTSJSONObject = {
+			id: storyId,
+			book_name: item.book_name ?? "",
+			book_logo: item.book_logo ?? "",
+			project_id: taskId.value
+		};
+		router.push({
+			path: "/pages/task/story-detail",
+			query: query
+		});
+	}
+
+	function applyNovelDetail(data: UTSJSONObject) {
+		if (urlTitle.value == "") {
+			const title = pickNonEmpty(
+				readDetailField(data, "title"),
+				readDetailField(data, "subtitle")
+			);
+			taskTitle.value = title != "" ? title : "小说详情";
+		}
+		if (urlLogo.value == "") {
+			logoUrl.value = pickNonEmpty(
+				readDetailField(data, "logo"),
+				readDetailField(data, "logo_url")
+			);
+		}
+		uni.setNavigationBarTitle({
+			title: taskTitle.value
+		});
+	}
+
+	function loadNovelList(reset: boolean) {
+		if (taskId.value <= 0) {
+			return;
+		}
+		if (reset) {
+			if (pageLoading.value || listLoadingMore.value) {
+				return;
+			}
+			pageLoading.value = true;
+			listPage.value = 1;
+			listHasMore.value = true;
+			detailList.value = [];
+		} else {
+			if (pageLoading.value || listLoadingMore.value || !listHasMore.value) {
+				return;
+			}
+			listLoadingMore.value = true;
+		}
+
+		const requestPage = reset ? 1 : listPage.value + 1;
+		getTaskDetail(taskId.value, requestPage, NOVEL_PAGE_LIMIT, queryKeyword.value)
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const row = getResponseRow(res);
+				const list = row != null ? getDetailList(row) : [];
+				if (reset && row == null && list.length == 0 && queryKeyword.value == "") {
+					uni.showToast({ title: "小说详情为空", icon: "none" });
+					return;
+				}
+				if (reset && row != null) {
+					applyNovelDetail(row);
+				}
+				if (reset) {
+					detailList.value = list;
+				} else {
+					detailList.value = detailList.value.concat(list);
+				}
+				listPage.value = requestPage;
+				const count = row != null ? parseListCount(row, detailList.value.length) : detailList.value.length;
+				updateListHasMore(list.length, count, requestPage);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				pageLoading.value = false;
+				listLoadingMore.value = false;
+			});
+	}
+
+	function onScrollToLower() {
+		if (!listHasMore.value || listLoadingMore.value || pageLoading.value) {
+			return;
+		}
+		loadNovelList(false);
+	}
+
+	function onSearch() {
+		queryKeyword.value = searchKeyword.value.trim();
+		loadNovelList(true);
+	}
+
+	function onParticipationRecord() {
+		const query: UTSJSONObject = {
+			title: taskTitle.value,
+			id: taskId.value,
+			logo: logoUrl.value
+		};
+		router.push({
+			path: "/pages/task/generate-record",
+			query: query
+		});
+	}
+
+	onLoad((options) => {
+		const idVal = options["id"] as string | null;
+		const titleVal = options["title"] as string | null;
+		const logoVal = options["logo"] as string | null;
+		const id = idVal != null ? parseInt(`${idVal}`) : 0;
+		if (titleVal != null && `${titleVal}`.trim() != "") {
+			urlTitle.value = `${titleVal}`.trim();
+			taskTitle.value = urlTitle.value;
+			uni.setNavigationBarTitle({
+				title: urlTitle.value
+			});
+		}
+		if (logoVal != null && `${logoVal}`.trim() != "") {
+			urlLogo.value = `${logoVal}`.trim();
+			logoUrl.value = urlLogo.value;
+		}
+		if (id <= 0) {
+			uni.showToast({ title: "缺少任务 ID", icon: "none" });
+			return;
+		}
+		taskId.value = id;
+		loadNovelList(true);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.nd-page {
+		position: relative;
+		width: 100%;
+		height: 100vh;
+		display: flex;
+		flex-direction: column;
+		padding: 24rpx 0 0;
+		padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+		background-color: #f7f8fa;
+		box-sizing: border-box;
+		overflow: hidden;
+	}
+
+	.nd-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 8rpx 30rpx 24rpx;
+		box-sizing: border-box;
+	}
+
+	.nd-top-logo {
+		width: 88rpx;
+		height: 88rpx;
+		border-radius: 16rpx;
+		flex-shrink: 0;
+		overflow: hidden;
+	}
+
+	.nd-top-title {
+		flex: 1;
+		min-width: 0;
+		margin-left: 20rpx;
+		font-size: 34rpx;
+		font-weight: 700;
+		color: #141b36;
+		line-height: 48rpx;
+	}
+
+	.nd-search-wrap {
+		flex-shrink: 0;
+		padding: 0 30rpx 20rpx;
+		box-sizing: border-box;
+	}
+
+	.nd-search-box {
+		height: 72rpx;
+		padding: 0 8rpx 0 24rpx;
+		border-radius: 36rpx;
+		background-color: #ffffff;
+		border: 1rpx solid #eeeeee;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		box-sizing: border-box;
+	}
+
+	.nd-search-field {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-right: 12rpx;
+	}
+
+	.nd-search-input {
+		flex: 1;
+		min-width: 0;
+		height: 56rpx;
+		margin-left: 12rpx;
+		font-size: 26rpx;
+		color: #333333;
+	}
+
+	.nd-search-placeholder {
+		color: #cccccc;
+		font-size: 26rpx;
+	}
+
+	.nd-search-btn {
+		height: 56rpx;
+		padding: 0 28rpx;
+		border-radius: 28rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.nd-search-btn-text {
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 36rpx;
+	}
+
+	.nd-loading {
+		flex: 1;
+		min-height: 200rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.nd-loading-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #7b8193;
+		line-height: 36rpx;
+	}
+
+	.nd-body {
+		flex: 1;
+		min-height: 0;
+		padding: 0 30rpx;
+		box-sizing: border-box;
+	}
+
+	.nd-scroll {
+		height: 100%;
+	}
+
+	.nd-inner {
+		padding-bottom: 24rpx;
+	}
+
+	.nd-loadmore {
+		padding: 8rpx 0 16rpx;
+	}
+
+	.nd-empty {
+		min-height: 240rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.nd-empty-text {
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.nd-list {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 20rpx;
+	}
+
+	.nd-item {
+		width: calc((100% - 40rpx) / 3);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 0 0 20rpx;
+		box-sizing: border-box;
+	}
+
+	.nd-item-cover {
+		width: 100%;
+		height: 0;
+		padding-bottom: 132.79%;
+		position: relative;
+		border-radius: 12rpx;
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+
+	.nd-item-logo {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		border-radius: 12rpx;
+	}
+
+	.nd-item-logo--text {
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.nd-item-logo-text {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 44rpx;
+	}
+
+	.nd-item-title {
+		width: 100%;
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 34rpx;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.nd-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 30;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		box-sizing: border-box;
+	}
+
+	.nd-footer-btn {
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #eef3fc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.nd-footer-btn-text {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #2b59c3;
+		line-height: 40rpx;
+	}
+</style>

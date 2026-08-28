@@ -1,0 +1,502 @@
+<template>
+	<view
+		class="cl-tabs"
+		:class="[
+			{
+				'cl-tabs--line': showLine,
+				'cl-tabs--slider': showSlider,
+				'cl-tabs--fill': fill,
+				'cl-tabs--disabled': disabled,
+				'is-dark': isDark
+			},
+			pt.className
+		]"
+		:style="{
+			height: getUnit(height)
+		}"
+	>
+		<scroll-view
+			class="cl-tabs__scrollbar"
+			:scroll-with-animation="true"
+			:scroll-x="true"
+			direction="horizontal"
+			:scroll-left="scrollLeft"
+			:scroll-into-view="scrollIntoView"
+			:show-scrollbar="false"
+		>
+			<view class="cl-tabs__inner">
+				<view
+					class="cl-tabs__item"
+					v-for="(item, index) in list"
+					:key="index"
+					:id="getItemId(index)"
+					:class="[pt.item?.className]"
+					:style="{
+						padding: `0 ${getUnit(gutter)}`
+					}"
+					@tap="change(index)"
+				>
+					<slot name="item" :item="item" :active="item.isActive">
+						<cl-text
+							:pt="{
+								className: parseClass([
+									[
+										item.isActive && color == '' && unColor == '',
+										showSlider ? 'text-white' : 'text-primary-500'
+									],
+									[item.disabled, 'opacity-30'],
+									pt.text?.className
+								])
+							}"
+							:style="getTextStyle(item)"
+							>{{ item.label }}</cl-text
+						>
+					</slot>
+				</view>
+
+				<template v-if="lineLeft > 0">
+					<view
+						class="cl-tabs__line"
+						:class="[pt.line?.className]"
+						:style="lineStyle"
+						v-if="showLine"
+					></view>
+					<view
+						class="cl-tabs__slider"
+						:class="[pt.slider?.className]"
+						:style="sliderStyle"
+						v-if="showSlider"
+					></view>
+				</template>
+			</view>
+		</scroll-view>
+	</view>
+</template>
+
+<script lang="ts" setup>
+import { type PropType, computed, getCurrentInstance, nextTick, onMounted, ref, watch } from "vue";
+import { getUnit, isDark, isEmpty, isNull, parseClass, parsePt } from "@/.cool";
+import type { ClTabsItem, PassThroughProps } from "../../types";
+
+// 定义标签类型
+type Item = {
+	label: string;
+	value: string | number;
+	disabled: boolean;
+	isActive: boolean;
+};
+
+defineOptions({
+	name: "cl-tabs"
+});
+
+defineSlots<{
+	item(props: { item: Item; active: boolean }): any;
+}>();
+
+const props = defineProps({
+	// 透传属性对象，允许外部自定义样式和属性
+	pt: {
+		type: Object,
+		default: () => ({})
+	},
+	// v-model绑定值，表示当前选中的tab
+	modelValue: {
+		type: [String, Number] as PropType<string | number>,
+		default: ""
+	},
+	// 标签高度
+	height: {
+		type: [String, Number] as PropType<string | number>,
+		default: 40
+	},
+	// 标签列表
+	list: {
+		type: Array as PropType<ClTabsItem[]>,
+		default: () => []
+	},
+	// 是否填充标签
+	fill: {
+		type: Boolean,
+		default: false
+	},
+	// 标签间隔
+	gutter: {
+		type: Number,
+		default: 14
+	},
+	// 选中标签的颜色
+	color: {
+		type: String,
+		default: ""
+	},
+	// 未选中标签的颜色
+	unColor: {
+		type: String,
+		default: ""
+	},
+	// 是否显示下划线
+	showLine: {
+		type: Boolean,
+		default: true
+	},
+	// 是否显示滑块
+	showSlider: {
+		type: Boolean,
+		default: false
+	},
+	// 是否禁用
+	disabled: {
+		type: Boolean,
+		default: false
+	},
+	// 横向滚动对齐：center 居中当前项，previous 保留左侧相邻项可见
+	scrollAlign: {
+		type: String as PropType<"center" | "previous">,
+		default: "center"
+	}
+});
+
+// 定义事件发射器
+const emit = defineEmits(["update:modelValue", "change"]);
+
+// 获取当前组件实例的proxy对象
+const { proxy } = getCurrentInstance()!;
+const tabsUid = `cl-tabs-${Date.now()}`;
+
+// 定义透传类型，便于类型推断和扩展
+type PassThrough = {
+	// 额外类名
+	className?: string;
+	// 文本的透传属性
+	text?: PassThroughProps;
+	// 单个item的透传属性
+	item?: PassThroughProps;
+	// 下划线的透传属性
+	line?: PassThroughProps;
+	// 滑块的透传属性
+	slider?: PassThroughProps;
+};
+
+// 计算透传属性，便于样式和属性扩展
+const pt = computed(() => parsePt<PassThrough>(props.pt));
+
+// 当前选中的标签值
+const active = ref(props.modelValue);
+
+// 计算标签列表，增加isActive和disabled属性，便于渲染和状态判断
+const list = computed(() =>
+	props.list.map((e) => {
+		return {
+			label: e.label,
+			value: e.value,
+			// 如果未传disabled则默认为false
+			disabled: e.disabled ?? false,
+			// 判断当前标签是否为激活状态
+			isActive: e.value == active.value
+		} as Item;
+	})
+);
+
+// 切换标签时触发，参数为索引
+async function change(index: number) {
+	// 如果整个Tabs被禁用，则不响应点击
+	if (props.disabled) {
+		return false;
+	}
+
+	// 获取当前点击标签的值
+	const { value, disabled } = list.value[index];
+
+	// 如果标签被禁用，则不响应点击
+	if (disabled) {
+		return false;
+	}
+
+	// 触发v-model的更新
+	emit("update:modelValue", value);
+	// 触发change事件
+	emit("change", value);
+	active.value = value;
+	scrollToActiveItem();
+}
+
+function getItemId(index: number): string {
+	return `${tabsUid}-item-${index}`;
+}
+
+// 获取当前选中标签的下标，未找到则返回0
+function getIndex() {
+	const index = list.value.findIndex((e) => e.isActive);
+	return index == -1 ? 0 : index;
+}
+
+// 根据激活状态获取标签颜色
+function getColor(isActive: boolean) {
+	let color: string;
+	// 选中时取props.color，否则取props.unColor
+	if (isActive) {
+		color = props.color;
+	} else {
+		color = props.unColor;
+	}
+
+	return isEmpty(color) ? null : color;
+}
+
+// tab区域宽度
+const tabWidth = ref(0);
+// tab区域左侧偏移
+const tabLeft = ref(0);
+// 下划线左侧偏移
+const lineLeft = ref(0);
+// 滑块左侧偏移
+const sliderLeft = ref(0);
+// 滑块宽度
+const sliderWidth = ref(0);
+// 滚动条左侧偏移
+const scrollLeft = ref(0);
+// scroll-into-view 目标
+const scrollIntoView = ref("");
+
+// 单个标签的位置信息类型，包含left和width
+type ItemRect = {
+	left: number;
+	width: number;
+};
+
+// 所有标签的位置信息，响应式数组
+const itemRects = ref<ItemRect[]>([]);
+
+// 计算下划线样式
+const lineStyle = computed(() => {
+	const style = {};
+
+	style["transform"] = `translateX(${lineLeft.value}px)`;
+
+	// 获取选中颜色
+	const bgColor = getColor(true);
+	if (bgColor != null) {
+		style["backgroundColor"] = bgColor;
+	}
+
+	return style;
+});
+
+// 计算滑块样式
+const sliderStyle = computed(() => {
+	const style = {};
+
+	style["transform"] = `translateX(${sliderLeft.value}px)`;
+	style["width"] = sliderWidth.value + "px";
+
+	// 获取选中颜色
+	const bgColor = getColor(true);
+	if (bgColor != null) {
+		style["backgroundColor"] = bgColor;
+	}
+
+	return style;
+});
+
+// 获取文本样式
+function getTextStyle(item: Item) {
+	const style = {};
+
+	// 获取选中颜色
+	const color = getColor(item.isActive);
+	if (color != null) {
+		style["color"] = color;
+	}
+
+	return style;
+}
+
+// 更新下划线、滑块、滚动条等位置
+function updatePosition() {
+	measureAndUpdatePosition();
+}
+
+function setScrollLeft(next: number) {
+	if (scrollLeft.value == next) {
+		scrollLeft.value = next + 1;
+		nextTick(() => {
+			scrollLeft.value = next;
+		});
+		return;
+	}
+	scrollLeft.value = next;
+}
+
+function scrollToActiveItem() {
+	const index = getIndex();
+	const scrollIndex = props.scrollAlign == "previous" && index > 0 ? index - 1 : index;
+	const targetId = getItemId(scrollIndex);
+	scrollIntoView.value = "";
+	nextTick(() => {
+		scrollIntoView.value = targetId;
+		measureAndUpdatePosition();
+	});
+}
+
+function measureAndUpdatePosition() {
+	nextTick(() => {
+		uni.createSelectorQuery()
+			.in(proxy)
+			.select(".cl-tabs")
+			.boundingClientRect()
+			.select(".cl-tabs__inner")
+			.boundingClientRect()
+			.selectAll(".cl-tabs__item")
+			.fields({ rect: true, size: true }, () => {})
+			.exec((nodes) => {
+				const tabNode = nodes[0] as NodeInfo | null;
+				const innerNode = nodes[1] as NodeInfo | null;
+				const itemNodes = nodes[2] as NodeInfo[] | null;
+				if (tabNode == null || innerNode == null || itemNodes == null || itemNodes.length == 0) {
+					return;
+				}
+
+				tabLeft.value = tabNode.left ?? 0;
+				tabWidth.value = tabNode.width ?? 0;
+
+				const innerLeft = innerNode.left ?? 0;
+				const innerWidth = innerNode.width ?? 0;
+				itemRects.value = itemNodes.map((e) => {
+					return {
+						left: (e.left ?? 0) - innerLeft,
+						width: e.width ?? 0
+					} as ItemRect;
+				});
+
+				const index = getIndex();
+				const item = itemRects.value[index];
+				if (isNull(item)) {
+					return;
+				}
+
+				const isLast = index == itemRects.value.length - 1;
+				let x = 0;
+				if (props.scrollAlign == "previous" && index > 0) {
+					const prevItem = itemRects.value[index - 1];
+					x = prevItem.left;
+				} else if (isLast) {
+					x = item.left + item.width - tabWidth.value;
+				} else {
+					x = item.left - (tabWidth.value - item.width) / 2;
+				}
+				if (x < 0) {
+					x = 0;
+				}
+				const maxScroll = Math.max(0, innerWidth - tabWidth.value);
+				if (x > maxScroll) {
+					x = maxScroll;
+				}
+				setScrollLeft(x);
+
+				lineLeft.value = item.left + item.width / 2 - 16 / 2;
+				sliderLeft.value = item.left;
+				sliderWidth.value = item.width;
+			});
+	});
+}
+
+// 获取所有标签的位置信息，便于后续计算
+function getRects() {
+	measureAndUpdatePosition();
+}
+
+// 刷新tab区域的宽度和位置信息
+function refresh() {
+	scrollToActiveItem();
+}
+
+onMounted(() => {
+	// 监听modelValue变化，更新active和位置
+	watch(
+		computed(() => props.modelValue!),
+		(val: string | number) => {
+			// 更新当前选中标签
+			active.value = val;
+			scrollToActiveItem();
+		},
+		{
+			// 立即执行一次
+			immediate: true
+		}
+	);
+
+	// 监听标签列表变化，刷新布局
+	watch(
+		computed(() => props.list),
+		() => {
+			refresh();
+		},
+		{
+			immediate: true
+		}
+	);
+});
+</script>
+
+<style lang="scss" scoped>
+.cl-tabs {
+	&__scrollbar {
+		@apply flex flex-row w-full h-full;
+	}
+
+	&__inner {
+		@apply flex flex-row relative;
+		flex-wrap: nowrap;
+	}
+
+	&__item {
+		@apply flex flex-row items-center justify-center h-full relative z-10;
+		flex-shrink: 0;
+	}
+
+	&__line {
+		@apply bg-primary-500 rounded-md absolute;
+		height: 2px;
+		width: 16px;
+		bottom: 1px;
+		left: 0;
+		transition-property: transform;
+		transition-duration: 0.3s;
+	}
+
+	&__slider {
+		@apply bg-primary-500 rounded-lg absolute h-full w-full;
+		top: 0;
+		left: 0;
+		transition-property: transform;
+		transition-duration: 0.3s;
+	}
+
+	&--slider {
+		@apply bg-surface-50 rounded-lg;
+
+		&.is-dark {
+			@apply bg-surface-700;
+		}
+	}
+
+	&--fill {
+		.cl-tabs__inner {
+			@apply w-full;
+		}
+
+		.cl-tabs__item {
+			flex: 1;
+		}
+
+		.cl-tabs__item-label {
+			@apply text-center;
+		}
+	}
+
+	&--disabled {
+		@apply opacity-50;
+	}
+}
+</style>

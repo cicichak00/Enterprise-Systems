@@ -1,0 +1,898 @@
+<!-- 绑定账户（静态样式页，估算对稿 375，待设计确认） -->
+<template>
+	<cl-page :pt="{ className: 'wba-page' }">
+		<view class="wba-page">
+			<view class="wba-tabs">
+				<view
+					class="wba-tab"
+					:class="{ 'wba-tab--active': activeTab == 'bank' }"
+					@tap="switchTab('bank')"
+				>
+					<text class="wba-tab-text" :class="{ 'wba-tab-text--active': activeTab == 'bank' }">银行卡</text>
+				</view>
+				<view
+					class="wba-tab"
+					:class="{ 'wba-tab--active': activeTab == 'alipay' }"
+					@tap="switchTab('alipay')"
+				>
+					<text class="wba-tab-text" :class="{ 'wba-tab-text--active': activeTab == 'alipay' }">支付宝</text>
+				</view>
+			</view>
+
+			<scroll-view class="wba-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="wba-scroll-inner">
+					<view class="wba-card">
+						<template v-if="activeTab == 'bank'">
+							<view class="wba-field">
+								<view class="wba-label-row">
+									<text class="wba-required">*</text>
+									<text class="wba-label">开户银行</text>
+								</view>
+								<view class="wba-input-wrap wba-input-wrap--picker" @tap="onPickBank">
+									<text
+										class="wba-picker-text"
+										:class="{ 'wba-picker-text--placeholder': bank_name == '' }"
+									>{{ bank_name != '' ? bank_name : '请选择开户银行' }}</text>
+									<cl-icon name="arrow-down-s-line" :size="16" color="#cccccc"></cl-icon>
+								</view>
+							</view>
+							<view class="wba-field">
+								<view class="wba-label-row">
+									<text class="wba-required">*</text>
+									<text class="wba-label">银行卡号</text>
+								</view>
+								<view class="wba-input-wrap">
+									<input
+										class="wba-input"
+										:value="bank_no"
+										type="number"
+										placeholder="请输入银行卡号"
+										placeholder-class="wba-placeholder"
+										@input="onBankNoInput"
+									/>
+								</view>
+							</view>
+							<view class="wba-field wba-field--last">
+								<view class="wba-label-row">
+									<text class="wba-required">*</text>
+									<text class="wba-label">预留手机号</text>
+								</view>
+								<view class="wba-input-wrap">
+									<input
+										:key="mobileInputKey"
+										class="wba-input"
+										:value="mobile"
+										type="digit"
+										:maxlength="11"
+										placeholder="请输入11位预留手机号"
+										placeholder-class="wba-placeholder"
+										@input="onMobileInput"
+									/>
+								</view>
+							</view>
+						</template>
+						<template v-else>
+							<view class="wba-field">
+								<view class="wba-label-row">
+									<text class="wba-required">*</text>
+									<text class="wba-label">支付宝账号</text>
+								</view>
+								<view class="wba-input-wrap">
+									<input
+										class="wba-input"
+										:value="bank_no"
+										placeholder="请输入支付宝账号手机号码或邮箱"
+										placeholder-class="wba-placeholder"
+										@input="onAlipayInput"
+									/>
+								</view>
+							</view>
+							<view class="wba-field wba-field--last">
+								<view class="wba-label-row">
+									<text class="wba-required">*</text>
+									<text class="wba-label">预留手机号</text>
+								</view>
+								<view class="wba-input-wrap">
+									<input
+										:key="mobileInputKey"
+										class="wba-input"
+										:value="mobile"
+										type="digit"
+										:maxlength="11"
+										placeholder="请输入11位预留手机号"
+										placeholder-class="wba-placeholder"
+										@input="onMobileInput"
+									/>
+								</view>
+							</view>
+						</template>
+					</view>
+
+					<view class="wba-card">
+						<view class="wba-field">
+							<view class="wba-label-row">
+								<text class="wba-label">真实姓名</text>
+							</view>
+							<view class="wba-input-wrap wba-input-wrap--readonly">
+								<text class="wba-readonly-text">{{ name }}</text>
+							</view>
+						</view>
+						<view class="wba-field wba-field--last">
+							<view class="wba-label-row">
+								<text class="wba-label">身份证号码</text>
+							</view>
+							<view class="wba-input-wrap wba-input-wrap--readonly">
+								<text class="wba-readonly-text">{{ id_card }}</text>
+							</view>
+						</view>
+					</view>
+
+					<view class="wba-agree" @tap="toggleAgree">
+						<view class="wba-check" :class="{ 'wba-check--on': agreed }">
+							<cl-icon v-if="agreed" name="check-line" :size="12" color="#ffffff"></cl-icon>
+						</view>
+						<view class="wba-agree-copy">
+							<text class="wba-agree-text">同意</text>
+							<text class="wba-agree-link" @tap.stop="onProtocol('collect')">《收款账户收集说明》</text>
+							<text class="wba-agree-text">与</text>
+							<text class="wba-agree-link" @tap.stop="onProtocol('partner')">《灵活就业合作伙伴协议》</text>
+							<text class="wba-agree-text">并委托平台自动签署</text>
+						</view>
+					</view>
+				</view>
+			</scroll-view>
+
+			<view class="wba-footer">
+				<view
+					class="wba-submit"
+					:class="{ 'wba-submit--disabled': submitting }"
+					@tap="onSubmit"
+				>
+					<text class="wba-submit-text">{{ submitting ? "提交中..." : "立即提交" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+
+			<cl-popup
+				v-model="bankPopupVisible"
+				direction="bottom"
+				:show-header="false"
+				:show-close="false"
+				:mask-closable="true"
+				:pt="{ className: 'wba-bank-popup-wrap' }"
+			>
+				<view class="wba-bank-popup">
+					<view class="wba-bank-popup-head">
+						<text class="wba-bank-popup-title">选择开户银行</text>
+						<view class="wba-bank-popup-close" @tap="closeBankPopup">
+							<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
+						</view>
+					</view>
+					<scroll-view class="wba-bank-popup-list" scroll-y="true" :show-scrollbar="false">
+						<view
+							v-for="(item, index) in bankList"
+							:key="item.id != null ? item.id : index"
+							class="wba-bank-item"
+							:class="{ 'wba-bank-item--active': bank_name == item.title }"
+							@tap="onChooseBank(item)"
+						>
+							<image
+								v-if="item.icon != null && `${item.icon}` != ''"
+								class="wba-bank-item-logo"
+								:src="`${item.icon}`"
+								mode="aspectFill"
+							></image>
+							<view v-else class="wba-bank-item-logo wba-bank-item-logo--placeholder">
+								<cl-icon name="bank-card-line" :size="28" color="#e0e0e0"></cl-icon>
+							</view>
+							<view class="wba-bank-item-main">
+								<text
+									class="wba-bank-item-title"
+									:class="{ 'wba-bank-item-title--active': bank_name == item.title }"
+								>{{ item.title }}</text>
+							</view>
+							<cl-icon
+								v-if="bank_name == item.title"
+								name="checkbox-circle-fill"
+								:size="22"
+								color="#2b59c3"
+							></cl-icon>
+						</view>
+						<view v-if="bankList.length == 0" class="wba-bank-empty">
+							<text class="wba-bank-empty-text">{{ bankListLoading ? "加载中..." : "暂无可选开户银行" }}</text>
+						</view>
+					</scroll-view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</cl-popup>
+
+			<cl-popup
+				v-model="agreeModalVisible"
+				direction="center"
+				size="560rpx"
+				:show-header="false"
+				:show-close="false"
+				:mask-closable="true"
+				:swipe-close="false"
+				:pt="{ className: 'wba-agree-popup-wrap' }"
+			>
+				<view class="wba-agree-modal">
+					<text class="wba-agree-modal-title">同意协议</text>
+					<text class="wba-agree-modal-content">
+						您还没有同意<text class="wba-agree-modal-link" @tap.stop="onProtocol('collect')">《收款账户收集说明》</text>与<text class="wba-agree-modal-link" @tap.stop="onProtocol('partner')">《灵活就业合作伙伴协议》</text>，请您阅读并点击“同意”即代表您已阅读并同意上述内容
+					</text>
+					<view class="wba-agree-modal-actions">
+						<view class="wba-agree-modal-btn wba-agree-modal-btn--ghost" @tap="closeAgreeModal">
+							<text class="wba-agree-modal-btn-text">取消</text>
+						</view>
+						<view class="wba-agree-modal-btn wba-agree-modal-btn--primary" @tap="onAgreeAndSubmit">
+							<text class="wba-agree-modal-btn-text wba-agree-modal-btn-text--primary">同意</text>
+						</view>
+					</view>
+				</view>
+			</cl-popup>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { queryUserCertifyVerify } from "@/.cool/api/user-certify";
+	import { addStaffBank, getStaffBankOptionList } from "@/.cool/api/wallet";
+	import type { StaffBankOptionItem } from "@/.cool/types/wallet";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import { countInputDigits, normalizePhone, readInputValue, readPhoneInput, validatePhoneValue } from "@/.cool/utils/phone";
+
+	type TabKey = "bank" | "alipay";
+
+	const activeTab = ref<TabKey>("bank");
+	const bank_name = ref("");
+	const bank_no = ref("");
+	const mobile = ref("");
+	const mobileInputKey = ref(0);
+	const agreed = ref(false);
+	const agreeModalVisible = ref(false);
+	const submitting = ref(false);
+	const bankPopupVisible = ref(false);
+	const bankListLoading = ref(false);
+	const bankList = ref<StaffBankOptionItem[]>([]);
+	const name = ref("-");
+	const id_card = ref("-");
+	const certify_id = ref(0);
+
+	function switchTab(tab: TabKey) {
+		if (submitting.value) {
+			return;
+		}
+		if (activeTab.value == tab) {
+			return;
+		}
+		activeTab.value = tab;
+		bank_name.value = "";
+		bank_no.value = "";
+		mobile.value = "";
+	}
+
+	function onBankNoInput(e: UniInputEvent) {
+		bank_no.value = readInputValue(e, "").trim();
+	}
+
+	function onAlipayInput(e: UniInputEvent) {
+		bank_no.value = readInputValue(e, "").trim();
+	}
+
+	function onMobileInput(e: UniInputEvent) {
+		const raw = readInputValue(e, "");
+		mobile.value = readPhoneInput(e);
+		// 粘贴/部分端可能绕过 maxlength，强制刷新以同步显示最多 11 位
+		if (countInputDigits(raw) > 11) {
+			mobileInputKey.value += 1;
+		}
+	}
+
+	function asText(raw: any | null, fallback: string = "-"): string {
+		if (raw == null) {
+			return fallback;
+		}
+		const text = `${raw}`.trim();
+		return text != "" ? text : fallback;
+	}
+
+	function loadCertifyInfo() {
+		queryUserCertifyVerify({ bind_scope: 1, force_sync: 0 })
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code as number | string)) {
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				name.value = asText(data["name"]);
+				id_card.value = asText(data["id_card"]);
+				const cid = data["certify_id"];
+				if (cid != null) {
+					const n = parseInt(`${cid}`);
+					certify_id.value = isNaN(n) ? 0 : n;
+				}
+			})
+			.catch(() => {});
+	}
+
+	function extractBankList(data: UTSJSONObject): StaffBankOptionItem[] {
+		const raw = data["list"] ?? data["lists"] ?? data["records"];
+		if (raw == null || !Array.isArray(raw)) {
+			return [];
+		}
+		return raw as StaffBankOptionItem[];
+	}
+
+	function loadBankList() {
+		bankListLoading.value = true;
+		getStaffBankOptionList({ platform_id: 1 })
+			.then((res) => {
+				if (res == null) {
+					bankList.value = [];
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code as number | string)) {
+					bankList.value = [];
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				bankList.value = extractBankList(data);
+			})
+			.catch(() => {
+				bankList.value = [];
+			})
+			.finally(() => {
+				bankListLoading.value = false;
+			});
+	}
+
+	function onPickBank() {
+		if (submitting.value) {
+			return;
+		}
+		if (bankListLoading.value) {
+			uni.showToast({ title: "银行列表加载中", icon: "none" });
+			return;
+		}
+		if (bankList.value.length == 0) {
+			uni.showToast({ title: "暂无可选开户银行", icon: "none" });
+			loadBankList();
+			return;
+		}
+		bankPopupVisible.value = true;
+	}
+
+	function closeBankPopup() {
+		bankPopupVisible.value = false;
+	}
+
+	function onChooseBank(item: StaffBankOptionItem) {
+		const title = `${item.title ?? ""}`.trim();
+		if (title == "") {
+			return;
+		}
+		bank_name.value = title;
+		bankPopupVisible.value = false;
+	}
+
+	function toggleAgree() {
+		if (submitting.value) {
+			return;
+		}
+		agreed.value = !agreed.value;
+	}
+
+	function onProtocol(_key: string) {
+		uni.showToast({ title: "协议内容待对接", icon: "none" });
+	}
+
+	function validateForm(): string {
+		if (activeTab.value == "bank") {
+			if (bank_name.value.trim() == "") {
+				return "请选择开户银行";
+			}
+			const no = bank_no.value.trim();
+			if (no == "") {
+				return "请输入银行卡号";
+			}
+			if (!/^\d{12,19}$/.test(no)) {
+				return "请输入12-19位银行卡号";
+			}
+		} else {
+			if (bank_no.value.trim() == "") {
+				return "请输入支付宝账号";
+			}
+		}
+		const phoneErr = validatePhoneValue(mobile.value, true, "请输入预留手机号");
+		if (phoneErr != "") {
+			return phoneErr;
+		}
+		return "";
+	}
+
+	function closeAgreeModal() {
+		agreeModalVisible.value = false;
+	}
+
+	function onSubmit() {
+		if (submitting.value) {
+			return;
+		}
+		const err = validateForm();
+		if (err != "") {
+			uni.showToast({ title: err, icon: "none" });
+			return;
+		}
+		if (!agreed.value) {
+			agreeModalVisible.value = true;
+			return;
+		}
+		doSubmit();
+	}
+
+	function onAgreeAndSubmit() {
+		agreed.value = true;
+		agreeModalVisible.value = false;
+		doSubmit();
+	}
+
+	function doSubmit() {
+		if (submitting.value) {
+			return;
+		}
+		const err = validateForm();
+		if (err != "") {
+			uni.showToast({ title: err, icon: "none" });
+			return;
+		}
+		const isBank = activeTab.value == "bank";
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		addStaffBank({
+			type: isBank ? 1 : 0,
+			bank_no: bank_no.value.trim(),
+			bank_name: isBank ? bank_name.value.trim() : "支付宝",
+			mobile: normalizePhone(mobile.value),
+			certify_id: certify_id.value > 0 ? certify_id.value : undefined
+		})
+			.then((res) => {
+				uni.hideLoading();
+				const envelope = res as UTSJSONObject | null;
+				const code = envelope != null ? envelope["code"] : null;
+				if (code != null && !isApiSuccess(code as number | string)) {
+					submitting.value = false;
+					uni.showToast({ title: getApiMessage(envelope, "提交失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(envelope, "绑定成功"), icon: "success" });
+				setTimeout(() => {
+					uni.navigateBack();
+				}, 400);
+			})
+			.catch((err) => {
+				uni.hideLoading();
+				submitting.value = false;
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			});
+	}
+
+	onShow(() => {
+		loadBankList();
+		loadCertifyInfo();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.wba-page {
+		height: 100%;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+
+		.wba-tabs {
+			margin: 24rpx 30rpx 8rpx;
+			padding: 6rpx;
+			border-radius: 16rpx;
+			background-color: #eceef2;
+			display: flex;
+			flex-direction: row;
+		}
+
+		.wba-tab {
+			flex: 1;
+			height: 68rpx;
+			border-radius: 12rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			&--active {
+				background-color: #ffffff;
+				box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+			}
+		}
+
+		.wba-tab-text {
+			font-size: 28rpx;
+			color: #999999;
+			line-height: 40rpx;
+
+			&--active {
+				color: #1a1a1a;
+				font-weight: 600;
+			}
+		}
+
+		.wba-scroll {
+			flex: 1;
+			min-height: 0;
+		}
+
+		.wba-scroll-inner {
+			padding: 16rpx 30rpx 24rpx;
+			box-sizing: border-box;
+		}
+
+		.wba-card {
+			margin-bottom: 20rpx;
+			padding: 28rpx 24rpx 8rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+		}
+
+		.wba-field {
+			margin-bottom: 24rpx;
+
+			&--last {
+				margin-bottom: 20rpx;
+			}
+		}
+
+		.wba-label-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			margin-bottom: 12rpx;
+		}
+
+		.wba-required {
+			margin-right: 4rpx;
+			font-size: 28rpx;
+			color: red;
+			line-height: 40rpx;
+		}
+
+		.wba-label {
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #333333;
+			line-height: 40rpx;
+		}
+
+		.wba-input-wrap {
+			height: 88rpx;
+			padding: 0 24rpx;
+			border-radius: 12rpx;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #ebebeb;
+			background-color: #ffffff;
+			box-sizing: border-box;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+
+			&--picker {
+				justify-content: space-between;
+			}
+
+			&--readonly {
+				background-color: #fafafa;
+			}
+		}
+
+		.wba-input {
+			flex: 1;
+			min-width: 0;
+			height: 88rpx;
+			font-size: 28rpx;
+			color: #333333;
+		}
+
+		.wba-placeholder {
+			color: #cccccc;
+			font-size: 28rpx;
+		}
+
+		.wba-picker-text {
+			flex: 1;
+			min-width: 0;
+			font-size: 28rpx;
+			color: #333333;
+			line-height: 40rpx;
+
+			&--placeholder {
+				color: #cccccc;
+			}
+		}
+
+		.wba-readonly-text {
+			font-size: 28rpx;
+			color: #333333;
+			line-height: 40rpx;
+		}
+
+		.wba-agree {
+			padding: 8rpx 4rpx 24rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: flex-start;
+		}
+
+		.wba-check {
+			width: 32rpx;
+			height: 32rpx;
+			margin-top: 4rpx;
+			margin-right: 12rpx;
+			border-radius: 6rpx;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #cccccc;
+			box-sizing: border-box;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+
+			&--on {
+				border-color: #333333;
+				background-color: #333333;
+			}
+		}
+
+		.wba-agree-copy {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: row;
+			flex-wrap: wrap;
+		}
+
+		.wba-agree-text {
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 36rpx;
+		}
+
+		.wba-agree-link {
+			font-size: 24rpx;
+			color: #2b59c3;
+			line-height: 36rpx;
+		}
+
+		.wba-footer {
+			flex-shrink: 0;
+			padding: 16rpx 30rpx 24rpx;
+			background-color: #f7f8fa;
+		}
+
+		.wba-submit {
+			height: 96rpx;
+			border-radius: 16rpx;
+			background-color: #2b59c3;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			&--disabled {
+				opacity: 0.7;
+			}
+		}
+
+		.wba-submit-text {
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #ffffff;
+			line-height: 42rpx;
+		}
+	}
+</style>
+
+<style lang="scss" scoped>
+	.wba-bank-popup {
+		display: flex;
+		flex-direction: column;
+		padding: 32rpx 32rpx 16rpx;
+		background-color: #f5f5f5;
+		border-top-left-radius: 24rpx;
+		border-top-right-radius: 24rpx;
+		box-sizing: border-box;
+	}
+
+	.wba-bank-popup-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 24rpx;
+		flex-shrink: 0;
+	}
+
+	.wba-bank-popup-title {
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 48rpx;
+	}
+
+	.wba-bank-popup-close {
+		width: 56rpx;
+		height: 56rpx;
+		background-color: #f0f0f0;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.wba-bank-popup-list {
+		flex-shrink: 0;
+		max-height: 60vh;
+		min-height: 240rpx;
+	}
+
+	.wba-bank-item {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 24rpx;
+		margin-bottom: 20rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		box-sizing: border-box;
+	}
+
+	.wba-bank-item-logo {
+		flex-shrink: 0;
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 50%;
+		background-color: #f5f5f5;
+		margin-right: 20rpx;
+
+		&--placeholder {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+	}
+
+	.wba-bank-item-main {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+	}
+
+	.wba-bank-item-title {
+		display: block;
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 42rpx;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		lines: 1;
+
+		&--active {
+			color: #2b59c3;
+		}
+	}
+
+	.wba-bank-empty {
+		min-height: 240rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.wba-bank-empty-text {
+		font-size: 24rpx;
+		color: #999999;
+	}
+</style>
+
+<style lang="scss">
+	.wba-bank-popup-wrap {
+		.cl-popup__inner {
+			border-top-left-radius: 24rpx;
+			border-top-right-radius: 24rpx;
+			background-color: transparent;
+			overflow: visible;
+		}
+	}
+
+	.wba-agree-popup-wrap {
+		.cl-popup__inner {
+			border-radius: 32rpx;
+			background-color: #ffffff;
+			overflow: visible;
+		}
+	}
+</style>
+
+<style lang="scss" scoped>
+	.wba-agree-modal {
+		width: 100%;
+		padding: 40rpx 32rpx 32rpx;
+		box-sizing: border-box;
+	}
+
+	.wba-agree-modal-title {
+		display: block;
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #333333;
+		text-align: center;
+		line-height: 48rpx;
+		margin-bottom: 24rpx;
+	}
+
+	.wba-agree-modal-content {
+		display: block;
+		width: 100%;
+		margin-bottom: 24rpx;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 44rpx;
+	}
+
+	.wba-agree-modal-link {
+		font-size: 26rpx;
+		color: #2b59c3;
+		line-height: 44rpx;
+	}
+
+	.wba-agree-modal-actions {
+		display: flex;
+		flex-direction: row;
+		width: 100%;
+	}
+
+	.wba-agree-modal-btn {
+		flex: 1;
+		height: 88rpx;
+		border-radius: 12rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--ghost {
+			margin-right: 20rpx;
+			background-color: #f5f5f5;
+		}
+
+		&--primary {
+			background-color: #2b59c3;
+		}
+	}
+
+	.wba-agree-modal-btn-text {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+
+		&--primary {
+			color: #ffffff;
+			font-weight: 600;
+		}
+	}
+</style>

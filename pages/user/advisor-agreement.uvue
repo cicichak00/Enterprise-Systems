@@ -1,0 +1,275 @@
+<template>
+	<cl-page :pt="{ className: 'aa-page' }">
+		<view class="aa-page">
+			<view class="aa-body">
+					<text class="aa-main-title">领航投顾签约协议</text>
+
+					<view class="aa-meta-row">
+						<view class="aa-version-tag">
+							<text class="aa-version-tag-text">v1.4</text>
+						</view>
+						<text class="aa-meta-text">生效 2026/04/18</text>
+					</view>
+
+					<view class="aa-changes-box">
+						<text class="aa-changes-title">v1.4 相比 v1.3 的变化</text>
+						<view
+							class="aa-changes-item"
+							v-for="(item, index) in changeItems"
+							:key="index"
+						>
+							<text class="aa-changes-dot">·</text>
+							<text class="aa-changes-text">{{ item }}</text>
+						</view>
+					</view>
+
+					<view
+						class="aa-section"
+						v-for="(section, index) in sections"
+						:key="index"
+					>
+						<text class="aa-section-title">{{ section.title }}</text>
+						<text
+							v-if="section.content != null && section.content != ''"
+							class="aa-section-content"
+						>{{ section.content }}</text>
+						<view
+							v-if="section.items != null && section.items.length > 0"
+							class="aa-section-list"
+						>
+							<view
+								class="aa-section-list-item"
+								v-for="(item, itemIndex) in section.items"
+								:key="itemIndex"
+							>
+								<text class="aa-section-list-text">{{ item }}</text>
+							</view>
+						</view>
+					</view>
+
+					<view class="aa-footer-note">
+						<text class="aa-footer-text">以上条款的最终解释权归合约所有，如有疑问联系 </text>
+						<text class="aa-footer-email" @tap="onCopyEmail">legal@youbao.com</text>
+					</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	type AgreementSection = {
+		title: string;
+		content: string;
+		items: string[] | null;
+	};
+
+	const changeItems = [
+		"第四章新增「账号生命周期」",
+		"第五章新增「下架与关系接管」",
+		"第六章新增「继承人预设」要求",
+		"第七章新增「团成员权益保障」"
+	];
+
+	const sections: AgreementSection[] = [
+		{
+			title: "一、分成",
+			content: "按团成员项目流水抽取 2%–3.5% 佣金，等级越高比例越高。领航投顾不收取服务费与入团费，收益全部来自项目流水分润。",
+			items: null
+		},
+		{
+			title: "二、终身绑定",
+			content: "投顾与邀请用户之间的绑定关系为终身有效，不因身份切换（如导师 ↔ 投顾）而稀释或解除。绑定关系一经建立，平台全程可追溯。",
+			items: null
+		},
+		{
+			title: "三、违规",
+			content: "禁止 SEO 作弊、虚假账号、刷单薅羊毛等行为。一经查实，平台有权撤销投顾资格、追回违规所得，并永久封禁相关账号。",
+			items: null
+		},
+		{
+			title: "四、账号生命周期",
+			content: "投顾账号设五个状态：签约中 → 活跃 → 预警 → 休眠 → 下架。连续 60 天无活跃触发预警，180 天无活跃进入休眠；合规分 ≥ 8 分可维持活跃状态。",
+			items: null
+		},
+		{
+			title: "五、下架与关系接管",
+			content: "投顾下架后，其名下绑定关系按以下三种方式接管：",
+			items: [
+				"1. 软接管：投顾主动退出或进入休眠状态时，关系暂由平台托管，成员权益不受影响。",
+				"2. 硬接管：因违规或封号导致下架，关系由平台指定合规投顾接管，历史分润记录保留。",
+				"3. 继承迁移：因失联或身故等特殊情况，关系迁移至预设继承人名下。"
+			]
+		},
+		{
+			title: "六、继承人预设",
+			content: "签约前须指定一名已完成实名认证的平台用户作为继承人。继承人须为同主体或经平台审核通过的关联账号，变更需提前 30 日申请。",
+			items: null
+		},
+		{
+			title: "七、团成员权益保障",
+			content: "无论投顾处于何种状态，团成员的历史记录、在途分润与已到账收益均受平台保障，不因投顾下架而丢失或清零。",
+			items: null
+		}
+	];
+
+	function onCopyEmail() {
+		uni.setClipboardData({
+			data: "legal@youbao.com",
+			success: () => {
+				uni.showToast({ title: "邮箱已复制", icon: "none" });
+			}
+		});
+	}
+</script>
+
+<style lang="scss" scoped>
+	.aa-page {
+		min-height: 100vh;
+		background-color: #fdfbf8;
+	}
+
+	.aa-body {
+		padding: 32rpx 30rpx 40rpx;
+		box-sizing: border-box;
+	}
+
+	.aa-main-title {
+		display: flex;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 60rpx;
+	}
+
+	.aa-meta-row {
+		margin-top: 20rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.aa-version-tag {
+		padding: 4rpx 14rpx;
+		border-radius: 8rpx;
+		background-color: #eeeeee;
+		margin-right: 12rpx;
+	}
+
+	.aa-version-tag-text {
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 32rpx;
+	}
+
+	.aa-meta-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.aa-changes-box {
+		margin-top: 28rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #fef7e6;
+	}
+
+	.aa-changes-title {
+		display: flex;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #8b6914;
+		line-height: 38rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.aa-changes-item {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		margin-bottom: 12rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.aa-changes-dot {
+		font-size: 26rpx;
+		color: #a67c52;
+		line-height: 40rpx;
+		margin-right: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.aa-changes-text {
+		flex: 1;
+		min-width: 0;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+	}
+
+	.aa-section {
+		margin-top: 36rpx;
+	}
+
+	.aa-section-title {
+		display: flex;
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 42rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.aa-section-content {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.aa-section-list {
+		margin-top: 12rpx;
+	}
+
+	.aa-section-list-item {
+		margin-bottom: 12rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.aa-section-list-text {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.aa-footer-note {
+		margin-top: 48rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #f0f0f0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.aa-footer-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 38rpx;
+	}
+
+	.aa-footer-email {
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 38rpx;
+	}
+</style>

@@ -1,0 +1,1228 @@
+<template>
+	<cl-page :pt="{ className: 'td-page' }" :back-top="false">
+		<view class="td-page">
+			<view v-if="pageLoading" class="td-loading">
+				<cl-loading :loading="true" :size="28" color="#0651f8"></cl-loading>
+				<text class="td-loading-text">加载中...</text>
+			</view>
+
+			<block v-else>
+				<view class="td-head">
+					<image
+						v-if="logoUrl != ''"
+						class="td-top-logo"
+						:src="logoUrl"
+						mode="aspectFill"
+					></image>
+					<view v-else class="td-top-logo td-top-logo--text">
+						<text class="td-top-logo-text">{{ logoText }}</text>
+					</view>
+					<view class="td-top-copy">
+						<text class="td-top-title">{{ taskTitle }}</text>
+						<text v-if="updateTime != ''" class="td-top-meta">数据更新至 · {{ updateTime }}</text>
+					</view>
+				</view>
+
+				<view class="td-body" v-if="false">
+					<view class="td-tabs">
+						<view
+							class="td-tab"
+							:class="{ 'td-tab--active': activeTab == 1 }"
+							@tap="activeTab = 1"
+						>
+							<text class="td-tab-title" :class="{ 'td-tab-title--active': activeTab == 1 }">项目介绍</text>
+							<text class="td-tab-sub" :class="{ 'td-tab-sub--active': activeTab == 1 }">说明与要求</text>
+						</view>
+						<view
+							class="td-tab"
+							:class="{ 'td-tab--active': activeTab == 2 }"
+							@tap="activeTab = 2"
+						>
+							<text class="td-tab-title" :class="{ 'td-tab-title--active': activeTab == 2 }">项目流程</text>
+							<text class="td-tab-sub" :class="{ 'td-tab-sub--active': activeTab == 2 }">实操流程</text>
+						</view>
+						<view
+							class="td-tab"
+							:class="{ 'td-tab--active': activeTab == 3 }"
+							@tap="activeTab = 3"
+						>
+							<text class="td-tab-title" :class="{ 'td-tab-title--active': activeTab == 3 }">特别注意</text>
+							<text class="td-tab-sub" :class="{ 'td-tab-sub--active': activeTab == 3 }">项目注意事项</text>
+						</view>
+						<view
+							class="td-tab"
+							:class="{ 'td-tab--active': activeTab == 4 }"
+							@tap="activeTab = 4"
+						>
+							<text class="td-tab-title" :class="{ 'td-tab-title--active': activeTab == 4 }">项目教学</text>
+							<text class="td-tab-sub" :class="{ 'td-tab-sub--active': activeTab == 4 }">经验共享</text>
+						</view>
+					</view>
+
+					<scroll-view class="td-content-scroll" scroll-y="true" :show-scrollbar="false">
+						<view class="td-content-inner">
+							<!-- 项目介绍：项目说明 / 关键词 / 回填 / 订单 / 结算 -->
+							<view v-if="activeTab == 1" class="td-panel">
+								<view
+									class="td-collapse"
+									v-for="(sec, index) in introSections"
+									:key="sec.key"
+								>
+									<view class="td-collapse-head" @tap="toggleIntroSection(index)">
+										<text class="td-collapse-title">{{ sec.title }}</text>
+										<cl-icon
+											:name="sec.open ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+											:size="16"
+											color="#999999"
+										></cl-icon>
+									</view>
+									<view v-if="sec.open" class="td-collapse-body">
+										<block v-if="sec.key == 'project_info'">
+											<view v-if="projectInfoHtml == ''" class="td-collapse-empty">
+												<text class="td-collapse-empty-text">暂无内容</text>
+											</view>
+											<view v-else class="td-rich-wrap">
+												<rich-text
+													class="td-rich"
+													:nodes="projectInfoHtml"
+													@itemclick="onRichItemClick(projectInfoHtml, $event)"
+												></rich-text>
+											</view>
+										</block>
+										<block v-else-if="sec.key == 'keyword_info'">
+											<view v-if="keywordInfoHtml == ''" class="td-collapse-empty">
+												<text class="td-collapse-empty-text">暂无内容</text>
+											</view>
+											<view v-else class="td-rich-wrap">
+												<rich-text
+													class="td-rich"
+													:nodes="keywordInfoHtml"
+													@itemclick="onRichItemClick(keywordInfoHtml, $event)"
+												></rich-text>
+											</view>
+										</block>
+										<block v-else-if="sec.key == 'back_info'">
+											<view v-if="backInfoHtml == ''" class="td-collapse-empty">
+												<text class="td-collapse-empty-text">暂无内容</text>
+											</view>
+											<view v-else class="td-rich-wrap">
+												<rich-text
+													class="td-rich"
+													:nodes="backInfoHtml"
+													@itemclick="onRichItemClick(backInfoHtml, $event)"
+												></rich-text>
+											</view>
+										</block>
+										<block v-else-if="sec.key == 'order_info'">
+											<view v-if="orderInfoHtml == ''" class="td-collapse-empty">
+												<text class="td-collapse-empty-text">暂无内容</text>
+											</view>
+											<view v-else class="td-rich-wrap">
+												<rich-text
+													class="td-rich"
+													:nodes="orderInfoHtml"
+													@itemclick="onRichItemClick(orderInfoHtml, $event)"
+												></rich-text>
+											</view>
+										</block>
+										<block v-else-if="sec.key == 'settlement_info'">
+											<view v-if="settlementInfoHtml == ''" class="td-collapse-empty">
+												<text class="td-collapse-empty-text">暂无内容</text>
+											</view>
+											<view v-else class="td-rich-wrap">
+												<rich-text
+													class="td-rich"
+													:nodes="settlementInfoHtml"
+													@itemclick="onRichItemClick(settlementInfoHtml, $event)"
+												></rich-text>
+											</view>
+										</block>
+									</view>
+								</view>
+							</view>
+
+							<!-- 项目流程 -->
+							<view v-if="activeTab == 2" class="td-panel">
+								<view v-if="processHtml == ''" class="td-empty">
+									<text class="td-empty-text">暂无项目流程</text>
+								</view>
+								<rich-text
+									v-else
+									class="td-rich"
+									:nodes="processHtml"
+									@itemclick="onRichItemClick(processHtml, $event)"
+								></rich-text>
+							</view>
+
+							<!-- 特别注意 -->
+							<view v-if="activeTab == 3" class="td-panel">
+								<view v-if="specialHtml == ''" class="td-empty">
+									<text class="td-empty-text">暂无特别注意</text>
+								</view>
+								<rich-text
+									v-else
+									class="td-rich"
+									:nodes="specialHtml"
+									@itemclick="onRichItemClick(specialHtml, $event)"
+								></rich-text>
+							</view>
+
+							<!-- 项目教学 -->
+							<view v-if="activeTab == 4" class="td-panel">
+								<view v-if="courseHtml == '' && courseLink == ''" class="td-empty">
+									<text class="td-empty-text">暂无项目教学</text>
+								</view>
+								<rich-text
+									v-else-if="courseHtml != ''"
+									class="td-rich"
+									:nodes="courseHtml"
+									@itemclick="onRichItemClick(courseHtml, $event)"
+								></rich-text>
+								<view v-else class="td-course-link" @tap="openCourseLink">
+									<text class="td-course-link-text">查看项目教学</text>
+									<cl-icon name="arrow-right-s-line" :size="16" color="#2b59c3"></cl-icon>
+								</view>
+							</view>
+						</view>
+					</scroll-view>
+				</view>
+			</block>
+
+			<view v-if="!pageLoading" class="td-footer">
+				<view class="td-footer-btn td-footer-btn--light" @tap="onParticipationRecord">
+					<text class="td-footer-btn-text">参与记录</text>
+				</view>
+				<view class="td-footer-btn td-footer-btn--primary" @tap="onParticipate">
+					<text class="td-footer-btn-text td-footer-btn-text--white">立即参与</text>
+				</view>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getTaskDetail } from "@/.cool/api/task";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { Response } from "@/.cool";
+
+	/** 项目介绍 Tab 五个折叠板块与详情接口字段一一对应 */
+	const INTRO_FIELD_KEYS = [
+		"project_info",
+		"keyword_info",
+		"back_info",
+		"order_info",
+		"settlement_info"
+	] as string[];
+
+	const taskId = ref(0);
+	const projectId = ref(0);
+	const categoryId = ref(0);
+	const taskTitle = ref("任务详情");
+	const logoUrl = ref("");
+	const logoText = ref("任");
+	const updateTime = ref("");
+	const pageLoading = ref(false);
+	const activeTab = ref(1);
+
+	type DetailSection = {
+		key: string;
+		title: string;
+		html: string;
+		open: boolean;
+	};
+
+	const introSections = ref<DetailSection[]>([]);
+	const projectInfoHtml = ref("");
+	const keywordInfoHtml = ref("");
+	const backInfoHtml = ref("");
+	const orderInfoHtml = ref("");
+	const settlementInfoHtml = ref("");
+	const processHtml = ref("");
+	const specialHtml = ref("");
+	const courseHtml = ref("");
+	const courseLink = ref("");
+	const is_batch_back = ref(0);
+
+	function getLogoText(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "任";
+		}
+		return text.substring(0, 1);
+	}
+
+	function formatUpdateDate(raw: string): string {
+		const text = `${raw}`.trim();
+		if (text == "") {
+			return "";
+		}
+		const spaceIdx = text.indexOf(" ");
+		const datePart = spaceIdx >= 0 ? text.substring(0, spaceIdx) : text;
+		const parts = datePart.split("-");
+		if (parts.length >= 3) {
+			return `${parts[1]}-${parts[2]}`;
+		}
+		return datePart;
+	}
+
+	function pickNonEmpty(...values: string[]): string {
+		for (let i = 0; i < values.length; i++) {
+			const text = values[i].trim();
+			if (text != "") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function parseTaskDetail(res: any | null): UTSJSONObject | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		let data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		if (Array.isArray(data)) {
+			const arr = data as any[];
+			if (arr.length == 0) {
+				return null;
+			}
+			data = arr[0];
+		}
+		const row = data as UTSJSONObject;
+		const nestedData = row["data"];
+		if (nestedData != null && typeof nestedData == "object" && !Array.isArray(nestedData)) {
+			const inner = nestedData as UTSJSONObject;
+			if (inner["project_info"] != null || inner["keyword_info"] != null || inner["title"] != null) {
+				return inner;
+			}
+		}
+		return row;
+	}
+
+	function pickStringValue(raw: any | null): string {
+		if (raw == null) {
+			return "";
+		}
+		if (typeof raw == "string") {
+			const text = decodeHtmlSource(raw).trim();
+			if (text == "" || text == "null" || text == "undefined") {
+				return "";
+			}
+			return text;
+		}
+		if (Array.isArray(raw)) {
+			if (raw.length == 0) {
+				return "";
+			}
+			return pickStringValue(raw[0]);
+		}
+		if (typeof raw == "object") {
+			const obj = raw as UTSJSONObject;
+			const nestedKeys = ["html", "content", "value", "text"];
+			for (let i = 0; i < nestedKeys.length; i++) {
+				const nested = obj[nestedKeys[i]];
+				if (nested == null) {
+					continue;
+				}
+				const text = pickStringValue(nested);
+				if (text.trim() != "") {
+					return text;
+				}
+			}
+		}
+		const text = decodeHtmlSource(`${raw}`).trim();
+		if (text == "" || text == "null" || text == "undefined") {
+			return "";
+		}
+		return text;
+	}
+
+	function decodeHtmlSource(text: string): string {
+		return text
+			.replace(/\\"/g, "\"")
+			.replace(/\\'/g, "'")
+			.replace(/\\n/g, "\n")
+			.replace(/\\t/g, "\t");
+	}
+
+	function normalizeProtocolHtml(html: string): string {
+		return html
+			.replace(/<br\s*\/?>/gi, "")
+			.replace(/<\/p>\s*<p[^>]*>/gi, "")
+			.replace(/<p[^>]*>/gi, '<p style="margin:0;padding:0;line-height:1.6;">')
+			.replace(/<h4[^>]*>/gi, '<p style="margin:0;padding:0;line-height:1.6;font-weight:600;">')
+			.replace(/<\/h4>/gi, "</p>");
+	}
+
+	function isInvalidCoercedText(text: string): boolean {
+		const val = text.trim();
+		return val == "" || val == "null" || val == "undefined" || val == "[object Object]";
+	}
+
+	/** 从详情 data 读取指定字段（支持 detail/info/project 等嵌套） */
+	function readDetailField(data: UTSJSONObject, field: string): string {
+		const direct = data[field];
+		if (direct != null) {
+			if (typeof direct == "string") {
+				const raw = decodeHtmlSource(direct).trim();
+				if (!isInvalidCoercedText(raw)) {
+					return raw;
+				}
+			}
+			const text = pickStringValue(direct);
+			if (text.trim() != "") {
+				return text;
+			}
+			const coerced = decodeHtmlSource(`${direct}`).trim();
+			if (!isInvalidCoercedText(coerced)) {
+				return coerced;
+			}
+		}
+		const nestedKeys = ["detail", "info", "task", "project", "task_detail", "project_detail"];
+		for (let i = 0; i < nestedKeys.length; i++) {
+			const nested = data[nestedKeys[i]];
+			if (nested == null) {
+				continue;
+			}
+			const nestedObj = nested as UTSJSONObject;
+			const val = pickStringValue(nestedObj[field]);
+			if (val.trim() != "") {
+				return val;
+			}
+		}
+		const desc = data["project_desc"];
+		if (desc != null) {
+			const descObj = desc as UTSJSONObject;
+			const val = pickStringValue(descObj[field]);
+			if (val.trim() != "") {
+				return val;
+			}
+		}
+		const nestedData = data["data"];
+		if (nestedData != null && typeof nestedData == "object" && !Array.isArray(nestedData)) {
+			const val = pickStringValue((nestedData as UTSJSONObject)[field]);
+			if (val.trim() != "") {
+				return val;
+			}
+		}
+		return "";
+	}
+
+	function isBlankHtml(text: string): boolean {
+		const trimmed = text.trim();
+		if (trimmed == "") {
+			return true;
+		}
+		const plain = trimmed
+			.replace(/<[^>]+>/g, "")
+			.replace(/&nbsp;/gi, " ")
+			.trim();
+		return plain == "";
+	}
+
+	const RICH_IMG_STYLE =
+		"max-width:100%;width:100%;height:auto!important;display:block;vertical-align:top;box-sizing:border-box;";
+
+	const RICH_WRAP_STYLE =
+		"max-width:100%;overflow:visible;word-break:break-word;font-size:14px;color:#666;line-height:1.6;";
+
+	function stripHtmlAttr(attrs: string, attrName: string): string {
+		const key = attrName.toLowerCase();
+		let result = attrs;
+		let guard = 0;
+		while (guard < 20) {
+			guard++;
+			const lower = result.toLowerCase();
+			const pos = lower.indexOf(key);
+			if (pos < 0) {
+				break;
+			}
+			if (pos > 0) {
+				const prev = lower.charAt(pos - 1);
+				if (prev != " " && prev != "\t" && prev != "\n") {
+					break;
+				}
+			}
+			let end = pos + key.length;
+			while (end < lower.length) {
+				const ch = lower.charAt(end);
+				if (ch != " " && ch != "\t" && ch != "=") {
+					break;
+				}
+				end++;
+			}
+			if (end < lower.length && lower.charAt(end) == "=") {
+				end++;
+				while (end < lower.length && lower.charAt(end) == " ") {
+					end++;
+				}
+				if (end < lower.length) {
+					const quote = lower.charAt(end);
+					if (quote == "\"" || quote == "'") {
+						const closeAt = lower.indexOf(quote, end + 1);
+						end = closeAt >= 0 ? closeAt + 1 : lower.length;
+					} else {
+						while (end < lower.length) {
+							const ch = lower.charAt(end);
+							if (ch == " " || ch == "/" || ch == ">") {
+								break;
+							}
+							end++;
+						}
+					}
+				}
+			}
+			result = `${result.substring(0, pos)}${result.substring(end)}`.replace(/\s{2,}/g, " ");
+		}
+		return result.trim();
+	}
+
+	function appendImgStyle(attrs: string): string {
+		let a = stripHtmlAttr(attrs, "width");
+		a = stripHtmlAttr(a, "height");
+		const lower = a.toLowerCase();
+		const stylePos = lower.indexOf("style");
+		if (stylePos >= 0) {
+			let eq = stylePos + 5;
+			while (eq < a.length && a.charAt(eq) == " ") {
+				eq++;
+			}
+			if (eq < a.length && a.charAt(eq) == "=") {
+				eq++;
+				while (eq < a.length && a.charAt(eq) == " ") {
+					eq++;
+				}
+				if (eq < a.length) {
+					const quote = a.charAt(eq);
+					if (quote == "\"" || quote == "'") {
+						const closeAt = a.indexOf(quote, eq + 1);
+						if (closeAt > eq) {
+							const oldStyle = a.substring(eq + 1, closeAt);
+							return `${a.substring(0, eq + 1)}${oldStyle};${RICH_IMG_STYLE}${a.substring(closeAt)}`;
+						}
+					}
+				}
+			}
+		}
+		if (a != "") {
+			return `${a} style="${RICH_IMG_STYLE}"`;
+		}
+		return `style="${RICH_IMG_STYLE}"`;
+	}
+
+	function normalizeRichImages(html: string): string {
+		let result = decodeHtmlSource(html);
+		let searchFrom = 0;
+		while (searchFrom < result.length) {
+			const lower = result.toLowerCase();
+			const start = lower.indexOf("<img", searchFrom);
+			if (start < 0) {
+				break;
+			}
+			const end = result.indexOf(">", start);
+			if (end < 0) {
+				break;
+			}
+			const attrs = result.substring(start + 4, end).trim();
+			const newTag = `<img ${appendImgStyle(attrs)} />`;
+			result = result.substring(0, start) + newTag + result.substring(end + 1);
+			searchFrom = start + newTag.length;
+		}
+		return result.trim();
+	}
+
+	function normalizeRichHtml(html: string): string {
+		const trimmed = normalizeProtocolHtml(normalizeRichImages(html));
+		const lowerTrim = trimmed.toLowerCase();
+		if (lowerTrim.indexOf("<div") == 0) {
+			return trimmed;
+		}
+		return `<div style="${RICH_WRAP_STYLE}">${trimmed}</div>`;
+	}
+
+	/** 与 overseas task-details / youboom htmlChunk：空占位视为无内容，其余原样输出 */
+	function htmlChunk(html: string): string {
+		const s = decodeHtmlSource(html).trim();
+		if (s == "" || s == "<p><br></p>" || s == "<p><br/></p>" || isBlankHtml(s)) {
+			return "";
+		}
+		return s;
+	}
+
+	function toIntroRichHtml(text: string): string {
+		return htmlChunk(text);
+	}
+
+	function applyIntroHtmlByKey(key: string, html: string) {
+		if (key == "project_info") {
+			projectInfoHtml.value = html;
+		} else if (key == "keyword_info") {
+			keywordInfoHtml.value = html;
+		} else if (key == "back_info") {
+			backInfoHtml.value = html;
+		} else if (key == "order_info") {
+			orderInfoHtml.value = html;
+		} else if (key == "settlement_info") {
+			settlementInfoHtml.value = html;
+		}
+	}
+
+	function toRichHtml(text: string): string {
+		const trimmed = decodeHtmlSource(text).trim();
+		if (trimmed == "" || isBlankHtml(trimmed)) {
+			return "";
+		}
+		if (trimmed.indexOf("<") >= 0 && trimmed.indexOf(">") > trimmed.indexOf("<")) {
+			return normalizeRichHtml(trimmed);
+		}
+		const escaped = trimmed
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
+		return `<div style="${RICH_WRAP_STYLE}">${escaped.replace(/\n/g, "<br/>")}</div>`;
+	}
+
+	function isHttpUrl(text: string): boolean {
+		const val = text.trim().toLowerCase();
+		return val.indexOf("http://") == 0 || val.indexOf("https://") == 0;
+	}
+
+	function extractImgSrcFromTag(tag: string): string {
+		const lower = tag.toLowerCase();
+		const key = "src";
+		const pos = lower.indexOf(key);
+		if (pos < 0) {
+			return "";
+		}
+		let i = pos + key.length;
+		while (i < tag.length) {
+			const ch = tag.charAt(i);
+			if (ch != " " && ch != "\t" && ch != "=") {
+				break;
+			}
+			i++;
+		}
+		if (i >= tag.length || tag.charAt(i) != "=") {
+			return "";
+		}
+		i++;
+		while (i < tag.length && tag.charAt(i) == " ") {
+			i++;
+		}
+		if (i >= tag.length) {
+			return "";
+		}
+		const quote = tag.charAt(i);
+		if (quote == "\"" || quote == "'") {
+			const closeAt = tag.indexOf(quote, i + 1);
+			if (closeAt > i) {
+				return tag.substring(i + 1, closeAt).trim();
+			}
+			return "";
+		}
+		let end = i;
+		while (end < tag.length) {
+			const ch = tag.charAt(end);
+			if (ch == " " || ch == "/" || ch == ">") {
+				break;
+			}
+			end++;
+		}
+		return tag.substring(i, end).trim();
+	}
+
+	function extractImageUrls(html: string): string[] {
+		const urls: string[] = [];
+		let searchFrom = 0;
+		while (searchFrom < html.length) {
+			const lower = html.toLowerCase();
+			const start = lower.indexOf("<img", searchFrom);
+			if (start < 0) {
+				break;
+			}
+			const end = html.indexOf(">", start);
+			if (end < 0) {
+				break;
+			}
+			const tag = html.substring(start, end + 1);
+			const src = extractImgSrcFromTag(tag);
+			if (src != "") {
+				urls.push(src);
+			}
+			searchFrom = end + 1;
+		}
+		return urls;
+	}
+
+	function previewRichImage(src: string, html: string) {
+		const imageUrl = src.trim();
+		if (imageUrl == "") {
+			return;
+		}
+		const urls = extractImageUrls(html);
+		const previewUrls = urls.length > 0 ? urls : [imageUrl];
+		let current: string | number = imageUrl;
+		for (let i = 0; i < previewUrls.length; i++) {
+			if (previewUrls[i] == imageUrl) {
+				current = i;
+				break;
+			}
+		}
+		uni.previewImage({
+			urls: previewUrls,
+			current: current
+		});
+	}
+
+	function onRichItemClick(html: string, e: any | null) {
+		if (e == null) {
+			return;
+		}
+		const evt = e as UniRichTextItemClickEvent;
+		const detail = evt.detail;
+		if (detail == null) {
+			return;
+		}
+		const src = `${detail.src ?? ""}`.trim();
+		if (src != "") {
+			previewRichImage(src, html);
+			return;
+		}
+		const href = `${detail.href ?? ""}`.trim();
+		if (href != "" && isHttpUrl(href)) {
+			uni.setClipboardData({
+				data: href,
+				success: () => {
+					uni.showToast({ title: "链接已复制，请在浏览器打开", icon: "none" });
+				}
+			});
+		}
+	}
+
+	function hasIntroContent(data: UTSJSONObject): boolean {
+		for (let i = 0; i < INTRO_FIELD_KEYS.length; i++) {
+			if (toIntroRichHtml(readDetailField(data, INTRO_FIELD_KEYS[i])) != "") {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function buildIntroSections(data: UTSJSONObject): DetailSection[] {
+		const defs: { key: string; title: string; field: string }[] = [
+			{ key: "project_info", title: "项目说明", field: "project_info" },
+			{ key: "keyword_info", title: "关键词", field: "keyword_info" },
+			{ key: "back_info", title: "回填", field: "back_info" },
+			{ key: "order_info", title: "订单", field: "order_info" },
+			{ key: "settlement_info", title: "结算", field: "settlement_info" }
+		];
+		const sections: DetailSection[] = [];
+		for (let i = 0; i < defs.length; i++) {
+			const raw = readDetailField(data, defs[i].field);
+			const html = toIntroRichHtml(raw);
+			applyIntroHtmlByKey(defs[i].key, html);
+			sections.push({
+				key: defs[i].key,
+				title: defs[i].title,
+				html: html,
+				open: html != "" && i == 0
+			});
+		}
+		return sections;
+	}
+
+	function readDetailNumber(data: UTSJSONObject, ...fields: string[]): number {
+		for (let i = 0; i < fields.length; i++) {
+			const raw = data[fields[i]];
+			if (raw == null) {
+				continue;
+			}
+			const n = parseInt(`${raw}`);
+			if (!isNaN(n) && n > 0) {
+				return n;
+			}
+		}
+		return 0;
+	}
+
+	function pickDefaultTab(data: UTSJSONObject): number {
+		if (hasIntroContent(data)) {
+			return 1;
+		}
+		if (toRichHtml(readDetailField(data, "details")) != "") {
+			return 2;
+		}
+		if (toRichHtml(readDetailField(data, "special_info")) != "") {
+			return 3;
+		}
+		const courseRaw = readDetailField(data, "course_url").trim();
+		if (courseRaw != "") {
+			return 4;
+		}
+		return 1;
+	}
+
+	function applyTaskDetail(data: UTSJSONObject) {
+		const title = pickNonEmpty(
+			readDetailField(data, "title"),
+			readDetailField(data, "subtitle")
+		);
+		taskTitle.value = title != "" ? title : "任务详情";
+		logoUrl.value = pickNonEmpty(
+			readDetailField(data, "logo"),
+			readDetailField(data, "logo_url")
+		);
+		logoText.value = getLogoText(taskTitle.value);
+		const detailProjectId = readDetailNumber(data, "project_id");
+		if (detailProjectId > 0) {
+			projectId.value = detailProjectId;
+		}
+		const detailCategoryId = readDetailNumber(data, "category_id");
+		if (detailCategoryId > 0) {
+			categoryId.value = detailCategoryId;
+		}
+		is_batch_back.value = readDetailNumber(data, "is_batch_back");
+		updateTime.value = formatUpdateDate(
+			pickNonEmpty(readDetailField(data, "time"), readDetailField(data, "update_time"))
+		);
+
+		introSections.value = buildIntroSections(data);
+		processHtml.value = toRichHtml(readDetailField(data, "details"));
+		specialHtml.value = toRichHtml(readDetailField(data, "special_info"));
+		const courseRaw = readDetailField(data, "course_url").trim();
+		if (isHttpUrl(courseRaw)) {
+			courseLink.value = courseRaw;
+			courseHtml.value = "";
+		} else {
+			courseLink.value = "";
+			courseHtml.value = toRichHtml(courseRaw);
+		}
+		activeTab.value = pickDefaultTab(data);
+
+		uni.setNavigationBarTitle({
+			title: taskTitle.value
+		});
+	}
+
+	function toggleIntroSection(index: number) {
+		const list = introSections.value;
+		if (index < 0 || index >= list.length) {
+			return;
+		}
+		const next: DetailSection[] = [];
+		for (let i = 0; i < list.length; i++) {
+			const item = list[i];
+			if (i == index) {
+				next.push({
+					key: item.key,
+					title: item.title,
+					html: item.html,
+					open: !item.open
+				});
+			} else {
+				next.push(item);
+			}
+		}
+		introSections.value = next;
+	}
+
+	function openCourseLink() {
+		const url = courseLink.value.trim();
+		if (url == "") {
+			return;
+		}
+		uni.setClipboardData({
+			data: url,
+			success: () => {
+				uni.showToast({ title: "链接已复制，请在浏览器打开", icon: "none" });
+			}
+		});
+	}
+
+	function loadTaskDetail(id: number) {
+		if (pageLoading.value || id <= 0) {
+			return;
+		}
+		pageLoading.value = true;
+		getTaskDetail(id)
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const detail = parseTaskDetail(res);
+				if (detail == null) {
+					uni.showToast({ title: "任务详情为空", icon: "none" });
+					return;
+				}
+				applyTaskDetail(detail);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				pageLoading.value = false;
+			});
+	}
+
+	function onParticipationRecord() {
+		const query: UTSJSONObject = {
+			title: taskTitle.value,
+            id: taskId.value,
+            logo: logoUrl.value,
+            is_batch_back: is_batch_back.value
+		};
+        if(taskId.value == 900001) {
+            router.push({
+                path: "/pages/task/prompt-record",
+                query: query
+            });
+            return;
+        }
+		router.push({
+			path: "/pages/task/record-list",
+			query: query
+		});
+	}
+
+	function onParticipate() {
+		const query: UTSJSONObject = {
+			id: taskId.value,
+			task_id: taskId.value,
+			project_id: projectId.value,
+			category_id: categoryId.value,
+			title: taskTitle.value,
+			logo: logoUrl.value
+		};
+        if(taskId.value == 900001) {
+            router.push({
+                path: "/pages/task/combo-prompt",
+                query: query
+            });
+            return;
+        }
+		router.push({
+			path: "/pages/task/form",
+			query: query
+		});
+	}
+
+	onLoad((options) => {
+		const idVal = options["id"] as string | null;
+		const titleVal = options["title"] as string | null;
+		const projectIdVal = options["project_id"] as string | null;
+		const categoryIdVal = options["category_id"] as string | null;
+		const id = idVal != null ? parseInt(`${idVal}`) : 0;
+		if (titleVal != null && `${titleVal}`.trim() != "") {
+			taskTitle.value = `${titleVal}`.trim();
+			logoText.value = getLogoText(taskTitle.value);
+		}
+		if (projectIdVal != null) {
+			const pid = parseInt(`${projectIdVal}`);
+			projectId.value = isNaN(pid) ? 0 : pid;
+		}
+		if (categoryIdVal != null) {
+			const cid = parseInt(`${categoryIdVal}`);
+			categoryId.value = isNaN(cid) ? 0 : cid;
+		}
+		if (id <= 0) {
+			uni.showToast({ title: "缺少任务 ID", icon: "none" });
+			return;
+		}
+		taskId.value = id;
+		loadTaskDetail(id);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.td-page {
+		position: relative;
+		width: 100%;
+		height: 100vh;
+		display: flex;
+		flex-direction: column;
+		padding: 24rpx 0 0;
+		padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+		background-color: #f7f8fa;
+		box-sizing: border-box;
+		overflow: hidden;
+	}
+
+	.td-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 8rpx 30rpx 24rpx;
+		box-sizing: border-box;
+	}
+
+	.td-loading {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.td-loading-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #7b8193;
+		line-height: 36rpx;
+	}
+
+	.td-top-logo {
+		width: 88rpx;
+		height: 88rpx;
+		border-radius: 16rpx;
+		flex-shrink: 0;
+		overflow: hidden;
+	}
+
+	.td-top-logo--text {
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.td-top-logo-text {
+		font-size: 36rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 48rpx;
+	}
+
+	.td-top-copy {
+		flex: 1;
+		min-width: 0;
+		margin-left: 24rpx;
+	}
+
+	.td-top-title {
+		font-size: 36rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 50rpx;
+	}
+
+	.td-top-meta {
+		margin-top: 8rpx;
+		font-size: 22rpx;
+		color: #7b8193;
+		line-height: 32rpx;
+	}
+
+	.td-body {
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		margin-top: 8rpx;
+		background-color: #ffffff;
+		border-radius: 24rpx 24rpx 0 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+	}
+
+	.td-tabs {
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+		padding: 20rpx 24rpx 12rpx;
+		box-sizing: border-box;
+		flex-shrink: 0;
+	}
+
+	.td-tab {
+		flex: 1;
+		min-width: 0;
+		margin: 0 4rpx;
+		padding: 15rpx 8rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		box-sizing: border-box;
+	}
+
+	.td-tab--active {
+		background-image: linear-gradient(360deg, #ffffff 0%, #edefff 100%);
+	}
+
+	.td-tab-title {
+		font-size: 28rpx;
+		color: #6a738f;
+		line-height: 40rpx;
+		text-align: center;
+	}
+
+	.td-tab-title--active {
+		color: #3951ff;
+		font-weight: 600;
+	}
+
+	.td-tab-sub {
+		margin-top: 2rpx;
+		font-size: 18rpx;
+		color: #a9adbb;
+		line-height: 25rpx;
+		text-align: center;
+	}
+
+	.td-tab-sub--active {
+		color: #7a85d9;
+	}
+
+	.td-content-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.td-content-inner {
+		padding: 8rpx 30rpx 32rpx;
+		box-sizing: border-box;
+	}
+
+	.td-panel {
+		min-height: 200rpx;
+		box-sizing: border-box;
+	}
+
+	.td-empty {
+		padding: 80rpx 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.td-empty-text {
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.td-collapse {
+		margin-bottom: 16rpx;
+		background-color: #f7f8fa;
+		border-radius: 12rpx;
+		overflow: visible;
+	}
+
+	.td-collapse-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding: 24rpx 20rpx;
+		box-sizing: border-box;
+	}
+
+	.td-collapse-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 40rpx;
+	}
+
+	.td-collapse-body {
+		padding: 16rpx 20rpx 24rpx;
+		background-color: #ffffff;
+		box-sizing: border-box;
+		overflow: visible;
+	}
+
+	.td-collapse-empty {
+		padding: 8rpx 0 4rpx;
+	}
+
+	.td-collapse-empty-text {
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 1.5;
+	}
+
+	.td-rich-wrap {
+		width: 100%;
+		min-height: 40rpx;
+		overflow: visible;
+	}
+
+	.td-rich {
+		width: 100%;
+		max-width: 100%;
+		min-height: 40rpx;
+		overflow: visible;
+		background-color: #ffffff;
+	}
+
+	.td-course-link {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		padding: 32rpx;
+		background-color: #eef3fc;
+		border-radius: 12rpx;
+	}
+
+	.td-course-link-text {
+		font-size: 28rpx;
+		color: #2b59c3;
+		line-height: 40rpx;
+		margin-right: 8rpx;
+	}
+
+	.td-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 30;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		box-sizing: border-box;
+	}
+
+	.td-footer-btn {
+		flex: 1;
+		height: 88rpx;
+		border-radius: 44rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.td-footer-btn--light {
+		margin-right: 24rpx;
+		background-color: #eef3fc;
+	}
+
+	.td-footer-btn--primary {
+		background-color: #2b59c3;
+	}
+
+	.td-footer-btn-text {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #2b59c3;
+		line-height: 40rpx;
+	}
+
+	.td-footer-btn-text--white {
+		color: #ffffff;
+	}
+</style>

@@ -1,0 +1,95 @@
+<template>
+	<view v-if="visible" class="bte-card" @tap="onTap">
+		<view class="bte-icon">
+			<cl-icon name="apps-line" :size="24" color="#ffffff"></cl-icon>
+		</view>
+		<view class="bte-copy">
+			<view class="bte-title-row">
+				<text class="bte-title">字节任务台</text>
+				<view class="bte-tag"><text class="bte-tag-text">专属入口</text></view>
+			</view>
+			<text class="bte-desc">绑定字节账号，进入机构专属任务平台</text>
+		</view>
+		<cl-icon name="arrow-right-s-line" :size="20" color="#9aa7c4"></cl-icon>
+	</view>
+</template>
+
+<script lang="ts" setup>
+	import { router } from "@/.cool";
+
+	defineProps({
+		visible: {
+			type: Boolean,
+			default: false
+		}
+	});
+
+	function onTap() {
+		router.push({ path: "/pages/task/byte-workbench" });
+	}
+</script>
+
+<style lang="scss" scoped>
+	.bte-card {
+		margin-bottom: 30rpx;
+		padding: 26rpx 24rpx;
+		border-radius: 22rpx;
+		background: linear-gradient(135deg, #ffffff 0%, #f3f6ff 100%);
+		box-shadow: 0 8rpx 28rpx rgba(43, 89, 195, 0.1);
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.bte-icon {
+		width: 84rpx;
+		height: 84rpx;
+		border-radius: 22rpx;
+		background: linear-gradient(135deg, #315fc3, #1f3f83);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.bte-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 18rpx;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.bte-title-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.bte-title {
+		font-size: 30rpx;
+		line-height: 42rpx;
+		font-weight: 700;
+		color: #1f2a44;
+	}
+
+	.bte-tag {
+		margin-left: 12rpx;
+		padding: 2rpx 10rpx;
+		border-radius: 999rpx;
+		background-color: #fff0e8;
+	}
+
+	.bte-tag-text {
+		font-size: 19rpx;
+		line-height: 28rpx;
+		color: #f25a33;
+	}
+
+	.bte-desc {
+		margin-top: 6rpx;
+		font-size: 23rpx;
+		line-height: 34rpx;
+		color: #778099;
+	}
+</style>

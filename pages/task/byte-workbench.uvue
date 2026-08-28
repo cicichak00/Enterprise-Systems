@@ -1,0 +1,318 @@
+<template>
+	<cl-page :pt="{ className: 'bw-page' }" :back-top="false">
+		<scroll-view class="bw-scroll" scroll-y="true" :show-scrollbar="false">
+			<view class="bw-main">
+				<view v-if="loading" class="bw-loading">
+					<cl-loading :loading="true" :size="28" color="#f45b35"></cl-loading>
+					<text class="bw-loading-text">加载中...</text>
+				</view>
+
+				<template v-else-if="hasAccess">
+					<view class="bw-card">
+						<text class="bw-card-title">机构专属链接</text>
+						<view class="bw-link-box">
+							<text class="bw-link-text">{{ exclusiveLink != "" ? exclusiveLink : "专属链接暂未配置" }}</text>
+							<view class="bw-copy-pill" @tap="copyExclusiveLink"><text class="bw-copy-pill-text">复制</text></view>
+						</view>
+						<view class="bw-link-actions">
+							<view class="bw-link-action bw-link-action--soft" @tap="copyExclusiveLink"><text class="bw-link-action-text bw-link-action-text--orange">复制链接</text></view>
+							<view class="bw-link-action bw-link-action--soft" @tap="openExclusiveLink"><text class="bw-link-action-text bw-link-action-text--orange">浏览器打开</text></view>
+							<view class="bw-link-action bw-link-action--primary" @tap="openExclusiveLink"><text class="bw-link-action-text">直接打开</text></view>
+						</view>
+					</view>
+
+					<view class="bw-card bw-bind-card">
+						<view class="bw-title-row">
+							<text class="bw-card-title">绑定字节UID</text>
+							<view v-if="auditText != ''" class="bw-status" :class="'bw-status--' + auditType">
+								<text class="bw-status-text">{{ auditText }}</text>
+							</view>
+						</view>
+
+						<view v-if="failReason != ''" class="bw-fail-box">
+							<text class="bw-fail-text">审核失败：{{ failReason }}</text>
+						</view>
+
+						<view class="bw-field">
+							<text class="bw-label"><text class="bw-required">*</text> 字节UID</text>
+							<text class="bw-tip">手机版：打开官方任务台登录—点击个人中心—个人信息—查看并复制UID；</text>
+							<text class="bw-tip">电脑版：打开官方任务台登录—点击右上角头像—账号管理—查看并复制UID</text>
+							<input class="bw-input" v-model="byteUid" placeholder="请填写正确的UID" placeholder-class="bw-placeholder" :disabled="formDisabled" />
+						</view>
+
+						<view class="bw-field">
+							<text class="bw-label"><text class="bw-required">*</text> 字节登录手机号</text>
+							<input class="bw-input" v-model="mobile" type="number" maxlength="11" placeholder="请填写您登录字节官方中心的手机号" placeholder-class="bw-placeholder" :disabled="formDisabled" />
+						</view>
+
+						<view class="bw-field">
+							<text class="bw-label"><text class="bw-required">*</text> 上传截图1</text>
+							<text class="bw-tip">需要显示机构名称和UID的完整截图</text>
+							<view class="bw-upload" @tap="chooseScreenshot(1)">
+								<image v-if="screenshot1Display != ''" class="bw-upload-image" :src="screenshot1Display" mode="aspectFill"></image>
+								<template v-else>
+									<cl-icon name="camera-line" :size="30" color="#7f8798"></cl-icon>
+									<text class="bw-upload-text">上传截图</text>
+								</template>
+								<view v-if="uploadingKind == 1" class="bw-upload-mask"><cl-loading :loading="true" :size="24" color="#ffffff"></cl-loading></view>
+							</view>
+						</view>
+
+						<view class="bw-field">
+							<text class="bw-label">上传截图2</text>
+							<view class="bw-upload" @tap="chooseScreenshot(2)">
+								<image v-if="screenshot2Display != ''" class="bw-upload-image" :src="screenshot2Display" mode="aspectFill"></image>
+								<template v-else>
+									<cl-icon name="camera-line" :size="30" color="#7f8798"></cl-icon>
+									<text class="bw-upload-text">上传截图</text>
+								</template>
+								<view v-if="uploadingKind == 2" class="bw-upload-mask"><cl-loading :loading="true" :size="24" color="#ffffff"></cl-loading></view>
+							</view>
+						</view>
+
+						<view class="bw-submit" :class="{ 'bw-submit--disabled': submitDisabled }" @tap="submitApply">
+							<cl-loading v-if="submitting" :loading="true" :size="20" color="#ffffff"></cl-loading>
+							<text class="bw-submit-text">{{ submitting ? "提交中..." : formDisabled ? "已提交申请" : "提交申请" }}</text>
+						</view>
+					</view>
+				</template>
+
+				<view v-else class="bw-no-access">
+					<cl-icon name="lock-line" :size="48" color="#a0a6b2"></cl-icon>
+					<text class="bw-no-access-title">暂未开放字节任务台</text>
+					<text class="bw-no-access-desc">请联系企业主为您开启入口权限</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</scroll-view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getStaffByteTaskInfo, submitStaffByteBinding } from "@/.cool/api/staff";
+	import { normalizePickDisplayPath, uploadImage } from "@/.cool/api/upload";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import { openWeb } from "@/uni_modules/cool-open-web";
+	import type { Response, StaffByteTaskInfo } from "@/.cool";
+
+	const loading = ref(false);
+	const hasAccess = ref(false);
+	const exclusiveLink = ref("");
+	const byteUid = ref("");
+	const mobile = ref("");
+	const screenshot1Url = ref("");
+	const screenshot2Url = ref("");
+	const screenshot1Display = ref("");
+	const screenshot2Display = ref("");
+	const uploadingKind = ref(0);
+	const submitting = ref(false);
+	const auditStatus = ref(-1);
+	const auditText = ref("");
+	const failReason = ref("");
+
+	const auditType = computed(() => {
+		if (auditStatus.value == 1) return "success";
+		if (auditStatus.value == 2) return "fail";
+		return "pending";
+	});
+
+	const formDisabled = computed(() => {
+		return auditStatus.value == 0 || auditStatus.value == 1;
+	});
+
+	const submitDisabled = computed(() => {
+		return submitting.value || uploadingKind.value > 0 || formDisabled.value;
+	});
+
+	function parseEnabled(raw: any | null): boolean {
+		if (raw == null) return false;
+		if (typeof raw == "boolean") return raw as boolean;
+		const text = `${raw}`.trim().toLowerCase();
+		return text == "1" || text == "true" || text == "yes" || text == "on";
+	}
+
+	function parseStatus(raw: any | null): number {
+		if (raw == null || `${raw}`.trim() == "") return -1;
+		const value = parseInt(`${raw}`);
+		return isNaN(value) ? -1 : value;
+	}
+
+	function applyInfo(info: StaffByteTaskInfo) {
+		hasAccess.value = parseEnabled(
+			info.can_byte_task ?? info.byte_task_enabled ?? info["enabled"] ?? info["can_use"]
+		);
+		exclusiveLink.value = `${info.exclusive_link ?? info.organization_link ?? info["link"] ?? info["url"] ?? ""}`.trim();
+		byteUid.value = `${info.byte_uid ?? ""}`.trim();
+		mobile.value = `${info.mobile ?? ""}`.trim();
+		screenshot1Url.value = `${info.screenshot_1 ?? ""}`.trim();
+		screenshot2Url.value = `${info.screenshot_2 ?? ""}`.trim();
+		screenshot1Display.value = screenshot1Url.value;
+		screenshot2Display.value = screenshot2Url.value;
+		auditStatus.value = parseStatus(info.audit_status ?? info["status"]);
+		const statusText = `${info.audit_status_text ?? ""}`.trim();
+		if (auditStatus.value == 0) auditText.value = statusText != "" ? statusText : "审核中";
+		else if (auditStatus.value == 1) auditText.value = statusText != "" ? statusText : "已通过";
+		else if (auditStatus.value == 2) auditText.value = statusText != "" ? statusText : "审核失败";
+		else auditText.value = "";
+		failReason.value = `${info.fail_reason ?? info.reject_reason ?? ""}`.trim();
+	}
+
+	function loadInfo() {
+		if (loading.value) return;
+		loading.value = true;
+		getStaffByteTaskInfo()
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const obj = (res ?? {}) as UTSJSONObject;
+				const data = (obj["data"] ?? obj) as StaffByteTaskInfo;
+				applyInfo(data);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loading.value = false;
+			});
+	}
+
+	function copyExclusiveLink() {
+		if (exclusiveLink.value == "") {
+			uni.showToast({ title: "专属链接暂未配置", icon: "none" });
+			return;
+		}
+		uni.setClipboardData({ data: exclusiveLink.value, success: () => uni.showToast({ title: "复制成功", icon: "none" }) });
+	}
+
+	function openExclusiveLink() {
+		if (exclusiveLink.value == "") {
+			uni.showToast({ title: "专属链接暂未配置", icon: "none" });
+			return;
+		}
+		if (!openWeb(exclusiveLink.value)) {
+			uni.showToast({ title: "打开失败，请复制链接后重试", icon: "none" });
+		}
+	}
+
+	function chooseScreenshot(kind: number) {
+		if (formDisabled.value || uploadingKind.value > 0 || submitting.value) return;
+		uni.chooseImage({
+			count: 1,
+			sizeType: ["compressed"],
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				if (res.tempFilePaths.length == 0) return;
+				const tempPath = res.tempFilePaths[0];
+				uploadingKind.value = kind;
+				normalizePickDisplayPath(tempPath)
+					.then((displayPath) => {
+						if (kind == 1) screenshot1Display.value = displayPath != "" ? displayPath : tempPath;
+						else screenshot2Display.value = displayPath != "" ? displayPath : tempPath;
+						return uploadImage(tempPath);
+					})
+					.then((url) => {
+						if (kind == 1) screenshot1Url.value = url;
+						else screenshot2Url.value = url;
+					})
+					.catch((err) => {
+						if (kind == 1) { screenshot1Url.value = ""; screenshot1Display.value = ""; }
+						else { screenshot2Url.value = ""; screenshot2Display.value = ""; }
+						uni.showToast({ title: getApiMessage(err, "图片上传失败"), icon: "none" });
+					})
+					.finally(() => { uploadingKind.value = 0; });
+			}
+		});
+	}
+
+	function validateForm(): string {
+		if (byteUid.value.trim() == "") return "请填写字节UID";
+		if (!/^1\d{10}$/.test(mobile.value.trim())) return "请填写正确的手机号";
+		if (screenshot1Url.value == "") return "请上传截图1";
+		return "";
+	}
+
+	function submitApply() {
+		if (submitDisabled.value) return;
+		const error = validateForm();
+		if (error != "") {
+			uni.showToast({ title: error, icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		submitStaffByteBinding({
+			byte_uid: byteUid.value.trim(),
+			mobile: mobile.value.trim(),
+			screenshot_1: screenshot1Url.value,
+			screenshot_2: screenshot2Url.value
+		})
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "提交失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: "提交成功", icon: "success" });
+				auditStatus.value = 0;
+				auditText.value = "审核中";
+				failReason.value = "";
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			})
+			.finally(() => { submitting.value = false; });
+	}
+
+	onLoad(() => { loadInfo(); });
+</script>
+
+<style lang="scss" scoped>
+	.bw-page { min-height: 100vh; background-color: #f5f5f7; }
+	.bw-scroll { height: 100vh; }
+	.bw-main { padding: 22rpx 24rpx 40rpx; }
+	.bw-card { margin-bottom: 22rpx; padding: 28rpx 30rpx; border-radius: 24rpx; background-color: #ffffff; }
+	.bw-card-title { font-size: 31rpx; line-height: 44rpx; font-weight: 700; color: #20283a; }
+	.bw-link-box { height: 88rpx; margin-top: 20rpx; padding-left: 26rpx; border-radius: 44rpx; background-color: #f45b35; display: flex; align-items: center; overflow: hidden; }
+	.bw-link-text { flex: 1; min-width: 0; font-size: 24rpx; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.bw-copy-pill { height: 70rpx; margin-right: 8rpx; padding: 0 22rpx; border-radius: 35rpx; background-color: #ffffff; display: flex; align-items: center; justify-content: center; }
+	.bw-copy-pill-text { font-size: 24rpx; font-weight: 600; color: #f45b35; }
+	.bw-link-actions { margin-top: 20rpx; display: flex; gap: 14rpx; }
+	.bw-link-action { flex: 1; height: 74rpx; border-radius: 14rpx; display: flex; align-items: center; justify-content: center; }
+	.bw-link-action--soft { background-color: #fff1eb; }
+	.bw-link-action--primary { background-color: #f45b35; }
+	.bw-link-action-text { font-size: 24rpx; font-weight: 600; color: #ffffff; }
+	.bw-link-action-text--orange { color: #f45b35; }
+	.bw-bind-card { padding-bottom: 30rpx; }
+	.bw-title-row { display: flex; align-items: center; justify-content: space-between; }
+	.bw-status { padding: 5rpx 14rpx; border-radius: 999rpx; background-color: #fff7e6; }
+	.bw-status--success { background-color: #ecfdf5; }
+	.bw-status--fail { background-color: #fef2f2; }
+	.bw-status-text { font-size: 21rpx; color: #d97706; }
+	.bw-status--success .bw-status-text { color: #16a34a; }
+	.bw-status--fail .bw-status-text { color: #dc2626; }
+	.bw-fail-box { margin-top: 20rpx; padding: 16rpx 18rpx; border-radius: 12rpx; background-color: #fef2f2; }
+	.bw-fail-text { font-size: 22rpx; line-height: 34rpx; color: #991b1b; }
+	.bw-field { margin-top: 30rpx; display: flex; flex-direction: column; }
+	.bw-label { font-size: 27rpx; line-height: 38rpx; font-weight: 600; color: #252d3d; }
+	.bw-required { color: #f04438; }
+	.bw-tip { margin-top: 8rpx; font-size: 20rpx; line-height: 30rpx; color: #f45b35; }
+	.bw-input { height: 94rpx; margin-top: 18rpx; padding: 0 24rpx; border: 1rpx solid #d8dce5; border-radius: 14rpx; font-size: 26rpx; color: #333333; box-sizing: border-box; }
+	.bw-placeholder { font-size: 25rpx; color: #999999; }
+	.bw-upload { position: relative; width: 220rpx; height: 220rpx; margin-top: 18rpx; border: 1rpx solid #d8dce5; border-radius: 14rpx; background-color: #f7f8fa; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+	.bw-upload-image { width: 100%; height: 100%; }
+	.bw-upload-text { margin-top: 10rpx; font-size: 22rpx; color: #7f8798; }
+	.bw-upload-mask { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-color: rgba(0,0,0,.42); display: flex; align-items: center; justify-content: center; }
+	.bw-submit { height: 92rpx; margin-top: 36rpx; border-radius: 14rpx; background-color: #f45b35; display: flex; align-items: center; justify-content: center; }
+	.bw-submit--disabled { opacity: .55; }
+	.bw-submit-text { margin-left: 8rpx; font-size: 28rpx; font-weight: 700; color: #ffffff; }
+	.bw-loading, .bw-no-access { min-height: 620rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+	.bw-loading-text, .bw-no-access-desc { margin-top: 16rpx; font-size: 24rpx; color: #999999; }
+	.bw-no-access-title { margin-top: 24rpx; font-size: 30rpx; font-weight: 600; color: #555555; }
+</style>
+
+<style lang="scss">
+	page { min-height: 100%; background-color: #f5f5f7; }
+</style>

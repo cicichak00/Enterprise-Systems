@@ -1,0 +1,527 @@
+<template>
+	<cl-page :pt="{ className: 'lg-page' }">
+		<view class="lg-page">
+			<view class="lg-body">
+				<text class="lg-title">账号密码登录</text>
+				<text class="lg-sub">使用密码登录企业号</text>
+				<view class="lg-field">
+					<text class="lg-label">手机号</text>
+					<input
+						class="lg-input"
+						v-model="mobile"
+						type="number"
+						maxlength="11"
+						placeholder="请输入手机号"
+						placeholder-class="lg-placeholder"
+					/>
+				</view>
+				<view class="lg-field">
+					<text class="lg-label">密码</text>
+					<input
+						class="lg-input"
+						v-model="password"
+						:password="hidePassword"
+						maxlength="32"
+						placeholder="请输入密码"
+						placeholder-class="lg-placeholder"
+					/>
+				</view>
+				<view class="lg-agreement" @tap="toggleAgreement">
+					<view class="lg-checkbox" :class="{ 'is-checked': agreed }">
+						<text v-if="agreed" class="lg-checkbox-mark">✓</text>
+					</view>
+					<view v-if="protocolList.length > 0" class="lg-agreement-copy">
+						<text class="lg-agreement-text">同意</text>
+						<template v-for="(item, index) in protocolList" :key="getProtocolKey(item, index)">
+							<text v-if="index > 0" class="lg-agreement-text">和</text>
+							<text class="lg-agreement-link" @tap.stop="openProtocol(item)">{{ formatProtocolTitle(item.title ?? "") }}</text>
+						</template>
+					</view>
+				</view>
+				<view class="lg-submit" :class="{ 'is-disabled': submitting }" @tap="onSubmit">
+					<text class="lg-submit-text">{{ submitting ? "登录中..." : "登录" }}</text>
+				</view>
+				<view class="lg-switch" @tap="toMobileLogin">
+					<text class="lg-switch-text">验证码登录</text>
+				</view>
+			</view>
+		</view>
+
+		<cl-popup
+			v-model="agreeModalVisible"
+			direction="center"
+			size="560rpx"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="true"
+			:swipe-close="false"
+			:pt="{ className: 'lg-agree-popup-wrap' }"
+		>
+			<view class="lg-agree-modal">
+				<text class="lg-agree-modal-title">同意协议</text>
+				<view class="lg-agree-modal-content">
+					<view class="lg-agree-modal-line">
+						<text class="lg-agree-modal-text">您还没有同意</text>
+						<template v-for="(item, index) in protocolList" :key="getProtocolKey(item, index)">
+							<text v-if="index > 0" class="lg-agree-modal-text">和</text>
+							<text class="lg-agree-modal-link" @tap.stop="openProtocol(item)">{{ formatProtocolTitle(item.title ?? "") }}</text>
+						</template>
+					</view>
+					<text class="lg-agree-modal-desc">请您阅读并点击“同意并登录”即代表您已阅读并同意上述内容</text>
+				</view>
+				<view class="lg-agree-modal-actions">
+					<view class="lg-agree-modal-btn lg-agree-modal-btn--ghost" @tap="closeAgreeModal">
+						<text class="lg-agree-modal-btn-text">取消</text>
+					</view>
+					<view class="lg-agree-modal-btn lg-agree-modal-btn--primary" @tap="onAgreeAndLogin">
+						<text class="lg-agree-modal-btn-text lg-agree-modal-btn-text--primary">同意并登录</text>
+					</view>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getAppInfo } from "@/.cool/api/info";
+	import { loginByAccount } from "@/.cool/api/login";
+	import { router, useStore, isApiSuccess, getApiMessage, type LoginEnvelope, type OAuthAuthorizeProtocolItem, type Response } from "@/.cool";
+	import { completeLoginNavigation } from "@/.cool/navigation/afterLogin";
+
+	const { user } = useStore();
+	const mobile = ref("");
+	const password = ref("");
+	const agreed = ref(false);
+	const agreeModalVisible = ref(false);
+	const submitting = ref(false);
+	const hidePassword = ref(true);
+	const protocolList = ref<OAuthAuthorizeProtocolItem[]>([]);
+
+	function isValidPhone(phone: string) {
+		return /^1[3-9]\d{9}$/.test(phone);
+	}
+
+	function toggleAgreement() {
+		agreed.value = !agreed.value;
+	}
+
+	function formatProtocolTitle(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "";
+		}
+		if (text.indexOf("《") == 0) {
+			return text;
+		}
+		return `《${text}》`;
+	}
+
+	function getProtocolKey(item: OAuthAuthorizeProtocolItem, index: number): string {
+		const idVal = item.id;
+		if (idVal != null) {
+			return `protocol-${idVal}`;
+		}
+		return `protocol-${index}`;
+	}
+
+	function openProtocol(item: OAuthAuthorizeProtocolItem) {
+		agreeModalVisible.value = false;
+		router.push({
+			path: "/pages/protocol/detail",
+			query: {
+				id: item.id
+			}
+		});
+	}
+
+	function parseProtocolList(data: UTSJSONObject): OAuthAuthorizeProtocolItem[] {
+		const protocolRaw = data["protocol"] as OAuthAuthorizeProtocolItem[] | null;
+		if (protocolRaw == null || protocolRaw.length == 0) {
+			return [];
+		}
+		const result: OAuthAuthorizeProtocolItem[] = [];
+		for (let i = 0; i < protocolRaw.length; i++) {
+			const row = protocolRaw[i] as UTSJSONObject;
+			const title = `${row["title"] ?? ""}`.trim();
+			if (title == "") {
+				continue;
+			}
+			result.push({
+				id: row["id"] as number | null,
+				title: title,
+				content: `${row["content"] ?? ""}`,
+				summary: `${row["summary"] ?? ""}`,
+				version: `${row["version"] ?? ""}`
+			});
+		}
+		return result;
+	}
+
+	function loadLoginProtocols() {
+		getAppInfo("login")
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				protocolList.value = parseProtocolList(data);
+			})
+			.catch(() => {});
+	}
+
+	function toMobileLogin() {
+		uni.setStorageSync("loginM", mobile.value);
+		router.back();
+	}
+
+	function closeAgreeModal() {
+		agreeModalVisible.value = false;
+	}
+
+	function onSubmit() {
+		if (submitting.value) {
+			return;
+		}
+		const phone = mobile.value.trim();
+		const pwd = password.value.trim();
+		if (!isValidPhone(phone)) {
+			uni.showToast({ title: "请输入正确的手机号", icon: "none" });
+			return;
+		}
+		if (pwd.length < 6) {
+			uni.showToast({ title: "密码长度至少6位", icon: "none" });
+			return;
+		}
+		if (!agreed.value) {
+			agreeModalVisible.value = true;
+			return;
+		}
+		doLogin();
+	}
+
+	function onAgreeAndLogin() {
+		agreed.value = true;
+		agreeModalVisible.value = false;
+		doLogin();
+	}
+
+	function doLogin() {
+		if (submitting.value) {
+			return;
+		}
+		const phone = mobile.value.trim();
+		const pwd = password.value.trim();
+		if (!isValidPhone(phone)) {
+			uni.showToast({ title: "请输入正确的手机号", icon: "none" });
+			return;
+		}
+		if (pwd.length < 6) {
+			uni.showToast({ title: "密码长度至少6位", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		const pendingRedirect = router.getLoginRedirect();
+		uni.showLoading({ title: "登录中..." });
+		loginByAccount(phone, pwd)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as LoginEnvelope;
+				if (envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: envelope.msg ?? "登录失败", icon: "none" });
+					return;
+				}
+				uni.setStorageSync("loginM", phone);
+				if (!user.applyLoginResponse(envelope)) {
+					uni.showToast({
+						title: getApiMessage(envelope, "登录失败：未获取到凭证"),
+						icon: "none"
+					});
+					return;
+				}
+				uni.showToast({ title: "登录成功", icon: "success" });
+				completeLoginNavigation(pendingRedirect, phone);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: res.msg ?? res.message ?? "登录失败", icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	const savedMobile = uni.getStorageSync("loginM") as string | null;
+	if (savedMobile != null && savedMobile != "") {
+		mobile.value = savedMobile;
+	}
+
+	onLoad(() => {
+		loadLoginProtocols();
+	});
+
+	onShow(() => {
+		router.preserveLoginRedirect();
+	});
+
+	onHide(() => {
+		agreeModalVisible.value = false;
+	});
+</script>
+
+<style lang="scss" scoped>
+	.lg-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.lg-body {
+		padding: 120rpx 40rpx 60rpx;
+	}
+
+	.lg-title {
+		display: block;
+		font-size: 48rpx;
+		font-weight: 800;
+		color: #1a1a1a;
+		line-height: 68rpx;
+	}
+
+	.lg-sub {
+		display: block;
+		margin-top: 12rpx;
+		margin-bottom: 48rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 38rpx;
+	}
+
+	.lg-field {
+		margin-bottom: 28rpx;
+	}
+
+	.lg-label {
+		display: block;
+		margin-bottom: 12rpx;
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.lg-input {
+		height: 88rpx;
+		padding: 0 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #e8e8e8;
+		font-size: 28rpx;
+		color: #333333;
+	}
+
+	.lg-placeholder {
+		color: #cccccc;
+		font-size: 28rpx;
+	}
+
+	.lg-agreement {
+		margin-top: 12rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+	}
+
+	.lg-checkbox {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 16rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+
+		&.is-checked {
+			background-color: #2b529f;
+			border-color: #2b529f;
+		}
+	}
+
+	.lg-checkbox-mark {
+		font-size: 20rpx;
+		color: #ffffff;
+		line-height: 28rpx;
+	}
+
+	.lg-agreement-copy {
+		margin-left: 12rpx;
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.lg-agreement-text {
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.lg-agreement-text--fallback {
+		margin-left: 12rpx;
+	}
+
+	.lg-agreement-link {
+		font-size: 22rpx;
+		color: #2b529f;
+		line-height: 32rpx;
+	}
+
+	.lg-submit {
+		margin-top: 48rpx;
+		height: 96rpx;
+		border-radius: 48rpx;
+		background-color: #2b529f;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&.is-disabled {
+			opacity: 0.7;
+		}
+	}
+
+	.lg-submit-text {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 42rpx;
+	}
+
+	.lg-switch {
+		margin-top: 32rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.lg-switch-text {
+		font-size: 26rpx;
+		color: #2b529f;
+		line-height: 36rpx;
+	}
+</style>
+
+<style lang="scss">
+	.lg-agree-popup-wrap {
+		.cl-popup__inner {
+			border-radius: 32rpx;
+			background-color: #ffffff;
+			overflow: visible;
+		}
+	}
+</style>
+
+<style lang="scss" scoped>
+	.lg-agree-modal {
+		width: 100%;
+		padding: 40rpx 32rpx 32rpx;
+		box-sizing: border-box;
+	}
+
+	.lg-agree-modal-title {
+		display: block;
+		font-size: 34rpx;
+		font-weight: 600;
+		color: #333333;
+		text-align: center;
+		line-height: 48rpx;
+		margin-bottom: 24rpx;
+	}
+
+	.lg-agree-modal-content {
+		width: 100%;
+		margin-bottom: 24rpx;
+	}
+
+	.lg-agree-modal-line {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		width: 100%;
+	}
+
+	.lg-agree-modal-desc {
+		display: block;
+		width: 100%;
+		margin-top: 12rpx;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 44rpx;
+	}
+
+	.lg-agree-modal-text {
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 44rpx;
+	}
+
+	.lg-agree-modal-link {
+		font-size: 26rpx;
+		color: #2b529f;
+		line-height: 44rpx;
+	}
+
+	.lg-agree-modal-actions {
+		display: flex;
+		flex-direction: row;
+		width: 100%;
+
+		.lg-agree-modal-btn--ghost {
+			margin-right: 20rpx;
+		}
+	}
+
+	.lg-agree-modal-btn {
+		flex: 1;
+		height: 88rpx;
+		border-radius: 12rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--ghost {
+			background-color: #f5f5f5;
+		}
+
+		&--primary {
+			background-color: #2b529f;
+		}
+	}
+
+	.lg-agree-modal-btn-text {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+
+		&--primary {
+			color: #ffffff;
+			font-weight: 600;
+		}
+	}
+</style>

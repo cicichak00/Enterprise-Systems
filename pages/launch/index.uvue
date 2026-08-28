@@ -1,0 +1,95 @@
+<template>
+	<cl-page :pt="{ className: 'lp-page' }">
+		<view class="lp-page">
+			<cl-safe-area type="top"></cl-safe-area>
+			<view class="lp-body">
+				<!-- <view class="lp-logo">
+					<text class="lp-logo-text">豹</text>
+				</view>
+				<text class="lp-app-name">企业号</text> -->
+				<view class="lp-loading-row">
+					<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+				</view>
+                <view class="lp-loading-text">加载中...</view>
+			</view>
+			<cl-safe-area type="bottom"></cl-safe-area>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { runAppLaunchBootstrap } from "@/.cool/navigation/appLaunch";
+	import { getApiMessage } from "@/.cool";
+
+	const bootstrapped = ref(false);
+
+	function startBootstrap() {
+		if (bootstrapped.value) {
+			return;
+		}
+		bootstrapped.value = true;
+		runAppLaunchBootstrap().catch((err) => {
+			uni.showToast({ title: getApiMessage(err, "启动失败"), icon: "none" });
+		});
+	}
+
+	onLoad(() => {
+		startBootstrap();
+	});
+</script>
+
+<style lang="scss" scoped>
+	.lp-page {
+		min-height: 100vh;
+	}
+
+	.lp-body {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 0 30rpx 80rpx;
+		box-sizing: border-box;
+	}
+
+	.lp-logo {
+		width: 120rpx;
+		height: 120rpx;
+		border-radius: 28rpx;
+		background-image: linear-gradient(135deg, #2b59c3 0%, #1a1f3a 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.lp-logo-text {
+		font-size: 56rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 72rpx;
+	}
+
+	.lp-app-name {
+		margin-top: 24rpx;
+		font-size: 36rpx;
+		font-weight: 700;
+		color: #333333;
+		line-height: 50rpx;
+	}
+
+	.lp-loading-row {
+		margin-top: 48rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.lp-loading-text {
+		margin-top: 12rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+</style>

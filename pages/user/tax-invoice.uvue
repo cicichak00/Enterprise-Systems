@@ -1,0 +1,213 @@
+<template>
+	<cl-page :pt="{ className: 'ti-page' }">
+		<view class="ti-page">
+			<view class="ti-body">
+					<text class="ti-main-title">税务与发票说明</text>
+
+					<view class="ti-meta-row">
+						<view class="ti-version-tag">
+							<text class="ti-version-tag-text">v1.8</text>
+						</view>
+						<text class="ti-meta-text">生效 2025/11/15</text>
+					</view>
+
+					<view class="ti-changes-box">
+						<text class="ti-changes-title">本版本相比上一版本的变化</text>
+						<view
+							class="ti-changes-item"
+							v-for="(item, index) in changeItems"
+							:key="index"
+						>
+							<text class="ti-changes-dot">·</text>
+							<text class="ti-changes-text">{{ item }}</text>
+						</view>
+					</view>
+
+					<view
+						class="ti-section"
+						v-for="(section, index) in sections"
+						:key="index"
+					>
+						<text class="ti-section-title">{{ section.title }}</text>
+						<text class="ti-section-content">{{ section.content }}</text>
+					</view>
+
+					<view class="ti-footer-note">
+						<text class="ti-footer-text">以上条款的最终解释权归企业号所有 · 如有疑问联系 </text>
+						<text class="ti-footer-email" @tap="onCopyEmail">legal@youbao.com</text>
+					</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	type AgreementSection = {
+		title: string;
+		content: string;
+	};
+
+	const changeItems = [
+		"新增「终身绑定」说明条款，明确不会因身份切换而稀释",
+		"更新违规处罚梯度与对应信用分扣减规则",
+		"删除了已失效的「老用户特权」章节"
+	];
+
+	const sections: AgreementSection[] = [
+		{
+			title: "一、税务主体",
+			content: "个人用户默认按自然人纳税；月收入 ¥800 以下免预扣；超过部分按 20% 劳务报酬预扣。"
+		},
+		{
+			title: "二、年度汇算",
+			content: "次年 3–6 月可在个税 App 做综合所得汇算，多退少补。"
+		},
+		{
+			title: "三、发票",
+			content: "个人可通过「发票中心」申请灵活用工平台代开；企业主体请上传对公信息后对公结算。"
+		}
+	];
+
+	function onCopyEmail() {
+		uni.setClipboardData({
+			data: "legal@youbao.com",
+			success: () => {
+				uni.showToast({ title: "邮箱已复制", icon: "none" });
+			}
+		});
+	}
+</script>
+
+<style lang="scss" scoped>
+	.ti-page {
+		min-height: 100vh;
+		background-color: #faf9f6;
+	}
+
+	.ti-body {
+		padding: 32rpx 30rpx 40rpx;
+		box-sizing: border-box;
+	}
+
+	.ti-main-title {
+		display: flex;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 60rpx;
+	}
+
+	.ti-meta-row {
+		margin-top: 20rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.ti-version-tag {
+		padding: 4rpx 14rpx;
+		border-radius: 8rpx;
+		background-color: #eeeeee;
+		margin-right: 12rpx;
+	}
+
+	.ti-version-tag-text {
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 32rpx;
+	}
+
+	.ti-meta-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.ti-changes-box {
+		margin-top: 28rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #fff7e6;
+	}
+
+	.ti-changes-title {
+		display: flex;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #b8860b;
+		line-height: 38rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.ti-changes-item {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		margin-bottom: 12rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.ti-changes-dot {
+		font-size: 26rpx;
+		color: #c67a3a;
+		line-height: 40rpx;
+		margin-right: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.ti-changes-text {
+		flex: 1;
+		min-width: 0;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+	}
+
+	.ti-section {
+		margin-top: 36rpx;
+	}
+
+	.ti-section-title {
+		display: flex;
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 42rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.ti-section-content {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.ti-footer-note {
+		margin-top: 48rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #f0f0f0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.ti-footer-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 38rpx;
+	}
+
+	.ti-footer-email {
+		font-size: 24rpx;
+		color: #666666;
+		line-height: 38rpx;
+	}
+</style>

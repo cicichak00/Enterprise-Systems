@@ -1,0 +1,246 @@
+<template>
+	<cl-page :pt="{ className: 'cs-page' }">
+		<view class="cs-page">
+
+			<view class="cs-body">
+				<view class="cs-card">
+					<view
+						class="cs-item"
+						v-for="(item, index) in contactItems"
+						:key="item.key"
+					>
+						<view class="cs-item-icon">
+							<cl-icon :name="item.iconName" :size="22" :color="item.iconColor"></cl-icon>
+						</view>
+						<view class="cs-item-copy">
+							<text class="cs-item-title">{{ item.title }}</text>
+							<text class="cs-item-sub">{{ item.subtitle }}</text>
+						</view>
+						<view class="cs-item-btn" @tap="onContactAction(item)">
+							<text class="cs-item-btn-text">{{ item.actionText }}</text>
+						</view>
+						<view v-if="index < contactItems.length - 1" class="cs-item-divider"></view>
+					</view>
+				</view>
+
+				<text class="cs-section-label">也许你想先看这里</text>
+				<view class="cs-faq-tags">
+					<view
+						class="cs-faq-tag"
+						v-for="(item, index) in faqTags"
+						:key="index"
+						@tap="onFaqTagTap(item)"
+					>
+						<text class="cs-faq-tag-text">{{ item }}</text>
+					</view>
+				</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed } from "vue";
+	import { getCapsuleNavStyle, router } from "@/.cool";
+
+	type ContactKey = "online" | "phone" | "email" | "advisor";
+
+	type ContactItem = {
+		key: ContactKey;
+		title: string;
+		subtitle: string;
+		actionText: string;
+		iconName: string;
+		iconColor: string;
+		value: string;
+	};
+
+	const contactItems: ContactItem[] = [
+		{
+			key: "online",
+			title: "在线客服",
+			subtitle: "工作日 9:00 - 22:00 · 平均 3 分钟响应",
+			actionText: "发起对话",
+			iconName: "chat-3-line",
+			iconColor: "#a78bfa",
+			value: ""
+		},
+		{
+			key: "phone",
+			title: "电话客服",
+			subtitle: "400-808-2268 · 周一至周五 9:30 - 18:00",
+			actionText: "拨打",
+			iconName: "phone-line",
+			iconColor: "#f472b6",
+			value: "4008082268"
+		},
+		{
+			key: "email",
+			title: "邮件支持",
+			subtitle: "support@youbao.com · 24h 内回复",
+			actionText: "复制邮箱",
+			iconName: "mail-line",
+			iconColor: "#a78bfa",
+			value: "support@youbao.com"
+		},
+		{
+			key: "advisor",
+			title: "专属顾问",
+			subtitle: "LV.5 以上用户专享 · 1v1 对接",
+			actionText: "查看",
+			iconName: "user-star-line",
+			iconColor: "#f59e0b",
+			value: ""
+		}
+	];
+
+	const faqTags = [
+		"提现未到账怎么办",
+		"实名认证失败",
+		"推文号被封了怎么办",
+		"团队退款流程",
+		"领航投顾邀请码填错了"
+	];
+
+	function onContactAction(item: ContactItem) {
+		if (item.key == "online") {
+			uni.showToast({ title: "正在接入在线客服", icon: "none" });
+			return;
+		}
+		if (item.key == "phone") {
+			uni.makePhoneCall({
+				phoneNumber: item.value
+			});
+			return;
+		}
+		if (item.key == "email") {
+			uni.setClipboardData({
+				data: item.value,
+				success: () => {
+					uni.showToast({ title: "邮箱已复制", icon: "none" });
+				}
+			});
+			return;
+		}
+		uni.showToast({ title: "专属顾问功能开发中", icon: "none" });
+	}
+
+	function onFaqTagTap(tag: string) {
+		router.push({ path: "/pages/user/help" });
+	}
+</script>
+
+<style lang="scss" scoped>
+	.cs-page {
+		min-height: 100vh;
+		background-color: #f8f7f2;
+	}
+
+	.cs-body {
+		padding: 16rpx 30rpx 40rpx;
+	}
+
+	.cs-card {
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		overflow: hidden;
+	}
+
+	.cs-item {
+		position: relative;
+		padding: 28rpx 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.cs-item-icon {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 18rpx;
+		background-color: #fdeee3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.cs-item-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 16rpx;
+	}
+
+	.cs-item-title {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.cs-item-sub {
+		margin-top: 6rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.cs-item-btn {
+		padding: 12rpx 24rpx;
+		border-radius: 32rpx;
+		background-color: #e87d4d;
+		flex-shrink: 0;
+	}
+
+	.cs-item-btn-text {
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 34rpx;
+	}
+
+	.cs-item-divider {
+		position: absolute;
+		left: 24rpx;
+		right: 24rpx;
+		bottom: 0;
+		height: 1rpx;
+		background-color: #f0f0f0;
+	}
+
+	.cs-section-label {
+		display: flex;
+		margin-top: 40rpx;
+		margin-bottom: 20rpx;
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+	}
+
+	.cs-faq-tags {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.cs-faq-tag {
+		margin: 0 16rpx 16rpx 0;
+		padding: 16rpx 28rpx;
+		border-radius: 32rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+	}
+
+	.cs-faq-tag-text {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+	}
+</style>

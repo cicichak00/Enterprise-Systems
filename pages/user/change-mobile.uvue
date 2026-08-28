@@ -1,0 +1,401 @@
+<template>
+	<cl-page :pt="{ className: 'cm-page' }">
+		<view class="cm-page">
+			<view class="cm-body">
+				<view class="cm-card">
+					<text class="cm-tip">向新手机号发送验证码，验证通过后即可更换登录手机号。</text>
+					<view class="cm-field">
+						<view class="cm-label-row">
+							<text class="cm-label">当前手机号</text>
+						</view>
+						<text class="cm-mobile">{{ currentMobileDisplay }}</text>
+					</view>
+					<view class="cm-field">
+						<view class="cm-label-row">
+							<text class="cm-label">新手机号</text>
+							<text class="cm-required">*</text>
+						</view>
+						<input
+							class="cm-input"
+							:value="newMobile"
+							type="digit"
+							maxlength="11"
+							placeholder="请输入新手机号"
+							placeholder-class="cm-input-placeholder"
+							@input="onNewMobileInput"
+							@blur="onNewMobileBlur"
+						/>
+					</view>
+					<view class="cm-field cm-field--last">
+						<view class="cm-label-row">
+							<text class="cm-label">验证码</text>
+							<text class="cm-required">*</text>
+						</view>
+						<view class="cm-code-row">
+							<input
+								class="cm-input cm-input--code"
+								:value="code"
+								type="digit"
+								maxlength="6"
+								autocomplete="one-time-code"
+								placeholder="请输入6位验证码"
+								placeholder-class="cm-input-placeholder"
+								@input="onCodeInput"
+								@blur="onCodeBlur"
+							/>
+							<view
+								class="cm-code-btn"
+								:class="{ 'cm-code-btn--disabled': codeSending || countdown > 0 }"
+								@tap="onSendCode"
+							>
+								<text class="cm-code-btn-text">{{ codeBtnText }}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+				<view class="cm-submit" :class="{ 'cm-submit--disabled': submitting }" @tap="onSubmit">
+					<text class="cm-submit-text">{{ submitting ? "提交中..." : "确认修改" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { changeUserMobile, sendChangeMobileSmsCode } from "@/.cool/api/login";
+	import { getApiMessage, isApiSuccess, useStore } from "@/.cool";
+	import { isValidPhone, normalizePhone, normalizeSmsCode, readPhoneInput, readSmsCodeInput } from "@/.cool/utils/phone";
+
+	const { user } = useStore();
+	const currentMobile = ref("");
+	const newMobile = ref("");
+	const code = ref("");
+	const submitting = ref(false);
+	const codeSending = ref(false);
+	const countdown = ref(0);
+	let countdownTimer: number | null = null;
+
+	const currentMobileDisplay = computed((): string => {
+		const phone = currentMobile.value.trim();
+		if (phone.length >= 11) {
+			return `+86 ${phone.slice(0, 3)} **** ${phone.slice(7)}`;
+		}
+		if (phone != "") {
+			return phone;
+		}
+		return "未绑定手机号";
+	});
+
+	const codeBtnText = computed((): string => {
+		if (countdown.value > 0) {
+			return `${countdown.value}s`;
+		}
+		return "获取验证码";
+	});
+
+	function onNewMobileInput(e: UniInputEvent) {
+		newMobile.value = readPhoneInput(e);
+	}
+
+	function onNewMobileBlur(e: UniInputBlurEvent) {
+		newMobile.value = readPhoneInput(e);
+	}
+
+	function onCodeInput(e: UniInputEvent) {
+		code.value = readSmsCodeInput(e);
+	}
+
+	function onCodeBlur(e: UniInputBlurEvent) {
+		code.value = readSmsCodeInput(e);
+	}
+
+	function pickMobileFromLocal(): string {
+		const info = user.info.value;
+		if (info != null && info.phone != "") {
+			return `${info.phone}`.trim();
+		}
+		const stored = uni.getStorageSync("userInfo") as UTSJSONObject | null;
+		if (stored != null) {
+			const m = `${stored["mobile"] ?? stored["phone"] ?? ""}`.trim();
+			if (m != "") {
+				return m;
+			}
+		}
+		const loginM = uni.getStorageSync("loginM") as string | null;
+		if (loginM != null && `${loginM}`.trim() != "") {
+			return `${loginM}`.trim();
+		}
+		return "";
+	}
+
+	function loadCurrentMobile() {
+		const local = pickMobileFromLocal();
+		if (local != "") {
+			currentMobile.value = local;
+			return;
+		}
+		user.fetchProfile()
+			.then(() => {
+				const fetched = pickMobileFromLocal();
+				if (fetched != "") {
+					currentMobile.value = fetched;
+				}
+			})
+			.catch(() => {});
+	}
+
+	function startCountdown() {
+		countdown.value = 60;
+		countdownTimer = setInterval(() => {
+			countdown.value -= 1;
+			if (countdown.value <= 0 && countdownTimer != null) {
+				clearInterval(countdownTimer);
+				countdownTimer = null;
+			}
+		}, 1000) as number;
+	}
+
+	function onSendCode() {
+		if (codeSending.value || countdown.value > 0) {
+			return;
+		}
+		const phone = normalizePhone(newMobile.value);
+		if (!isValidPhone(phone)) {
+			uni.showToast({ title: "请输入正确的新手机号", icon: "none" });
+			return;
+		}
+		if (phone == normalizePhone(currentMobile.value)) {
+			uni.showToast({ title: "新手机号不能与当前手机号相同", icon: "none" });
+			return;
+		}
+		codeSending.value = true;
+		sendChangeMobileSmsCode(phone)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const codeVal = envelope["code"];
+				if (codeVal != null && !isApiSuccess(codeVal)) {
+					uni.showToast({ title: getApiMessage(res, "发送失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: "验证码已发送", icon: "none" });
+				startCountdown();
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "发送失败"), icon: "none" });
+			})
+			.finally(() => {
+				codeSending.value = false;
+			});
+	}
+
+	function validate(): string {
+		const phone = normalizePhone(newMobile.value);
+		if (!isValidPhone(phone)) {
+			return "请输入正确的新手机号";
+		}
+		if (phone == normalizePhone(currentMobile.value)) {
+			return "新手机号不能与当前手机号相同";
+		}
+		const smsCode = normalizeSmsCode(code.value);
+		if (smsCode.length != 6) {
+			return "请输入6位验证码";
+		}
+		return "";
+	}
+
+	function onSubmit() {
+		if (submitting.value) {
+			return;
+		}
+		const err = validate();
+		if (err != "") {
+			uni.showToast({ title: err, icon: "none" });
+			return;
+		}
+		const phone = normalizePhone(newMobile.value);
+		const smsCode = normalizeSmsCode(code.value);
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		changeUserMobile(phone, smsCode)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const codeVal = envelope["code"];
+				if (codeVal != null && !isApiSuccess(codeVal)) {
+					uni.showToast({ title: getApiMessage(res, "修改失败"), icon: "none" });
+					return;
+				}
+				uni.setStorageSync("loginM", phone);
+				user.fetchProfile().catch(() => {});
+				uni.showToast({ title: getApiMessage(res, "修改成功"), icon: "success" });
+				setTimeout(() => {
+					uni.navigateBack();
+				}, 400);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "修改失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	onShow(() => {
+		loadCurrentMobile();
+	});
+
+	onUnload(() => {
+		if (countdownTimer != null) {
+			clearInterval(countdownTimer);
+			countdownTimer = null;
+		}
+	});
+</script>
+
+<style lang="scss" scoped>
+	.cm-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.cm-body {
+		min-height: 100vh;
+		padding: 24rpx 30rpx 40rpx;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.cm-card {
+		padding: 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+	}
+
+	.cm-tip {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		margin-bottom: 28rpx;
+	}
+
+	.cm-field {
+		margin-bottom: 28rpx;
+
+		&--last {
+			margin-bottom: 0;
+		}
+	}
+
+	.cm-label-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 12rpx;
+	}
+
+	.cm-label {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+		font-weight: 500;
+	}
+
+	.cm-required {
+		margin-left: 4rpx;
+		font-size: 26rpx;
+		color: #ef4444;
+		line-height: 36rpx;
+	}
+
+	.cm-mobile {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.cm-code-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.cm-input {
+		width: 100%;
+		height: 80rpx;
+		padding: 0 20rpx;
+		border-radius: 12rpx;
+		background-color: #f7f8fa;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+		font-size: 28rpx;
+		color: #333333;
+		box-sizing: border-box;
+
+		&--code {
+			flex: 1;
+			min-width: 0;
+		}
+	}
+
+	.cm-input-placeholder {
+		color: #999999;
+		font-size: 28rpx;
+	}
+
+	.cm-code-btn {
+		margin-left: 16rpx;
+		height: 80rpx;
+		padding: 0 24rpx;
+		border-radius: 12rpx;
+		background-color: rgba(43, 89, 195, 0.1);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+
+		&--disabled {
+			opacity: 0.6;
+		}
+	}
+
+	.cm-code-btn-text {
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 34rpx;
+		white-space: nowrap;
+	}
+
+	.cm-submit {
+		margin-top: auto;
+		padding: 28rpx;
+		border-radius: 24rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--disabled {
+			opacity: 0.6;
+		}
+	}
+
+	.cm-submit-text {
+		font-size: 30rpx;
+		color: #ffffff;
+		line-height: 42rpx;
+		font-weight: 600;
+	}
+</style>

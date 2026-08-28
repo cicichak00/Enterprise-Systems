@@ -1,0 +1,551 @@
+<!-- 员工端 · 组员详情 -->
+<template>
+	<cl-page :pt="{ className: 'smd-page' }" :back-top="false">
+		<view class="smd-page">
+			<view class="smd-profile">
+				<view class="smd-avatar">
+					<image
+						v-if="avatarUrl != ''"
+						class="smd-avatar-img"
+						:src="avatarUrl"
+						mode="aspectFill"
+					></image>
+					<text v-else class="smd-avatar-text">{{ avatarText }}</text>
+				</view>
+				<view class="smd-profile-copy">
+					<text class="smd-name">{{ nickname }}</text>
+					<text v-if="metaLine != ''" class="smd-meta">{{ metaLine }}</text>
+				</view>
+			</view>
+
+			<view class="smd-tabs">
+				<view
+					class="smd-tab"
+					:class="{ 'smd-tab--active': activeTab == 'history' }"
+					@tap="onTabChange('history')"
+				>
+					<text
+						class="smd-tab-text"
+						:class="{ 'smd-tab-text--active': activeTab == 'history' }"
+					>全部历史订单</text>
+				</view>
+				<view
+					class="smd-tab"
+					:class="{ 'smd-tab--active': activeTab == 'daily' }"
+					@tap="onTabChange('daily')"
+				>
+					<text
+						class="smd-tab-text"
+						:class="{ 'smd-tab-text--active': activeTab == 'daily' }"
+					>每日做单数据</text>
+				</view>
+			</view>
+
+			<scroll-view
+				class="smd-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="smd-scroll-inner">
+					<view v-if="loading && orderList.length == 0" class="smd-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="smd-state-text">加载中...</text>
+					</view>
+					<view v-else-if="orderList.length == 0" class="smd-state">
+						<text class="smd-state-text">{{ activeTab == "daily" ? "暂无每日做单数据" : "暂无历史订单" }}</text>
+					</view>
+					<view v-else-if="activeTab == 'history'" class="smd-order-list">
+						<view class="smd-order-card" v-for="(item, index) in orderList" :key="getOrderKey(item, index)">
+							<text class="smd-order-title">{{ item.title }}</text>
+							<text class="smd-order-line">时间：{{ item.time }}</text>
+							<text class="smd-order-line">收益：{{ item.revenue }}</text>
+							<text v-if="item.status != ''" class="smd-order-line">状态：{{ item.status }}</text>
+						</view>
+					</view>
+					<view v-else class="smd-daily-list">
+						<view class="smd-daily-card" v-for="(item, index) in dailyList" :key="`${item.date}-${index}`">
+							<text class="smd-daily-date">{{ item.date }}</text>
+							<text class="smd-daily-line">做单量：{{ item.count }}</text>
+							<text class="smd-daily-line">收益：{{ item.revenue }}</text>
+						</view>
+					</view>
+					<view v-if="orderList.length > 0 && activeTab == 'history'" class="smd-loadmore">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getStaffDetail } from "@/.cool/api/staff";
+	import { getOrderList } from "@/.cool/api/order";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+
+	type TabKey = "history" | "daily";
+
+	type OrderRow = {
+		id: string;
+		title: string;
+		time: string;
+		revenue: string;
+		status: string;
+		dateKey: string;
+	};
+
+	type DailyRow = {
+		date: string;
+		count: string;
+		revenue: string;
+	};
+
+	const staffId = ref(0);
+	const userId = ref(0);
+	const nickname = ref("组员");
+	const avatarUrl = ref("");
+	const avatarText = ref("组");
+	const metaLine = ref("");
+	const activeTab = ref<TabKey>("history");
+	const orderList = ref<OrderRow[]>([]);
+	const page = ref(1);
+	const limit = 20;
+	const hasMore = ref(true);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const fetchSeq = ref(0);
+	const profileLoading = ref(false);
+
+	const dailyList = computed((): DailyRow[] => {
+		const map: UTSJSONObject = {};
+		const dates: string[] = [];
+		for (let i = 0; i < orderList.value.length; i++) {
+			const row = orderList.value[i];
+			const key = row.dateKey != "" ? row.dateKey : "未知日期";
+			const exist = map[key] as UTSJSONObject | null;
+			if (exist == null) {
+				map[key] = {
+					count: 1,
+					revenue: parseFloat(row.revenue) || 0
+				};
+				dates.push(key);
+			} else {
+				const count = parseInt(`${exist["count"] ?? 0}`);
+				const revenue = parseFloat(`${exist["revenue"] ?? 0}`);
+				exist["count"] = (isNaN(count) ? 0 : count) + 1;
+				exist["revenue"] = (isNaN(revenue) ? 0 : revenue) + (parseFloat(row.revenue) || 0);
+			}
+		}
+		const rows: DailyRow[] = [];
+		for (let i = 0; i < dates.length; i++) {
+			const key = dates[i];
+			const cell = map[key] as UTSJSONObject;
+			const revenue = parseFloat(`${cell["revenue"] ?? 0}`);
+			rows.push({
+				date: key,
+				count: `${cell["count"] ?? 0}`,
+				revenue: isNaN(revenue) ? "0.00" : revenue.toFixed(2)
+			});
+		}
+		return rows;
+	});
+
+	function pickText(...vals: Array<string | number | null | undefined>): string {
+		for (let i = 0; i < vals.length; i++) {
+			const raw = vals[i];
+			if (raw == null) {
+				continue;
+			}
+			const text = `${raw}`.trim();
+			if (text != "" && text != "null" && text != "undefined") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function getAvatarText(name: string): string {
+		const text = name.trim();
+		return text != "" ? text.substring(0, 1) : "组";
+	}
+
+	function getOrderKey(item: OrderRow, index: number): string {
+		if (item.id != "") {
+			return item.id;
+		}
+		return `${index}`;
+	}
+
+	function toDateKey(raw: string): string {
+		const text = raw.trim();
+		if (text.length >= 10) {
+			return text.substring(0, 10);
+		}
+		return text;
+	}
+
+	function mapOrder(raw: UTSJSONObject): OrderRow {
+		const id = pickText(raw["id"]);
+		const title = pickText(raw["project_title"], raw["title"], raw["keyword"], "订单");
+		const time = pickText(raw["create_time"], raw["payment_time"], raw["settle_time"], "-");
+		const revenue = pickText(raw["staff_revenue"], raw["revenue"], raw["amount"], "0.00").replace(/^¥/, "");
+		const status = pickText(raw["payment_status_text"], raw["status_text"]);
+		return {
+			id: id,
+			title: title,
+			time: time,
+			revenue: revenue != "" ? revenue : "0.00",
+			status: status,
+			dateKey: toDateKey(time)
+		};
+	}
+
+	function extractOrders(data: any): OrderRow[] {
+		if (data == null) {
+			return [];
+		}
+		if (Array.isArray(data)) {
+			return (data as UTSJSONObject[]).map((item) => mapOrder(item));
+		}
+		const obj = data as UTSJSONObject;
+		const list = obj["list"] as UTSJSONObject[] | null;
+		if (list != null) {
+			return list.map((item) => mapOrder(item));
+		}
+		return [];
+	}
+
+	function loadProfile() {
+		if (staffId.value <= 0 || profileLoading.value) {
+			return;
+		}
+		profileLoading.value = true;
+		getStaffDetail(staffId.value)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const name = pickText(data["nickname"], data["mobile"]);
+				if (name != "") {
+					nickname.value = name;
+					avatarText.value = getAvatarText(name);
+				}
+				avatarUrl.value = pickText(data["avatar"]);
+				const mobile = pickText(data["mobile_mask"], data["mobile"]);
+				const sn = pickText(data["sn"]);
+				if (mobile != "" && sn != "") {
+					metaLine.value = `${mobile} · ${sn}`;
+				} else if (mobile != "") {
+					metaLine.value = mobile;
+				} else if (sn != "") {
+					metaLine.value = sn;
+				}
+				const uid = data["user_id"];
+				if (uid != null && userId.value <= 0) {
+					const n = parseInt(`${uid}`);
+					if (!isNaN(n) && n > 0) {
+						userId.value = n;
+						fetchOrders(true);
+					}
+				}
+			})
+			.finally(() => {
+				profileLoading.value = false;
+			});
+	}
+
+	function fetchOrders(reset: boolean) {
+		if (userId.value <= 0) {
+			if (reset) {
+				orderList.value = [];
+				hasMore.value = false;
+			}
+			return;
+		}
+		if (reset) {
+			fetchSeq.value += 1;
+			const seq = fetchSeq.value;
+			orderList.value = [];
+			loading.value = true;
+			page.value = 1;
+			hasMore.value = true;
+			getOrderList({ page: 1, limit: limit, user_id: `${userId.value}` })
+				.then((res) => {
+					if (seq != fetchSeq.value) {
+						return;
+					}
+					handleOrderResponse(res, true, 1);
+				})
+				.catch((err) => {
+					uni.showToast({ title: getApiMessage(err, "加载订单失败"), icon: "none" });
+				})
+				.finally(() => {
+					if (seq == fetchSeq.value) {
+						loading.value = false;
+					}
+				});
+			return;
+		}
+		if (loadingMore.value || !hasMore.value || loading.value) {
+			return;
+		}
+		loadingMore.value = true;
+		const reqPage = page.value;
+		getOrderList({ page: reqPage, limit: limit, user_id: `${userId.value}` })
+			.then((res) => {
+				handleOrderResponse(res, false, reqPage);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载订单失败"), icon: "none" });
+			})
+			.finally(() => {
+				loadingMore.value = false;
+			});
+	}
+
+	function handleOrderResponse(res: any | null, reset: boolean, reqPage: number) {
+		if (res == null) {
+			return;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			uni.showToast({ title: getApiMessage(res, "加载订单失败"), icon: "none" });
+			return;
+		}
+		const data = envelope["data"] ?? envelope;
+		const rows = extractOrders(data);
+		if (reset) {
+			orderList.value = rows;
+		} else {
+			orderList.value = orderList.value.concat(rows);
+		}
+		const obj = data as UTSJSONObject;
+		const totalRaw = obj["total"] ?? obj["count"];
+		let total = orderList.value.length;
+		if (totalRaw != null) {
+			const n = parseInt(`${totalRaw}`);
+			if (!isNaN(n)) {
+				total = n;
+			}
+		}
+		hasMore.value = orderList.value.length < total && rows.length >= limit;
+		if (hasMore.value) {
+			page.value = reqPage + 1;
+		}
+	}
+
+	function onTabChange(key: TabKey) {
+		if (activeTab.value == key) {
+			return;
+		}
+		activeTab.value = key;
+	}
+
+	function onScrollToLower() {
+		if (activeTab.value == "history") {
+			fetchOrders(false);
+		}
+	}
+
+	function initPageOptions(options: OnLoadOptions) {
+		const idVal = options["id"] as string | null;
+		const userIdVal = options["user_id"] as string | null;
+		const nameVal = options["nickname"] as string | null;
+		if (idVal != null) {
+			const n = parseInt(`${idVal}`);
+			staffId.value = isNaN(n) ? 0 : n;
+		}
+		if (userIdVal != null) {
+			const n = parseInt(`${userIdVal}`);
+			userId.value = isNaN(n) ? 0 : n;
+		}
+		if (nameVal != null && `${nameVal}`.trim() != "") {
+			nickname.value = `${nameVal}`.trim();
+			avatarText.value = getAvatarText(nickname.value);
+		}
+	}
+
+	onLoad((options) => {
+		initPageOptions(options);
+		uni.setNavigationBarTitle({ title: "组员详情" });
+		loadProfile();
+		fetchOrders(true);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.smd-page {
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		box-sizing: border-box;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		padding: 24rpx 30rpx 0;
+
+		.smd-profile {
+			flex-shrink: 0;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			padding: 28rpx 24rpx;
+			border-radius: 24rpx;
+			background-color: #ffffff;
+			margin-bottom: 20rpx;
+
+			.smd-avatar {
+				width: 96rpx;
+				height: 96rpx;
+				border-radius: 50%;
+				background-color: #2b59c3;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin-right: 20rpx;
+				flex-shrink: 0;
+				overflow: hidden;
+			}
+
+			.smd-avatar-img {
+				width: 96rpx;
+				height: 96rpx;
+				border-radius: 50%;
+			}
+
+			.smd-avatar-text {
+				font-size: 36rpx;
+				color: #ffffff;
+				font-weight: 700;
+			}
+
+			.smd-profile-copy {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.smd-name {
+				font-size: 32rpx;
+				font-weight: 700;
+				color: #1a1a1a;
+				line-height: 44rpx;
+			}
+
+			.smd-meta {
+				margin-top: 6rpx;
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+			}
+		}
+
+		.smd-tabs {
+			flex-shrink: 0;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			margin-bottom: 16rpx;
+
+			.smd-tab {
+				flex: 1;
+				height: 72rpx;
+				margin-right: 12rpx;
+				border-radius: 12rpx;
+				background-color: #ffffff;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+
+				&:last-child {
+					margin-right: 0;
+				}
+			}
+
+			.smd-tab--active {
+				background-color: #0651f8;
+			}
+
+			.smd-tab-text {
+				font-size: 26rpx;
+				color: #333333;
+				line-height: 36rpx;
+			}
+
+			.smd-tab-text--active {
+				color: #ffffff;
+				font-weight: 600;
+			}
+		}
+
+		.smd-scroll {
+			flex: 1;
+			height: 0;
+		}
+
+		.smd-scroll-inner {
+			padding-bottom: 24rpx;
+		}
+
+		.smd-state {
+			padding: 120rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+
+			.smd-state-text {
+				margin-top: 16rpx;
+				font-size: 26rpx;
+				color: #999999;
+			}
+		}
+
+		.smd-order-card,
+		.smd-daily-card {
+			margin-bottom: 16rpx;
+			padding: 24rpx 28rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.smd-order-title,
+		.smd-daily-date {
+			font-size: 28rpx;
+			font-weight: 600;
+			color: #1a1a1a;
+			line-height: 40rpx;
+			margin-bottom: 8rpx;
+		}
+
+		.smd-order-line,
+		.smd-daily-line {
+			font-size: 24rpx;
+			color: #666666;
+			line-height: 36rpx;
+			margin-top: 2rpx;
+		}
+
+		.smd-loadmore {
+			padding: 8rpx 0 16rpx;
+		}
+	}
+</style>

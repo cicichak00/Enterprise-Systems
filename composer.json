@@ -1,0 +1,5 @@
+{
+    "require": {
+        "webman/captcha": "^1.0"
+    }
+}

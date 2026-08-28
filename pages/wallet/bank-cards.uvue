@@ -1,0 +1,596 @@
+<!-- 我的账户（估算对稿 375，待设计确认） -->
+<template>
+	<cl-page :pt="{ className: 'wbc-page' }">
+		<view class="wbc-page">
+			<view class="wbc-header-actions">
+				<view class="wbc-header-btn" @tap="onAddTap">
+					<text class="wbc-header-btn-plus">+</text>
+					<text class="wbc-header-btn-text">新增</text>
+				</view>
+				<view
+					class="wbc-header-btn"
+					:class="{ 'wbc-header-btn--on': manageMode }"
+					@tap="toggleManage"
+				>
+					<cl-icon v-if="!manageMode" name="apps-line" :size="14" color="#666666"></cl-icon>
+					<text class="wbc-header-btn-text">{{ manageMode ? "取消" : "管理" }}</text>
+				</view>
+			</view>
+
+			<scroll-view
+				class="wbc-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="wbc-body" :class="{ 'wbc-body--manage': manageMode }">
+					<view class="wbc-notice">
+						<text class="wbc-notice-text">您</text>
+						<text class="wbc-notice-highlight">已完成个人认证</text>
+						<text class="wbc-notice-text">，可添加个人银行收款账户信息。</text>
+					</view>
+
+					<view v-if="pageLoading && list.length == 0" class="wbc-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="wbc-state-text">加载中...</text>
+					</view>
+					<view v-else-if="list.length == 0" class="wbc-state">
+						<text class="wbc-state-text">暂无提现账户</text>
+					</view>
+					<view v-else class="wbc-list">
+						<view
+							class="wbc-card"
+							v-for="(item, index) in list"
+							:key="item.id != null ? item.id : index"
+							@tap="onCardTap(item)"
+						>
+							<view v-if="manageMode" class="wbc-check">
+								<view
+									class="wbc-check-dot"
+									:class="{ 'wbc-check-dot--on': isSelected(item.id) }"
+								>
+									<cl-icon
+										v-if="isSelected(item.id)"
+										name="check-line"
+										:size="14"
+										color="#ffffff"
+									></cl-icon>
+								</view>
+							</view>
+							<image
+								v-if="item.bank_ico != null && `${item.bank_ico}` != ''"
+								class="wbc-logo-img"
+								:src="`${item.bank_ico}`"
+								mode="aspectFill"
+							></image>
+							<view v-else class="wbc-logo">
+								<cl-icon name="wallet-3-line" :size="28" color="#cccccc"></cl-icon>
+							</view>
+							<view class="wbc-copy">
+								<view class="wbc-name-row">
+									<text class="wbc-name">{{ item.bank }}</text>
+									<view v-if="item.is_invalid == 1" class="wbc-status">
+										<text class="wbc-status-text">{{ item.status_txt }}</text>
+										<view
+											v-if="hasStatusTip(item)"
+											class="wbc-status-tip"
+											@tap.stop="onStatusTip(item)"
+										>
+											<cl-icon name="question-line" :size="14" color="#cccccc"></cl-icon>
+										</view>
+									</view>
+								</view>
+								<text class="wbc-no">{{ item.bank_no }}</text>
+								<text v-if="item.name != null && `${item.name}` != ''" class="wbc-holder">{{ item.name }}</text>
+							</view>
+						</view>
+						<view class="wbc-loadmore">
+							<cl-loadmore
+								:loading="loadingMore"
+								:finish="!hasMore"
+								finish-text="没有更多了"
+								loading-text="加载中..."
+							></cl-loadmore>
+						</view>
+					</view>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</scroll-view>
+
+			<view v-if="manageMode" class="wbc-footer">
+				<view
+					class="wbc-delete-btn"
+					:class="{ 'wbc-delete-btn--disabled': selectedIds.length == 0 || deleteSubmitting }"
+					@tap="onConfirmDelete"
+				>
+					<text class="wbc-delete-btn-text">{{ deleteBtnText }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { deleteStaffBank, getStaffBankLists } from "@/.cool/api/wallet";
+	import type { StaffBankListItem } from "@/.cool/types/wallet";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+
+	const PAGE_SIZE = 15;
+
+	const manageMode = ref(false);
+	const selectedIds = ref<string[]>([]);
+	const list = ref<StaffBankListItem[]>([]);
+	const pageNo = ref(1);
+	const hasMore = ref(true);
+	const pageLoading = ref(false);
+	const loadingMore = ref(false);
+	const deleteSubmitting = ref(false);
+
+	function toggleManage() {
+		manageMode.value = !manageMode.value;
+		selectedIds.value = [];
+		deleteSubmitting.value = false;
+	}
+
+	const deleteBtnText = computed((): string => {
+		if (deleteSubmitting.value) {
+			return "删除中...";
+		}
+		if (selectedIds.value.length > 0) {
+			return `确认删除(${selectedIds.value.length})`;
+		}
+		return "确认删除";
+	});
+
+	function itemIdText(id: number | string | null | undefined): string {
+		if (id == null) {
+			return "";
+		}
+		return `${id}`;
+	}
+
+	function isSelected(id: number | string | null | undefined): boolean {
+		const key = itemIdText(id);
+		if (key == "") {
+			return false;
+		}
+		return selectedIds.value.indexOf(key) >= 0;
+	}
+
+	function hasStatusTip(item: StaffBankListItem): boolean {
+		const tip = `${item.remarks ?? item.status_tip ?? item.remark ?? ""}`.trim();
+		return tip != "";
+	}
+
+	function onStatusTip(item: StaffBankListItem) {
+		const content = `${item.remarks ?? item.status_tip ?? item.remark ?? ""}`.trim();
+		if (content == "") {
+			return;
+		}
+		uni.showModal({
+			title: `${item.status_txt ?? "提示"}`,
+			content: content,
+			showCancel: false
+		});
+	}
+
+	function onCardTap(item: StaffBankListItem) {
+		if (!manageMode.value || deleteSubmitting.value) {
+			return;
+		}
+		const key = itemIdText(item.id);
+		if (key == "") {
+			return;
+		}
+		const ids = selectedIds.value.slice();
+		const idx = ids.indexOf(key);
+		if (idx >= 0) {
+			ids.splice(idx, 1);
+		} else {
+			if (ids.length >= 10) {
+				uni.showToast({ title: "最多选择10个账户", icon: "none" });
+				return;
+			}
+			ids.push(key);
+		}
+		selectedIds.value = ids;
+	}
+
+	function onAddTap() {
+		router.push({ path: "/pages/wallet/bank-card-add" });
+	}
+
+	function toIdNumberList(ids: string[]): number[] {
+		const result: number[] = [];
+		for (let i = 0; i < ids.length; i++) {
+			const n = parseInt(ids[i]);
+			if (!isNaN(n) && n > 0) {
+				result.push(n);
+			}
+		}
+		return result;
+	}
+
+	function exitManageMode() {
+		manageMode.value = false;
+		selectedIds.value = [];
+		deleteSubmitting.value = false;
+	}
+
+	function submitDelete() {
+		if (deleteSubmitting.value) {
+			return;
+		}
+		const idList = toIdNumberList(selectedIds.value);
+		if (idList.length == 0) {
+			uni.showToast({ title: "请选择要删除的账户", icon: "none" });
+			return;
+		}
+		if (idList.length > 10) {
+			uni.showToast({ title: "最多删除10个账户", icon: "none" });
+			return;
+		}
+		deleteSubmitting.value = true;
+		uni.showLoading({ title: "删除中..." });
+		deleteStaffBank({ id: idList })
+			.then((res) => {
+				uni.hideLoading();
+				const envelope = res as UTSJSONObject | null;
+				const code = envelope != null ? envelope["code"] : null;
+				if (code != null && !isApiSuccess(code as number | string)) {
+					deleteSubmitting.value = false;
+					uni.showToast({ title: getApiMessage(envelope, "删除失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(envelope, "删除成功"), icon: "success" });
+				exitManageMode();
+				loadList(false);
+			})
+			.catch((err) => {
+				uni.hideLoading();
+				deleteSubmitting.value = false;
+				uni.showToast({ title: getApiMessage(err, "删除失败"), icon: "none" });
+			});
+	}
+
+	function onConfirmDelete() {
+		if (selectedIds.value.length == 0 || deleteSubmitting.value) {
+			return;
+		}
+		uni.showModal({
+			title: "提示",
+			content: `确定删除选中的 ${selectedIds.value.length} 个账户吗？`,
+			success: (res) => {
+				if (res.confirm) {
+					submitDelete();
+				}
+			}
+		});
+	}
+
+	function extractList(data: UTSJSONObject): StaffBankListItem[] {
+		const raw = data["lists"] ?? data["list"] ?? data["records"] ?? data["items"];
+		if (raw == null || !Array.isArray(raw)) {
+			return [];
+		}
+		return raw as StaffBankListItem[];
+	}
+
+	function extractTotal(data: UTSJSONObject): number {
+		const raw = data["count"] ?? data["total"] ?? data["total_count"];
+		if (raw == null) {
+			return -1;
+		}
+		const n = parseInt(`${raw}`);
+		return isNaN(n) ? -1 : n;
+	}
+
+	function loadList(more: boolean = false) {
+		if (more) {
+			if (!hasMore.value || loadingMore.value || pageLoading.value) {
+				return;
+			}
+			loadingMore.value = true;
+		} else {
+			pageLoading.value = true;
+			pageNo.value = 1;
+			hasMore.value = true;
+		}
+		const nextPage = more ? pageNo.value + 1 : 1;
+		getStaffBankLists({ page_no: nextPage, page_size: PAGE_SIZE })
+			.then((res) => {
+				if (res == null) {
+					if (!more) {
+						list.value = [];
+					}
+					hasMore.value = false;
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code as number | string)) {
+					if (!more) {
+						list.value = [];
+						uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					}
+					hasMore.value = false;
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				const rows = extractList(data);
+				const total = extractTotal(data);
+				if (more) {
+					list.value = list.value.concat(rows);
+					pageNo.value = nextPage;
+				} else {
+					list.value = rows;
+					pageNo.value = 1;
+				}
+				if (total >= 0) {
+					hasMore.value = list.value.length < total;
+				} else {
+					hasMore.value = rows.length >= PAGE_SIZE;
+				}
+			})
+			.catch((err) => {
+				if (!more) {
+					list.value = [];
+					uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+				}
+				hasMore.value = false;
+			})
+			.finally(() => {
+				pageLoading.value = false;
+				loadingMore.value = false;
+			});
+	}
+
+	function onScrollToLower() {
+		loadList(true);
+	}
+
+	onShow(() => {
+		loadList(false);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.wbc-page {
+		height: 100%;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+
+		.wbc-header-actions {
+			flex-shrink: 0;
+			padding: 12rpx 30rpx 8rpx;
+			display: flex;
+			flex-direction: row;
+			justify-content: flex-end;
+		}
+
+		.wbc-header-btn {
+			height: 56rpx;
+			padding: 0 18rpx;
+			margin-left: 12rpx;
+			border-radius: 28rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+
+			&--on {
+				background-color: #e8eef8;
+			}
+		}
+
+		.wbc-header-btn-plus {
+			margin-right: 4rpx;
+			font-size: 28rpx;
+			color: #666666;
+			line-height: 32rpx;
+		}
+
+		.wbc-header-btn-text {
+			margin-left: 4rpx;
+			font-size: 24rpx;
+			color: #666666;
+			line-height: 34rpx;
+		}
+
+		.wbc-scroll {
+			flex: 1;
+			min-height: 0;
+		}
+
+		.wbc-body {
+			padding: 8rpx 30rpx 40rpx;
+
+			&--manage {
+				padding-bottom: 180rpx;
+			}
+		}
+
+		.wbc-notice {
+			padding: 8rpx 4rpx 20rpx;
+			display: flex;
+			flex-direction: row;
+			flex-wrap: wrap;
+		}
+
+		.wbc-notice-text {
+			font-size: 24rpx;
+			color: #666666;
+			line-height: 36rpx;
+		}
+
+		.wbc-notice-highlight {
+			font-size: 24rpx;
+			color: #2b59c3;
+			line-height: 36rpx;
+		}
+
+		.wbc-state {
+			padding: 120rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.wbc-state-text {
+			margin-top: 16rpx;
+			font-size: 26rpx;
+			color: #999999;
+		}
+
+		.wbc-list {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wbc-card {
+			margin-bottom: 16rpx;
+			padding: 28rpx 24rpx;
+			border-radius: 20rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.wbc-check {
+			margin-right: 16rpx;
+		}
+
+		.wbc-check-dot {
+			width: 40rpx;
+			height: 40rpx;
+			border-radius: 50%;
+			border-width: 2rpx;
+			border-style: solid;
+			border-color: #dddddd;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			&--on {
+				border-color: #2b59c3;
+				background-color: #2b59c3;
+			}
+		}
+
+		.wbc-logo-img {
+			width: 80rpx;
+			height: 80rpx;
+			border-radius: 50%;
+			margin-right: 20rpx;
+			flex-shrink: 0;
+			background-color: #f5f5f5;
+		}
+
+		.wbc-logo {
+			width: 80rpx;
+			height: 80rpx;
+			border-radius: 50%;
+			margin-right: 20rpx;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-shrink: 0;
+			background-color: #f5f5f5;
+		}
+
+		.wbc-copy {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.wbc-name-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.wbc-name {
+			flex: 1;
+			min-width: 0;
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #1a1a1a;
+			line-height: 42rpx;
+		}
+
+		.wbc-status {
+			margin-left: 12rpx;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			flex-shrink: 0;
+		}
+
+		.wbc-status-text {
+			font-size: 22rpx;
+			color: #bbbbbb;
+			line-height: 30rpx;
+		}
+
+		.wbc-status-tip {
+			margin-left: 4rpx;
+		}
+
+		.wbc-no {
+			margin-top: 8rpx;
+			font-size: 26rpx;
+			color: #666666;
+			line-height: 36rpx;
+		}
+
+		.wbc-holder {
+			margin-top: 6rpx;
+			font-size: 24rpx;
+			color: #999999;
+			line-height: 34rpx;
+		}
+
+		.wbc-loadmore {
+			padding: 16rpx 0 8rpx;
+		}
+
+		.wbc-footer {
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			padding: 20rpx 30rpx;
+			background-color: #ffffff;
+			z-index: 10;
+		}
+
+		.wbc-delete-btn {
+			height: 96rpx;
+			border-radius: 16rpx;
+			background-color: #2b59c3;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			&--disabled {
+				opacity: 0.5;
+			}
+		}
+
+		.wbc-delete-btn-text {
+			font-size: 30rpx;
+			font-weight: 600;
+			color: #ffffff;
+		}
+	}
+</style>

@@ -1,0 +1,810 @@
+{
+	"pages": [
+		{
+			"path": "pages/launch/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "black"
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+		{
+			"path": "pages/tabbar/home/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#1a1f3a",
+				"onReachBottomDistance": 120
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+		{
+			"path": "pages/tabbar/business/index",
+			"style": {
+				"navigationStyle": "custom"
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+		{
+			"path": "pages/tabbar/my/index",
+			"style": {
+				"navigationStyle": "custom"
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+        {
+        	"path": "pages/tabbar/studio/index",
+        	"style": {
+                "navigationBarTitleText": "工作室",
+                "h5": {
+                    "navigationStyle": "custom"
+                }
+        	},
+        	"meta": {
+        		"isAuth": false
+        	}
+        },
+		{
+			"path": "pages/tabbar/studio/my",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "我的"
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+		{
+			"path": "pages/tabbar/studio/data",
+			"style": {
+				"navigationBarTitleText": "数据",
+                "h5": {
+                    "navigationStyle": "custom"
+                }
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+		{
+			"path": "pages/tabbar/studio/member-detail",
+			"style": {
+				"navigationBarTitleText": "组员详情",
+                "h5": {
+                    "navigationStyle": "custom"
+                }
+			},
+			"meta": {
+				"isAuth": false
+			}
+		},
+		{
+			"path": "pages/tabbar/income/index",
+			"style": {
+				"navigationStyle": "custom",
+				"onReachBottomDistance": 120
+			},
+			"meta": {
+				"isAuth": false
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTitleText": "企业号",
+		"navigationBarTextStyle": "@navTextStyle",
+		"backgroundColorContent": "@bgContentColor",
+		"backgroundColor": "@bgColor",
+		"navigationBarBackgroundColor": "@navBgColor"
+	},
+	"tabBar": {
+		"custom": true,
+		"color": "#999999",
+		"selectedColor": "#2b59c3",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "black",
+		"height": "60px",
+		"list": [
+			{
+				"pagePath": "pages/tabbar/home/index",
+				"text": "总览"
+			},
+			{
+				"pagePath": "pages/tabbar/business/index",
+				"text": "经营中心"
+			},
+			{
+				"pagePath": "pages/tabbar/income/index",
+				"text": "收益"
+			},
+			{
+				"pagePath": "pages/tabbar/my/index",
+				"text": "我"
+			},
+			{
+				"pagePath": "pages/tabbar/studio/index",
+				"text": "工作室"
+			},
+			{
+				"pagePath": "pages/tabbar/studio/my",
+				"text": "我的"
+			}
+
+		]
+	},
+	"subPackages": [
+		{
+			"root": "pages/login",
+			"pages": [
+				{
+					"path": "mobile",
+					"style": {
+                        "navigationBarTitleText": "手机号登录",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "account",
+					"style": {
+						"navigationBarTitleText": "密码登录",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/notice",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+                        "navigationBarTitleText": "平台公告",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "detail",
+					"style": {
+						"navigationBarTitleText": "消息详情",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/wallet",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "钱包",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "departure-recovery",
+					"style": {
+						"navigationBarTitleText": "离职回收明细",
+						"h5": { "navigationStyle": "custom" }
+					},
+					"meta": { "isAuth": false }
+				},
+				{
+					"path": "transactions",
+					"style": {
+						"navigationBarTitleText": "项目收益明细",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "transaction-detail",
+					"style": {
+						"navigationBarTitleText": "交易详情",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "bank-cards",
+					"style": {
+						"navigationBarTitleText": "我的账户",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "bank-card-add",
+					"style": {
+						"navigationBarTitleText": "绑定账户",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "withdraw-apply",
+					"style": {
+						"navigationBarTitleText": "提现",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "withdrawals",
+					"style": {
+						"navigationBarTitleText": "项目收益提现记录",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "withdrawal-detail",
+					"style": {
+						"navigationBarTitleText": "提现详情",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "withdrawal-password",
+					"style": {
+						"navigationBarTitleText": "设置提现密码",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/user",
+			"pages": [
+				{
+					"path": "settings",
+					"style": {
+						"navigationBarTitleText": "企业设置",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "compliance",
+					"style": {
+                        "navigationBarTitleText": "协议与合规",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "help",
+					"style": {
+                        "navigationBarTitleText": "帮助中心",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "staff-list",
+					"style": {
+						"navigationBarTitleText": "选择员工",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "byte-binding-records",
+					"style": {
+						"navigationBarTitleText": "字节绑定记录",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "security",
+					"style": {
+                        "navigationBarTitleText": "帐户安全",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "login-password",
+					"style": {
+						"navigationBarTitleText": "修改登录密码",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "real-name",
+					"style": {
+						"navigationBarTitleText": "实名认证",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": true
+					}
+				},
+				{
+					"path": "change-mobile",
+					"style": {
+						"navigationBarTitleText": "修改手机号",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "about",
+					"style": {
+                        "navigationBarTitleText": "关于企业号",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "account",
+					"style": {
+                        "navigationBarTitleText": "帐户中心",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "applications",
+					"style": {
+                        "navigationBarTitleText": "加入申请",
+						"backgroundColor": "#f7f8fa",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "application-audit",
+					"style": {
+						"navigationBarTitleText": "审核详情",
+						"backgroundColor": "#f7f8fa",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "service",
+					"style": {
+                        "navigationBarTitleText": "联系客服",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "user-agreement",
+					"style": {
+                        "navigationBarTitleText": "用户服务协议",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "advisor-agreement",
+					"style": {
+                        "navigationBarTitleText": "领航投顾签约协议",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "risk-penalty",
+					"style": {
+                        "navigationBarTitleText": "风控与违规处罚规则",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "tax-invoice",
+					"style": {
+                        "navigationBarTitleText": "税务与发票说明",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/task",
+			"pages": [
+				{
+					"path": "detail",
+					"style": {
+						"navigationBarTitleText": "任务详情",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "novel-detail",
+					"style": {
+						"navigationBarTitleText": "详情",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "story-detail",
+					"style": {
+						"navigationBarTitleText": "详情",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "record-list",
+					"style": {
+						"navigationBarTitleText": "我的词库",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "keyword-transfer",
+					"style": {
+						"navigationBarTitleText": "关键词转赠",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "byte-workbench",
+					"style": {
+						"navigationBarTitleText": "字节任务台",
+						"backgroundColor": "#f5f5f7",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "generate-record",
+					"style": {
+						"navigationBarTitleText": "生成记录",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "backfill",
+					"style": {
+						"navigationBarTitleText": "批量回填",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "form",
+					"style": {
+						"navigationBarTitleText": "立即参与",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "promotion-content",
+					"style": {
+						"navigationBarTitleText": "选择推广内容",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "publish",
+					"style": {
+						"navigationBarTitleText": "立即回填",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "publish_list",
+					"style": {
+						"navigationBarTitleText": "作品数",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "combo-prompt",
+					"style": {
+						"navigationBarTitleText": "组合提词",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "prompt-record",
+					"style": {
+						"navigationBarTitleText": "提词记录",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "combo-backfill",
+					"style": {
+						"navigationBarTitleText": "回填",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/protocol",
+			"pages": [
+				{
+					"path": "detail",
+					"style": {
+                        "navigationBarTitleText": "协议详情",
+                        "h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/join",
+			"pages": [
+				{
+					"path": "invite",
+					"style": {
+						"disableScroll": true,
+						"h5": {
+							"navigationBarTitleText": "企业名称",
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "enterprise-apply",
+					"style": {
+						"disableScroll": true,
+						"h5": {
+							"navigationBarTitleText": "申请成为入驻",
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/account",
+			"pages": [
+				{
+					"path": "list",
+					"style": {
+						"navigationBarTitleText": "我的账号",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				},
+				{
+					"path": "add",
+					"style": {
+						"navigationBarTitleText": "新增账号",
+						"h5": {
+							"navigationStyle": "custom"
+						}
+					},
+					"meta": {
+						"isAuth": false
+					}
+				}
+			]
+		}
+	],
+	"uniIdRouter": {}
+}

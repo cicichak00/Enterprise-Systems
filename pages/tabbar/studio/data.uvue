@@ -1,0 +1,519 @@
+<!-- 员工端 · 团队数据 -->
+<template>
+	<cl-page :pt="{ className: 'sd-page' }" :back-top="false">
+		<view class="sd-page">
+			<view class="sd-summary">
+				<view
+					class="sd-summary-item"
+					v-for="(item, index) in summaryItems"
+					:key="index"
+					:class="{ 'sd-summary-item--divider': index > 0 }"
+				>
+					<text class="sd-summary-value">{{ item.value }}</text>
+					<text class="sd-summary-label">{{ item.label }}</text>
+				</view>
+			</view>
+
+			<view class="sd-section-head">
+				<text class="sd-section-title">组员列表</text>
+			</view>
+
+			<scroll-view
+				class="sd-scroll"
+				scroll-y="true"
+				:show-scrollbar="false"
+				:lower-threshold="120"
+				@scrolltolower="onScrollToLower"
+			>
+				<view class="sd-scroll-inner">
+					<view v-if="loading && memberList.length == 0" class="sd-state">
+						<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+						<text class="sd-state-text">加载中...</text>
+					</view>
+					<view v-else-if="memberList.length == 0" class="sd-state">
+						<text class="sd-state-text">暂无组员</text>
+					</view>
+					<view v-else class="sd-list">
+						<view
+							class="sd-card"
+							v-for="(item, index) in memberList"
+							:key="getRowKey(item, index)"
+							@tap="onMemberTap(item)"
+						>
+							<view class="sd-card-main">
+								<view class="sd-avatar">
+									<image
+										v-if="item.avatar != ''"
+										class="sd-avatar-img"
+										:src="item.avatar"
+										mode="aspectFill"
+									></image>
+									<text v-else class="sd-avatar-text">{{ item.avatarText }}</text>
+								</view>
+								<view class="sd-card-copy">
+									<text class="sd-name">{{ item.nickname }}</text>
+									<text class="sd-meta">累计做单量：{{ item.orderCount }}</text>
+									<text class="sd-meta">累计个人收益：{{ item.revenue }}</text>
+								</view>
+							</view>
+							<view v-if="item.canViewDetail" class="sd-card-action">
+								<text class="sd-card-action-text">详情</text>
+								<cl-icon name="arrow-right-s-line" :size="16" color="#999999"></cl-icon>
+							</view>
+						</view>
+					</view>
+					<view v-if="memberList.length > 0" class="sd-loadmore">
+						<cl-loadmore
+							:loading="loadingMore"
+							:finish="!hasMore"
+							finish-text="没有更多了"
+							loading-text="加载中..."
+						></cl-loadmore>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { ref } from "vue";
+	import { getStaffList } from "@/.cool/api/staff";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { StaffListData, StaffListItem } from "@/.cool";
+
+	type SummaryItem = {
+		label: string;
+		value: string;
+	};
+
+	type MemberRow = {
+		id: number;
+		userId: number;
+		nickname: string;
+		avatar: string;
+		avatarText: string;
+		orderCount: string;
+		revenue: string;
+		canViewDetail: boolean;
+	};
+
+	const summaryItems = ref<SummaryItem[]>([
+		{ label: "组员总数", value: "0" },
+		{ label: "本月团队完成量", value: "0" },
+		{ label: "累计团队贡献收益", value: "0.00" }
+	]);
+	const memberList = ref<MemberRow[]>([]);
+	const page = ref(1);
+	const limit = 20;
+	const hasMore = ref(true);
+	const loading = ref(false);
+	const loadingMore = ref(false);
+	const fetchSeq = ref(0);
+
+	function pickText(...vals: Array<string | number | null | undefined>): string {
+		for (let i = 0; i < vals.length; i++) {
+			const raw = vals[i];
+			if (raw == null) {
+				continue;
+			}
+			const text = `${raw}`.trim();
+			if (text != "" && text != "null" && text != "undefined") {
+				return text;
+			}
+		}
+		return "";
+	}
+
+	function formatCount(raw: string | number | null | undefined): string {
+		const text = pickText(raw);
+		return text != "" ? text : "0";
+	}
+
+	function formatMoney(raw: string | number | null | undefined): string {
+		const text = pickText(raw).replace(/^¥/, "");
+		return text != "" ? text : "0.00";
+	}
+
+	function getAvatarText(name: string): string {
+		const text = name.trim();
+		return text != "" ? text.substring(0, 1) : "组";
+	}
+
+	function getRowKey(item: MemberRow, index: number): string {
+		if (item.id > 0) {
+			return `${item.id}`;
+		}
+		if (item.userId > 0) {
+			return `u-${item.userId}`;
+		}
+		return `${index}`;
+	}
+
+	function canViewMemberDetail(item: StaffListItem): boolean {
+		const detail = item.can_view_detail;
+		if (detail != null) {
+			return detail == 1 || `${detail}` == "1";
+		}
+		const manage = item.can_manage;
+		if (manage != null) {
+			return manage == 1 || `${manage}` == "1";
+		}
+		return true;
+	}
+
+	function mapMember(item: StaffListItem): MemberRow {
+		const stats = (item.stats ?? {}) as UTSJSONObject;
+		const nickname = pickText(item.nickname, item.mobile, "未命名");
+		const id = item.id != null ? parseInt(`${item.id}`) : 0;
+		const userId = item.user_id != null ? parseInt(`${item.user_id}`) : 0;
+		return {
+			id: isNaN(id) ? 0 : id,
+			userId: isNaN(userId) ? 0 : userId,
+			nickname: nickname,
+			avatar: pickText(item.avatar),
+			avatarText: getAvatarText(nickname),
+			orderCount: formatCount(
+				stats["order_count"] ??
+					stats["complete_count"] ??
+					stats["total_backfill_count"] ??
+					item["order_count"] ??
+					item["complete_count"]
+			),
+			revenue: formatMoney(
+				stats["personal_revenue"] ??
+					stats["total_revenue"] ??
+					stats["staff_revenue"] ??
+					item["personal_revenue"] ??
+					item["total_revenue"]
+			),
+			canViewDetail: canViewMemberDetail(item)
+		};
+	}
+
+	function applySummary(data: StaffListData, listLen: number) {
+		const card = (data.revenue_card ?? {}) as UTSJSONObject;
+		const summary = (data.summary ?? {}) as UTSJSONObject;
+		const memberCount = formatCount(
+			data.member_count ??
+				data.staff_count ??
+				data.count ??
+				card["staff_count"] ??
+				card["staff_normal"] ??
+				listLen
+		);
+		const monthComplete = formatCount(
+			data.month_complete_count ??
+				data.month_team_complete ??
+				summary["month_complete_count"] ??
+				summary["month_team_complete"] ??
+				summary["total_backfill_count_today"] ??
+				card["keyword_count"]
+		);
+		const teamRevenue = formatMoney(
+			data.team_contribution_revenue ??
+				data.team_revenue ??
+				summary["team_contribution_revenue"] ??
+				summary["team_revenue"] ??
+				summary["enterprise_revenue"] ??
+				card["revenue"]
+		);
+		summaryItems.value = [
+			{ label: "组员总数", value: memberCount },
+			{ label: "本月团队完成量", value: monthComplete },
+			{ label: "累计团队贡献收益", value: teamRevenue }
+		];
+	}
+
+	function extractList(data: StaffListData): StaffListItem[] {
+		const list = data.list;
+		if (list != null) {
+			return list;
+		}
+		return [];
+	}
+
+	function fetchList(reset: boolean) {
+		if (reset) {
+			fetchSeq.value += 1;
+			const seq = fetchSeq.value;
+			memberList.value = [];
+			loading.value = true;
+			page.value = 1;
+			hasMore.value = true;
+			getStaffList({ page: 1, limit: limit, status: 1 })
+				.then((res) => {
+					if (seq != fetchSeq.value) {
+						return;
+					}
+					handleListResponse(res, true, 1);
+				})
+				.catch((err) => {
+					uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+				})
+				.finally(() => {
+					if (seq == fetchSeq.value) {
+						loading.value = false;
+					}
+				});
+			return;
+		}
+		if (loadingMore.value || !hasMore.value || loading.value) {
+			return;
+		}
+		loadingMore.value = true;
+		const reqPage = page.value;
+		getStaffList({ page: reqPage, limit: limit, status: 1 })
+			.then((res) => {
+				handleListResponse(res, false, reqPage);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				loadingMore.value = false;
+			});
+	}
+
+	function handleListResponse(res: any | null, reset: boolean, reqPage: number) {
+		if (res == null) {
+			return;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			return;
+		}
+		const data = (envelope["data"] ?? envelope) as StaffListData;
+		const rows = extractList(data).map((item) => mapMember(item));
+		if (reset) {
+			memberList.value = rows;
+			applySummary(data, rows.length);
+		} else {
+			memberList.value = memberList.value.concat(rows);
+		}
+		const totalRaw = data.count ?? data.member_count ?? data.staff_count;
+		let total = memberList.value.length;
+		if (totalRaw != null) {
+			const n = parseInt(`${totalRaw}`);
+			if (!isNaN(n)) {
+				total = n;
+			}
+		}
+		hasMore.value = memberList.value.length < total && rows.length >= limit;
+		if (hasMore.value) {
+			page.value = reqPage + 1;
+		}
+	}
+
+	function onScrollToLower() {
+		fetchList(false);
+	}
+
+	function onMemberTap(item: MemberRow) {
+		if (!item.canViewDetail) {
+			return;
+		}
+		const query: UTSJSONObject = {
+			id: item.id,
+			user_id: item.userId,
+			nickname: item.nickname
+		};
+		router.push({
+			path: "/pages/tabbar/studio/member-detail",
+			query: query
+		});
+	}
+
+	onLoad(() => {
+		uni.setNavigationBarTitle({ title: "数据" });
+	});
+
+	onShow(() => {
+		fetchList(true);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.sd-page {
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		box-sizing: border-box;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		padding: 24rpx 30rpx 0;
+
+		.sd-summary {
+			flex-shrink: 0;
+			display: flex;
+			flex-direction: row;
+			align-items: stretch;
+			padding: 28rpx 12rpx;
+			border-radius: 24rpx;
+			background-color: #ffffff;
+			margin-bottom: 28rpx;
+
+			.sd-summary-item {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				padding: 0 8rpx;
+			}
+
+			.sd-summary-item--divider {
+				border-left-width: 1rpx;
+				border-left-style: solid;
+				border-left-color: #f0f0f0;
+			}
+
+			.sd-summary-value {
+				font-size: 32rpx;
+				font-weight: 700;
+				color: #1a1a1a;
+				line-height: 44rpx;
+				text-align: center;
+			}
+
+			.sd-summary-label {
+				margin-top: 8rpx;
+				font-size: 22rpx;
+				color: #999999;
+				line-height: 32rpx;
+				text-align: center;
+			}
+		}
+
+		.sd-section-head {
+			flex-shrink: 0;
+			margin-bottom: 16rpx;
+			padding-left: 8rpx;
+
+			.sd-section-title {
+				font-size: 28rpx;
+				font-weight: 600;
+				color: #333333;
+				line-height: 40rpx;
+			}
+		}
+
+		.sd-scroll {
+			flex: 1;
+			height: 0;
+		}
+
+		.sd-scroll-inner {
+			padding-bottom: 24rpx;
+		}
+
+		.sd-state {
+			padding: 120rpx 0;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+
+			.sd-state-text {
+				margin-top: 16rpx;
+				font-size: 26rpx;
+				color: #999999;
+				line-height: 36rpx;
+			}
+		}
+
+		.sd-list {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.sd-card {
+			margin-bottom: 16rpx;
+			padding: 24rpx;
+			border-radius: 24rpx;
+			background-color: #ffffff;
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+			box-sizing: border-box;
+
+			.sd-card-main {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+			}
+
+			.sd-avatar {
+				width: 88rpx;
+				height: 88rpx;
+				border-radius: 50%;
+				background-color: #2b59c3;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin-right: 20rpx;
+				flex-shrink: 0;
+				overflow: hidden;
+			}
+
+			.sd-avatar-img {
+				width: 88rpx;
+				height: 88rpx;
+				border-radius: 50%;
+			}
+
+			.sd-avatar-text {
+				font-size: 32rpx;
+				color: #ffffff;
+				font-weight: 700;
+			}
+
+			.sd-card-copy {
+				flex: 1;
+				min-width: 0;
+				display: flex;
+				flex-direction: column;
+			}
+
+			.sd-name {
+				font-size: 30rpx;
+				font-weight: 600;
+				color: #1a1a1a;
+				line-height: 42rpx;
+			}
+
+			.sd-meta {
+				margin-top: 4rpx;
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+			}
+
+			.sd-card-action {
+				flex-shrink: 0;
+				margin-left: 12rpx;
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+			}
+
+			.sd-card-action-text {
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+				margin-right: 2rpx;
+			}
+		}
+
+		.sd-loadmore {
+			padding: 8rpx 0 16rpx;
+		}
+	}
+</style>

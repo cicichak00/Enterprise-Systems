@@ -1,0 +1,877 @@
+<template>
+	<cl-page :pt="{ className: 'bf-page' }">
+		<view class="bf-wrap">
+			<view v-if="pageStep == 1" class="bf-step1">
+				<textarea
+					class="bf-textarea"
+					v-model="videoUrl"
+					auto-height
+					maxlength="-1"
+					placeholder="请粘贴作品链接，系统将自动识别处理"
+					placeholder-class="bf-textarea-placeholder"
+				></textarea>
+			</view>
+
+			<view v-if="pageStep == 2" class="bf-step2">
+				<view v-if="videoUrl != ''" class="bf-url-box">
+					<scroll-view class="bf-url-scroll" scroll-y="true" :show-scrollbar="false">
+						<text class="bf-url-content">{{ videoUrl }}</text>
+					</scroll-view>
+					<text class="bf-copy-link" @tap="copyFailedLinks">点击复制失败链接</text>
+				</view>
+
+				<view class="bf-stats-card">
+					<view
+						class="bf-stat-col"
+						:class="{ 'bf-stat-col--active': activeMenu == 'all' }"
+						@tap="changeListData(allList, 'all')"
+					>
+						<text class="bf-stat-num">{{ submitStats.total }}</text>
+						<text class="bf-stat-label">本次识别</text>
+					</view>
+					<view
+						class="bf-stat-col"
+						:class="{ 'bf-stat-col--active': activeMenu == 'success' }"
+						@tap="changeListData(successList, 'success')"
+					>
+						<text class="bf-stat-num">{{ submitStats.success }}</text>
+						<text class="bf-stat-label">识别成功</text>
+					</view>
+					<view
+						class="bf-stat-col"
+						:class="{ 'bf-stat-col--active': activeMenu == 'error' }"
+						@tap="changeListData(errorList, 'error')"
+					>
+						<text class="bf-stat-num">{{ submitStats.fail }}</text>
+						<text class="bf-stat-label">识别失败</text>
+					</view>
+				</view>
+
+				<view v-if="listData.length == 0" class="bf-empty">
+					<cl-icon name="stack-line" :size="72" color="#eeeeee"></cl-icon>
+					<text class="bf-empty-text">暂无数据</text>
+				</view>
+
+				<view
+					v-for="(item, index) in listData"
+					:key="index"
+					class="bf-detail-card"
+				>
+					<view class="bf-detail-line">
+						<text class="bf-detail-key">链接:</text>
+						<text class="bf-detail-val">{{ item.video_url ?? "" }}</text>
+					</view>
+					<view v-if="hasText(item.tk_uid)" class="bf-detail-line">
+						<text class="bf-detail-key">tiktok ID:</text>
+						<text class="bf-detail-val">{{ item.tk_uid }}</text>
+					</view>
+					<view v-if="hasText(item.keyword)" class="bf-detail-line">
+						<text class="bf-detail-key">{{ item.keyword_name ?? "关键词" }}:</text>
+						<text class="bf-detail-val">{{ item.keyword }}</text>
+					</view>
+					<view class="bf-detail-line">
+						<text class="bf-detail-key">识别结果:</text>
+						<text
+							class="bf-detail-val"
+							:class="{
+								'bf-detail-val--success': item.result == '成功',
+								'bf-detail-val--fail': item.result == '失败'
+							}"
+						>{{ item.status ?? "" }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view class="bf-footer">
+				<!-- #ifdef H5 -->
+				<view
+					v-if="pageStep == 1 && showScanBtn"
+					class="bf-footer-btn bf-footer-btn--ghost"
+					@tap="startScan"
+				>
+					<text class="bf-footer-btn-text bf-footer-btn-text--ghost">扫一扫</text>
+				</view>
+				<!-- #endif -->
+				<view
+					v-if="pageStep == 1"
+					class="bf-footer-btn bf-footer-btn--primary"
+					:class="{ 'bf-footer-btn--flex': true }"
+					@tap="onSubmit(1)"
+				>
+					<text class="bf-footer-btn-text">智能识别</text>
+				</view>
+				<view
+					v-if="pageStep == 2"
+					class="bf-footer-btn bf-footer-btn--primary bf-footer-btn--flex"
+					@tap="onSubmit(2)"
+				>
+					<text class="bf-footer-btn-text">提交</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+
+		<!-- #ifdef H5 -->
+		<view
+			v-if="showScanner"
+			class="bf-scanner-mask"
+			@tap.stop="closeScanner"
+		>
+			<view class="bf-scanner-panel" @tap.stop>
+				<view class="bf-scanner-header">
+					<text class="bf-scanner-title">对准二维码扫描</text>
+					<view class="bf-scanner-close" @tap.stop="closeScanner">
+						<text class="bf-scanner-close-text">×</text>
+					</view>
+				</view>
+				<view class="bf-scanner-body">
+					<view ref="videoContainer" class="bf-scanner-video-wrap"></view>
+					<view class="bf-scanner-frame">
+						<view class="bf-scanner-corner bf-scanner-corner--tl"></view>
+						<view class="bf-scanner-corner bf-scanner-corner--tr"></view>
+						<view class="bf-scanner-corner bf-scanner-corner--bl"></view>
+						<view class="bf-scanner-corner bf-scanner-corner--br"></view>
+					</view>
+				</view>
+				<text class="bf-scanner-hint">圆点码请填满扫描框、保持手机稳定、光线充足</text>
+			</view>
+		</view>
+		<!-- #endif -->
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { nextTick, ref } from "vue";
+	import { postKeywordIsFill, postKeywordPublishList } from "@/.cool/api/keyword";
+	import { submitPublish } from "@/.cool/api/task";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type {
+		KeywordFillFormItem,
+		KeywordFillResultItem,
+		KeywordIsFillResult,
+		KeywordPublishListItem,
+		PublishSubmitParams,
+		Response
+	} from "@/.cool";
+	// #ifdef H5
+	import {
+		createQrReader,
+		isH5CameraSupported,
+		mountNativeVideo,
+		startVideoScan,
+		stopVideoScan
+	} from "@/.cool/utils/qr-decode-h5.js";
+	// #endif
+
+	const videoContainer = ref<any>(null);
+
+	type FillMenuKey = "all" | "success" | "error";
+
+	type SubmitStats = {
+		total: number;
+		success: number;
+		fail: number;
+	};
+
+	const pageStep = ref(1);
+	const projectId = ref(0);
+	const videoUrl = ref("");
+	const submitting = ref(false);
+	const activeMenu = ref<FillMenuKey>("all");
+	const submitStats = ref<SubmitStats>({
+		total: 0,
+		success: 0,
+		fail: 0
+	});
+	const allList = ref<KeywordFillResultItem[]>([]);
+	const successList = ref<KeywordFillResultItem[]>([]);
+	const errorList = ref<KeywordFillResultItem[]>([]);
+	const form_list = ref<KeywordFillFormItem[]>([]);
+	const listData = ref<KeywordFillResultItem[]>([]);
+	const showScanBtn = ref(true);
+	// #ifdef H5
+	const showScanner = ref(false);
+	let qrReader: any | null = null;
+	let videoEl: any | null = null;
+	const scanning = ref(false);
+	// #endif
+
+	function getVideoContainer(): any | null {
+		return videoContainer.value;
+	}
+
+	function hasText(val: string | number | null | undefined): boolean {
+		return `${val ?? ""}`.trim() != "";
+	}
+
+	function parseProjectId(query: UTSJSONObject): number {
+		const projectVal = (query["project_id"] ?? query["id"]) as string | number | null;
+		if (projectVal == null) {
+			return 0;
+		}
+		const n = parseInt(`${projectVal}`);
+		return isNaN(n) ? 0 : n;
+	}
+
+	function mergeErrorUrl(errorUrl: string | null | undefined): string {
+		if (errorUrl == null || `${errorUrl}`.trim() == "") {
+			return "";
+		}
+		const arr = `${errorUrl}`.split(",");
+		let merged = "";
+		for (let i = 0; i < arr.length; i++) {
+			merged = merged + arr[i];
+		}
+		return merged;
+	}
+
+	function applyFillResult(data: KeywordIsFillResult) {
+		submitStats.value = {
+			total: data.all_num ?? 0,
+			success: data.success_num ?? 0,
+			fail: data.error_num ?? 0
+		};
+		allList.value = data.all_list ?? [];
+		successList.value = data.success_list ?? [];
+		errorList.value = data.error_list ?? [];
+        form_list.value = data.form_list ?? []
+		listData.value = allList.value;
+		activeMenu.value = "all";
+		videoUrl.value = mergeErrorUrl(data.error_url);
+		pageStep.value = 2;
+	}
+
+	function changeListData(arr: KeywordFillResultItem[], type: FillMenuKey) {
+		listData.value = arr;
+		activeMenu.value = type;
+	}
+
+	function copyFailedLinks() {
+		const value = videoUrl.value;
+		if (value.trim() == "") {
+			uni.showToast({ title: "暂无失败链接", icon: "none" });
+			return;
+		}
+		uni.setClipboardData({
+			data: value,
+			success: () => {
+				uni.showToast({ title: "复制成功", icon: "none" });
+			},
+			fail: () => {
+				uni.showToast({ title: "复制失败", icon: "none" });
+			}
+		});
+	}
+
+	function startScan() {
+		// #ifdef H5
+		if (scanning.value) {
+			return;
+		}
+		if (!isH5CameraSupported()) {
+			uni.showModal({
+				title: "提示",
+				content: "当前环境不支持相机，请使用「从相册识别」或在外部浏览器(HTTPS)中打开",
+				showCancel: false
+			});
+			return;
+		}
+		showScanner.value = true;
+		scanning.value = true;
+		nextTick(() => {
+			setTimeout(() => {
+				initCameraScan();
+			}, 400);
+		});
+		// #endif
+	}
+
+	// #ifdef H5
+	function initCameraScan() {
+		const container = getVideoContainer();
+		const mountedVideo = mountNativeVideo(container);
+		if (mountedVideo == null) {
+			scanning.value = false;
+			showScanner.value = false;
+			uni.showToast({ title: "相机初始化失败", icon: "none" });
+			return;
+		}
+		videoEl = mountedVideo;
+		qrReader = createQrReader();
+		startVideoScan(qrReader, videoEl, (text: string) => {
+			onDecodeSuccess(text);
+		}).catch((err: any) => {
+			scanning.value = false;
+			showScanner.value = false;
+			forceStopCamera();
+			const msg = err != null && err.message != null ? `${err.message}` : "无法打开相机";
+			uni.showModal({
+				title: "相机不可用",
+				content: `${msg}，可尝试「从相册识别」`,
+				showCancel: false
+			});
+		});
+	}
+
+	function forceStopCamera() {
+		const currentVideo = videoEl;
+		if (currentVideo != null) {
+			try {
+				currentVideo.pause();
+			} catch (e) {}
+			try {
+				currentVideo.removeAttribute("src");
+			} catch (e) {}
+			try {
+				currentVideo.load();
+			} catch (e) {}
+		}
+		try {
+			stopVideoScan(qrReader, currentVideo);
+		} catch (e) {
+			console.error("stopVideoScan error:", e);
+		}
+		qrReader = null;
+		videoEl = null;
+	}
+
+	function closeScanner() {
+		showScanner.value = false;
+		scanning.value = false;
+		try {
+			forceStopCamera();
+		} catch (e) {
+			console.error("forceStopCamera error:", e);
+		}
+		try {
+			const container = getVideoContainer();
+			if (container != null) {
+				const el = (container as UTSJSONObject)["$el"] ?? container;
+				if (el != null && typeof (el as any).innerHTML == "string") {
+					(el as any).innerHTML = "";
+				}
+			}
+		} catch (e) {
+			console.error("cleanup videoContainer error:", e);
+		}
+	}
+
+	function onDecodeSuccess(text: string) {
+		const value = `${text}`.trim();
+		if (value == "") {
+			return;
+		}
+		if (videoUrl.value.trim() != "") {
+			videoUrl.value = `${videoUrl.value}\n${value}`;
+		} else {
+			videoUrl.value = value;
+		}
+		uni.showToast({ title: "识别成功", icon: "none" });
+		closeScanner();
+	}
+	// #endif
+
+	function isFill() {
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		if (submitting.value) {
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "识别中...", mask: true });
+		postKeywordIsFill(projectId.value, videoUrl.value)
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "识别失败"), icon: "none" });
+					return;
+				}
+				const data = ((envelope?.data ?? envelope) ?? {}) as KeywordIsFillResult;
+				applyFillResult(data);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "识别失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function toPublishParams(item: KeywordFillFormItem): PublishSubmitParams {
+		return {
+			project_id: item.project_id ?? projectId.value,
+			keyword_id: item.keyword_id ?? 0,
+			form_info: item.form_info ?? []
+		};
+	}
+
+	function finishSubmitSuccess(message: string) {
+		uni.showToast({ title: message, icon: "none", mask: true });
+		setTimeout(() => {
+			uni.navigateBack();
+		}, 1500);
+	}
+
+	function handleSubmitResponse(res: any, fallbackMsg: string): boolean {
+		const envelope = res as Response | null;
+		if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+			uni.showToast({ title: getApiMessage(envelope, fallbackMsg), icon: "none" });
+			return false;
+		}
+		return true;
+	}
+
+	function submitDynamicFormList() {
+		const tasks: Promise<any>[] = [];
+		for (let i = 0; i < form_list.value.length; i++) {
+			tasks.push(submitPublish(toPublishParams(form_list.value[i])));
+		}
+		Promise.all(tasks)
+			.then((results) => {
+				for (let i = 0; i < results.length; i++) {
+					if (!handleSubmitResponse(results[i], "提交失败")) {
+						return;
+					}
+				}
+				finishSubmitSuccess("提交成功");
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function submitLegacyPublishList() {
+		const payload: KeywordPublishListItem[] = [];
+		for (let i = 0; i < successList.value.length; i++) {
+			const item = successList.value[i];
+			payload.push({
+				keyword: item.keyword,
+				keyword_id: item.keyword_id,
+				video_url: item.video_url
+			});
+		}
+		postKeywordPublishList({
+			project_id: projectId.value,
+			data: payload
+		})
+			.then((res) => {
+				if (!handleSubmitResponse(res, "提交失败")) {
+					return;
+				}
+				finishSubmitSuccess(getApiMessage(res, "提交成功"));
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function addWorks() {
+		if (pageStep.value == 1) {
+			uni.showToast({ title: "请先进行智能识别", icon: "none" });
+			return;
+		}
+		if (form_list.value.length == 0 && successList.value.length == 0) {
+			uni.showToast({ title: "暂无识别成功的数据", icon: "none" });
+			return;
+		}
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		if (submitting.value) {
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中...", mask: true });
+		if (form_list.value.length > 0) {
+			submitDynamicFormList();
+			return;
+		}
+		submitLegacyPublishList();
+	}
+
+	function onSubmit(type: number) {
+		if (type == 2) {
+			addWorks();
+			return;
+		}
+		if (videoUrl.value.trim() == "") {
+			uni.showToast({ title: "请输入作品链接", icon: "none" });
+			return;
+		}
+		isFill();
+	}
+
+	onLoad((query: UTSJSONObject) => {
+		projectId.value = parseProjectId(query);
+		const title = query["title"] as string | null;
+		const navTitle = title != null && title.trim() != "" ? title : "批量回填";
+		uni.setNavigationBarTitle({ title: navTitle });
+	});
+
+	onUnload(() => {
+		// #ifdef H5
+		closeScanner();
+		// #endif
+	});
+</script>
+
+<style lang="scss" scoped>
+	.bf-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+	}
+
+	.bf-wrap {
+		min-height: 100vh;
+		padding: 30rpx;
+		padding-bottom: 180rpx;
+		box-sizing: border-box;
+	}
+
+	.bf-step1 {
+		min-height: 80vh;
+	}
+
+	.bf-textarea {
+		width: 100%;
+		min-height: 80vh;
+		padding: 24rpx;
+		box-sizing: border-box;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 1.6;
+	}
+
+	.bf-textarea-placeholder {
+		color: #999999;
+		font-size: 28rpx;
+	}
+
+	.bf-url-box {
+		position: relative;
+		padding: 20rpx 0 50rpx;
+		margin-bottom: 24rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		box-sizing: border-box;
+	}
+
+	.bf-url-scroll {
+		height: 600rpx;
+		padding: 0 20rpx;
+		box-sizing: border-box;
+	}
+
+	.bf-url-content {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 1.5;
+		word-break: break-all;
+	}
+
+	.bf-copy-link {
+		position: absolute;
+		right: 20rpx;
+		bottom: 15rpx;
+		font-size: 24rpx;
+		color: #0651f8;
+	}
+
+	.bf-stats-card {
+		display: flex;
+		flex-direction: row;
+		justify-content: space-around;
+		margin-bottom: 24rpx;
+		padding: 10rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		box-sizing: border-box;
+	}
+
+	.bf-stat-col {
+		flex: 1;
+		padding: 32rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+
+		&--active {
+			background-color: #f2f2f2;
+			border-radius: 16rpx;
+		}
+	}
+
+	.bf-stat-num {
+		font-size: 48rpx;
+		font-weight: bold;
+		color: #333333;
+		line-height: 1.2;
+	}
+
+	.bf-stat-label {
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		color: #333333;
+	}
+
+	.bf-empty {
+		padding: 100rpx 0 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.bf-empty-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+	}
+
+	.bf-detail-card {
+		margin-bottom: 24rpx;
+		padding: 28rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		box-sizing: border-box;
+	}
+
+	.bf-detail-line {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		margin-bottom: 16rpx;
+		font-size: 26rpx;
+		line-height: 1.45;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.bf-detail-key {
+		flex-shrink: 0;
+		margin-right: 8rpx;
+		color: #333333;
+	}
+
+	.bf-detail-val {
+		flex: 1;
+		color: #333333;
+		word-break: break-all;
+
+		&--success {
+			color: #19be6b;
+		}
+
+		&--fail {
+			color: #fa3534;
+		}
+	}
+
+	.bf-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 9;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 15rpx 30rpx;
+		background-color: #ffffff;
+		box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2);
+		box-sizing: border-box;
+	}
+
+	.bf-footer-btn {
+		height: 88rpx;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+
+		&--ghost {
+			width: 220rpx;
+			margin-right: 20rpx;
+			background-color: #ffffff;
+			border-width: 1rpx;
+			border-style: solid;
+			border-color: #0651f8;
+		}
+
+		&--primary {
+			background-color: #0651f8;
+		}
+
+		&--flex {
+			flex: 1;
+		}
+	}
+
+	.bf-footer-btn-text {
+		font-size: 32rpx;
+		color: #ffffff;
+
+		&--ghost {
+			color: #0651f8;
+		}
+	}
+</style>
+
+<!-- #ifdef H5 -->
+<style lang="scss">
+	.bf-scanner-mask {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 99999;
+		background-color: #000000;
+		overflow: hidden;
+	}
+
+	.bf-scanner-panel {
+		width: 100%;
+		height: 100%;
+		position: relative;
+		background-color: #000000;
+		overflow: hidden;
+	}
+
+	.bf-scanner-header {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 10;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		padding: calc(env(safe-area-inset-top) + 24rpx) 30rpx 24rpx;
+		background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+	}
+
+	.bf-scanner-title {
+		color: #ffffff;
+		font-size: 30rpx;
+	}
+
+	.bf-scanner-close {
+		width: 80rpx;
+		height: 80rpx;
+		background-color: rgba(255, 255, 255, 0.12);
+		border-radius: 999rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.bf-scanner-close-text {
+		color: #ffffff;
+		font-size: 48rpx;
+		line-height: 1;
+	}
+
+	.bf-scanner-body {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		background-color: #000000;
+		overflow: hidden;
+	}
+
+	.bf-scanner-video-wrap {
+		width: 100%;
+		height: 100%;
+		position: absolute;
+		top: 0;
+		left: 0;
+	}
+
+	.bf-scanner-video-wrap .scanner-video-native {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.bf-scanner-frame {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 58vw;
+		height: 58vw;
+		max-width: 520rpx;
+		max-height: 520rpx;
+		transform: translate(-50%, -50%);
+		pointer-events: none;
+		z-index: 2;
+	}
+
+	.bf-scanner-corner {
+		position: absolute;
+		width: 40rpx;
+		height: 40rpx;
+		border-color: #0651f8;
+		border-style: solid;
+
+		&--tl {
+			top: 0;
+			left: 0;
+			border-width: 6rpx 0 0 6rpx;
+		}
+
+		&--tr {
+			top: 0;
+			right: 0;
+			border-width: 6rpx 6rpx 0 0;
+		}
+
+		&--bl {
+			bottom: 0;
+			left: 0;
+			border-width: 0 0 6rpx 6rpx;
+		}
+
+		&--br {
+			bottom: 0;
+			right: 0;
+			border-width: 0 6rpx 6rpx 0;
+		}
+	}
+
+	.bf-scanner-hint {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: calc(env(safe-area-inset-bottom) + 36rpx);
+		z-index: 10;
+		padding: 0 30rpx;
+		text-align: center;
+		color: rgba(255, 255, 255, 0.82);
+		font-size: 24rpx;
+		line-height: 1.5;
+	}
+</style>
+<!-- #endif -->

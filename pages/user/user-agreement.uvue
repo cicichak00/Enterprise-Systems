@@ -1,0 +1,278 @@
+<template>
+	<cl-page :pt="{ className: 'ua-page' }">
+		<view class="ua-page">
+			<view class="ua-body">
+					<text class="ua-main-title">用户服务协议</text>
+
+					<view class="ua-meta-row">
+						<view class="ua-version-tag">
+							<text class="ua-version-tag-text">v4.1</text>
+						</view>
+						<text class="ua-meta-text">生效 2025/12/10</text>
+						<view class="ua-signed-tag">
+							<text class="ua-signed-tag-text">你已签署 · 2024/08/12</text>
+						</view>
+					</view>
+
+					<view class="ua-changes-box">
+						<text class="ua-changes-title">本版本相比上一版本的变化</text>
+						<view
+							class="ua-changes-item"
+							v-for="(item, index) in changeItems"
+							:key="index"
+						>
+							<text class="ua-changes-dot">·</text>
+							<text class="ua-changes-text">{{ item }}</text>
+						</view>
+					</view>
+
+					<view
+						class="ua-section"
+						v-for="(section, index) in sections"
+						:key="index"
+					>
+						<text class="ua-section-title">{{ section.title }}</text>
+						<view class="ua-section-body">
+							<text class="ua-section-content">{{ section.content }}</text>
+							<text
+								v-if="section.linkText != null && section.linkText != ''"
+								class="ua-section-link"
+								@tap="onSectionLinkTap(section.linkText)"
+							>{{ section.linkText }}</text>
+						</view>
+					</view>
+
+					<view class="ua-footer-note">
+						<text class="ua-footer-text">以上条款的最终解释权归企业号所有 · 如有疑问联系 </text>
+						<text class="ua-footer-email" @tap="onCopyEmail">legal@youbao.com</text>
+					</view>
+
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { router } from "@/.cool";
+
+	type AgreementSection = {
+		title: string;
+		content: string;
+		linkText: string | null;
+	};
+
+	const changeItems = [
+		"新增「终身绑定」说明条款，明确不会因身份切换而稀释",
+		"更新违规处罚梯度与对应信用分扣减规则",
+		"删除了已失效的「老用户特权」章节"
+	];
+
+	const sections: AgreementSection[] = [
+		{
+			title: "一、账号规则",
+			content: "一人只能注册一个企业号账号。如需多账号运营变现，可在「我的 → 账号管理」中绑定多个推文号，但主体实名信息须一致。",
+			linkText: null
+		},
+		{
+			title: "二、禁止行为",
+			content: "禁止使用脚本、群控设备、虚假订单骗取平台补贴，或向第三方平台导流。一经发现，平台有权立即冻结账号并追回违规所得。",
+			linkText: null
+		},
+		{
+			title: "三、处罚",
+			content: "违规处罚梯度：警告 → 信用分扣减 → 功能限制 → 账号封禁。具体细则见 ",
+			linkText: "《风控处罚规则》"
+		},
+		{
+			title: "四、争议解决",
+			content: "因使用本平台产生的争议，优先通过客服协商解决；协商不成的，提交杭州互联网法院管辖。",
+			linkText: null
+		}
+	];
+
+	function onSectionLinkTap(linkText: string | null) {
+		if (linkText == null || linkText == "") {
+			return;
+		}
+		onLinkTap(linkText);
+	}
+
+	function onLinkTap(text: string) {
+		if (text == "《风控处罚规则》") {
+			router.push({ path: "/pages/user/risk-penalty" });
+			return;
+		}
+		uni.showToast({ title: text, icon: "none" });
+	}
+
+	function onCopyEmail() {
+		uni.setClipboardData({
+			data: "legal@youbao.com",
+			success: () => {
+				uni.showToast({ title: "邮箱已复制", icon: "none" });
+			}
+		});
+	}
+</script>
+
+<style lang="scss" scoped>
+	.ua-page {
+		min-height: 100vh;
+		background-color: #f9f8f4;
+	}
+
+	.ua-body {
+		padding: 32rpx 30rpx 40rpx;
+		box-sizing: border-box;
+	}
+
+	.ua-main-title {
+		display: flex;
+		font-size: 44rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 60rpx;
+	}
+
+	.ua-meta-row {
+		margin-top: 20rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.ua-version-tag {
+		padding: 4rpx 14rpx;
+		border-radius: 8rpx;
+		background-color: #eeeeee;
+		margin-right: 12rpx;
+		margin-bottom: 8rpx;
+	}
+
+	.ua-version-tag-text {
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 32rpx;
+	}
+
+	.ua-meta-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+		margin-right: 12rpx;
+		margin-bottom: 8rpx;
+	}
+
+	.ua-signed-tag {
+		padding: 4rpx 14rpx;
+		border-radius: 8rpx;
+		background-color: #ecfdf5;
+		margin-bottom: 8rpx;
+	}
+
+	.ua-signed-tag-text {
+		font-size: 22rpx;
+		color: #16a34a;
+		line-height: 32rpx;
+	}
+
+	.ua-changes-box {
+		margin-top: 28rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #fff7e6;
+	}
+
+	.ua-changes-title {
+		display: flex;
+		font-size: 26rpx;
+		font-weight: 600;
+		color: #b8860b;
+		line-height: 38rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.ua-changes-item {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		margin-bottom: 12rpx;
+
+		&:last-child {
+			margin-bottom: 0;
+		}
+	}
+
+	.ua-changes-dot {
+		font-size: 26rpx;
+		color: #b8860b;
+		line-height: 40rpx;
+		margin-right: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.ua-changes-text {
+		flex: 1;
+		min-width: 0;
+		font-size: 26rpx;
+		color: #666666;
+		line-height: 40rpx;
+	}
+
+	.ua-section {
+		margin-top: 36rpx;
+	}
+
+	.ua-section-title {
+		display: flex;
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 42rpx;
+		margin-bottom: 16rpx;
+	}
+
+	.ua-section-body {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: flex-start;
+	}
+
+	.ua-section-content {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.ua-section-link {
+		font-size: 28rpx;
+		color: #2b59c3;
+		line-height: 44rpx;
+	}
+
+	.ua-footer-note {
+		margin-top: 48rpx;
+		padding: 28rpx 24rpx;
+		border-radius: 16rpx;
+		background-color: #f0f0f0;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.ua-footer-text {
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 38rpx;
+	}
+
+	.ua-footer-email {
+		font-size: 24rpx;
+		color: #2b59c3;
+		line-height: 38rpx;
+	}
+</style>

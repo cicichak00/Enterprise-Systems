@@ -1,0 +1,2033 @@
+<!-- 作品回填 pages/task/publish.uvue · 对齐 youbao_mini publish -->
+<template>
+	<cl-page :pt="{ className: 'tp-page' }" :back-top="false">
+		<view class="tp-page">
+			<view v-if="pageLoading" class="tp-loading">
+				<cl-loading :loading="true" :size="28" color="#0651f8"></cl-loading>
+				<text class="tp-loading-text">加载中...</text>
+			</view>
+
+			<view v-else class="tp-body">
+				<scroll-view class="tp-scroll" scroll-y="true" :show-scrollbar="false">
+					<view class="tp-inner">
+						<view class="tp-head">
+							<text class="tp-head-title">{{ headTitle }}</text>
+							<text class="tp-head-meta">创建时间 · {{ headCreateTime }}</text>
+							<text v-if="projectId == 90" class="tp-head-meta tp-head-meta--warn">* 商品ID · {{ headBookId }}</text>
+							<text v-if="projectId == 90" class="tp-head-meta tp-head-meta--warn">* 商品名称 · {{ headBookName }}</text>
+						</view>
+
+						<view
+							v-if="batchBackfillEnabled"
+							class="tp-batch-card"
+							@tap="openBatchPopup"
+						>
+							<view class="tp-batch-icon-wrap">
+								<image
+									class="tp-batch-icon"
+									src="/static/images/batch_backfill_icon.png"
+									mode="aspectFill"
+								></image>
+							</view>
+							<view class="tp-batch-main">
+								<text class="tp-batch-title">批量回填</text>
+								<text class="tp-batch-desc">通过表格快捷回填</text>
+							</view>
+						</view>
+
+						<view
+							class="tp-block"
+							v-for="(row, rowIndex) in formList"
+							:key="`work-${rowIndex}`"
+						>
+							<view class="tp-block-head">
+								<text class="tp-block-title">作品{{ formList.length - rowIndex }}</text>
+								<view class="tp-block-actions">
+									<view class="tp-block-action" @tap="delItem(rowIndex)">
+										<cl-icon name="delete-bin-line" :size="16" color="#141b36"></cl-icon>
+										<text class="tp-block-action-text">删除</text>
+									</view>
+									<view v-if="rowIndex == 0" class="tp-block-action" @tap="addItem">
+										<cl-icon name="add-circle-line" :size="16" color="#141b36"></cl-icon>
+										<text class="tp-block-action-text">新增</text>
+									</view>
+								</view>
+							</view>
+
+							<!-- 动态字段 -->
+							<view v-if="!useLegacyForm" class="tp-block-body">
+								<view
+									class="tp-field"
+									v-for="(field, fieldIndex) in fieldList"
+									:key="`dyn-${rowIndex}-${fieldIndex}`"
+								>
+									<view class="tp-label-row">
+										<text class="tp-label">{{ field.field_title }}</text>
+										<text v-if="field.is_require == 1" class="tp-required">*</text>
+									</view>
+
+									<view v-if="field.type == 1" class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].video_url"
+											:placeholder="field.placeholder"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+
+									<view
+										v-else-if="field.type == 2"
+										class="tp-picker"
+										@tap="openAccountPicker(rowIndex)"
+									>
+										<text
+											class="tp-picker-text"
+											:class="{ 'tp-picker-text--placeholder': formList[rowIndex].account_name == '' }"
+										>{{ formList[rowIndex].account_name != '' ? formList[rowIndex].account_name : '请选择' }}</text>
+										<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+									</view>
+
+									<picker
+										v-else-if="field.type == 3"
+										class="tp-picker-wrap"
+										mode="date"
+										:value="formList[rowIndex].publish_time"
+										@change="onDateChange($event, rowIndex)"
+									>
+										<view class="tp-picker">
+											<text
+												class="tp-picker-text"
+												:class="{ 'tp-picker-text--placeholder': formList[rowIndex].publish_time == '' }"
+											>{{ formList[rowIndex].publish_time != '' ? formList[rowIndex].publish_time : '请选择' }}</text>
+											<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+										</view>
+									</picker>
+
+									<view v-else-if="field.type == 4" class="tp-type-wrap">
+										<view class="tp-radio-grid">
+											<view
+												v-for="(opt, optIndex) in field.options"
+												:key="optIndex"
+												class="tp-radio-chip"
+												:class="{ 'tp-radio-chip--active': formList[rowIndex].publish_type == opt }"
+												@tap="changePublishType(opt, rowIndex, fieldIndex, optIndex)"
+											>
+												<text class="tp-radio-chip-text">{{ opt }}</text>
+											</view>
+										</view>
+										<view
+											v-for="(sub, subIndex) in field.optionList"
+											:key="`sub-${subIndex}`"
+										>
+											<view
+												v-if="sub.field_title == formList[rowIndex].publish_type"
+												class="tp-sub-field"
+											>
+												<view v-if="sub.field_type == 1" class="tp-input-wrap">
+													<input
+														class="tp-input"
+														v-model="formList[rowIndex].options"
+														type="number"
+														:placeholder="sub.placeholder"
+														placeholder-class="tp-placeholder"
+													/>
+												</view>
+												<view
+													v-else-if="sub.field_type == 5"
+													class="tp-picker"
+													@tap="openRelationSelect(fieldIndex, subIndex, rowIndex)"
+												>
+													<text
+														class="tp-picker-text"
+														:class="{ 'tp-picker-text--placeholder': formList[rowIndex].options == '' }"
+													>{{ formList[rowIndex].options != '' ? formList[rowIndex].options : '请选择' }}</text>
+													<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+												</view>
+												<view v-else class="tp-input-wrap">
+													<input
+														class="tp-input"
+														v-model="formList[rowIndex].options"
+														:placeholder="sub.placeholder"
+														placeholder-class="tp-placeholder"
+													/>
+												</view>
+											</view>
+										</view>
+									</view>
+
+									<view v-else-if="field.type == 5" class="tp-upload-row">
+										<view
+											class="tp-upload-item"
+											v-for="(img, imgIndex) in formFileList[rowIndex].media_imageList"
+											:key="`img-${imgIndex}`"
+										>
+											<image class="tp-upload-preview" :src="img.localPath" mode="aspectFill"></image>
+											<view class="tp-upload-remove" @tap.stop="removeMedia(rowIndex, 1, imgIndex)">
+												<cl-icon name="close-line" :size="12" color="#ffffff"></cl-icon>
+											</view>
+										</view>
+										<view
+											v-if="formFileList[rowIndex].media_imageList.length < field.max_len"
+											class="tp-upload-add"
+											@tap="pickMedia(rowIndex, 1, field.max_len)"
+										>
+											<cl-icon name="camera-fill" :size="24" color="#0651f8"></cl-icon>
+											<text class="tp-upload-add-text">上传图片</text>
+										</view>
+									</view>
+
+									<view v-else-if="field.type == 6" class="tp-upload-row">
+										<view
+											class="tp-upload-item"
+											v-for="(vid, vidIndex) in formFileList[rowIndex].media_videoList"
+											:key="`vid-${vidIndex}`"
+										>
+											<view class="tp-upload-video">
+												<cl-icon name="video-line" :size="28" color="#0651f8"></cl-icon>
+											</view>
+											<view class="tp-upload-remove" @tap.stop="removeMedia(rowIndex, 2, vidIndex)">
+												<cl-icon name="close-line" :size="12" color="#ffffff"></cl-icon>
+											</view>
+										</view>
+										<view
+											v-if="formFileList[rowIndex].media_videoList.length < field.max_len"
+											class="tp-upload-add"
+											@tap="pickMedia(rowIndex, 2, field.max_len)"
+										>
+											<cl-icon name="camera-fill" :size="24" color="#0651f8"></cl-icon>
+											<text class="tp-upload-add-text">上传视频</text>
+										</view>
+									</view>
+
+									<view v-else-if="field.type == 7" class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].link"
+											:placeholder="field.placeholder"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+
+									<view v-else-if="field.type == 8" class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].publish_text"
+											:placeholder="field.placeholder"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+
+									<view v-else-if="field.type == 9" class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].work_num"
+											type="number"
+											:placeholder="field.placeholder"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+								</view>
+							</view>
+
+							<!-- 旧版固定字段 -->
+							<view v-else class="tp-block-body">
+								<view class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">视频链接</text>
+										<text class="tp-required">*</text>
+									</view>
+									<view class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].video_url"
+											placeholder="请填写视频链接"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+								</view>
+
+								<view v-if="needPlayNum" class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">播放量</text>
+									</view>
+									<view class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].play_num"
+											type="number"
+											placeholder="播放量填写不能低于200"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+								</view>
+
+								<view v-if="projectId == 90" class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">是否星图</text>
+										<text class="tp-required">*</text>
+									</view>
+									<view class="tp-radio-inline">
+										<view
+											v-for="(opt, xi) in xingtuList"
+											:key="xi"
+											class="tp-radio-inline-item"
+											@tap="changeXingtu(rowIndex, xi)"
+										>
+											<view
+												class="tp-radio-icon"
+												:class="{ 'tp-radio-icon--checked': formList[rowIndex].is_xingtu == xi }"
+											>
+												<text v-if="formList[rowIndex].is_xingtu == xi" class="tp-radio-mark">✓</text>
+											</view>
+											<text class="tp-radio-text">{{ opt }}</text>
+										</view>
+									</view>
+								</view>
+                                <view class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">发布平台</text>
+									</view>
+									<view class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].publish_platform"
+											placeholder="请输入发布平台"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+								</view>
+								<view class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">平台ID</text>
+									</view>
+									<view class="tp-input-wrap">
+										<input
+											class="tp-input"
+											v-model="formList[rowIndex].account_id"
+											placeholder="请输入平台ID"
+											placeholder-class="tp-placeholder"
+										/>
+									</view>
+								</view>
+
+								<view v-if="showUploadBox" class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">上传附件</text>
+									</view>
+									<view class="tp-upload-row">
+										<view
+											class="tp-upload-item"
+											v-for="(img, imgIndex) in formFileList[rowIndex].media_imageList"
+											:key="`legacy-img-${imgIndex}`"
+										>
+											<image class="tp-upload-preview" :src="img.localPath" mode="aspectFill"></image>
+											<view class="tp-upload-remove" @tap.stop="removeMedia(rowIndex, 1, imgIndex)">
+												<cl-icon name="close-line" :size="12" color="#ffffff"></cl-icon>
+											</view>
+										</view>
+										<view
+											v-if="formFileList[rowIndex].media_imageList.length < 9"
+											class="tp-upload-add"
+											@tap="pickMedia(rowIndex, 1, 9)"
+										>
+											<cl-icon name="camera-fill" :size="24" color="#0651f8"></cl-icon>
+											<text class="tp-upload-add-text">上传图片</text>
+										</view>
+										<view
+											class="tp-upload-item"
+											v-for="(vid, vidIndex) in formFileList[rowIndex].media_videoList"
+											:key="`legacy-vid-${vidIndex}`"
+										>
+											<view class="tp-upload-video">
+												<cl-icon name="video-line" :size="28" color="#0651f8"></cl-icon>
+											</view>
+											<view class="tp-upload-remove" @tap.stop="removeMedia(rowIndex, 2, vidIndex)">
+												<cl-icon name="close-line" :size="12" color="#ffffff"></cl-icon>
+											</view>
+										</view>
+										<view
+											v-if="formFileList[rowIndex].media_videoList.length < 1"
+											class="tp-upload-add"
+											@tap="pickMedia(rowIndex, 2, 1)"
+										>
+											<cl-icon name="camera-fill" :size="24" color="#0651f8"></cl-icon>
+											<text class="tp-upload-add-text">上传视频</text>
+										</view>
+									</view>
+									<text class="tp-upload-tip">已添加图片 {{ formFileList[rowIndex].media_imageList.length }}/9，已添加视频 {{ formFileList[rowIndex].media_videoList.length }}/1。视频限制大小300M</text>
+								</view>
+
+								<view class="tp-field">
+									<view class="tp-label-row">
+										<text class="tp-label">发布日期</text>
+										<text class="tp-required">*</text>
+									</view>
+									<picker
+										class="tp-picker-wrap"
+										mode="date"
+										:value="formList[rowIndex].publish_time"
+										@change="onDateChange($event, rowIndex)"
+									>
+										<view class="tp-picker">
+											<text
+												class="tp-picker-text"
+												:class="{ 'tp-picker-text--placeholder': formList[rowIndex].publish_time == '' }"
+											>{{ formList[rowIndex].publish_time != '' ? formList[rowIndex].publish_time : '请选择' }}</text>
+											<cl-icon name="arrow-down-s-line" :size="16" color="#999999"></cl-icon>
+										</view>
+									</picker>
+								</view>
+							</view>
+						</view>
+
+						<view class="tp-scroll-pad"></view>
+					</view>
+				</scroll-view>
+
+				<view class="tp-footer">
+					<view
+						class="tp-submit-btn"
+						:class="{ 'tp-submit-btn--disabled': submitting || mediaUploading }"
+						@tap="onSubmit"
+					>
+						<text class="tp-submit-btn-text">{{ submitBtnText }}</text>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</view>
+		</view>
+
+		<cl-popup v-model="accountPopupVisible" direction="bottom" size="50%" :show-header="false">
+			<view class="tp-account-popup">
+				<scroll-view
+					v-if="typeList.length > 0"
+					class="tp-account-scroll"
+					scroll-y="true"
+					:show-scrollbar="false"
+				>
+					<view
+						class="tp-select-option"
+						v-for="(opt, optIndex) in typeList"
+						:key="optIndex"
+						@tap="chooseAccountOption(opt)"
+					>
+						<text class="tp-select-option-text">{{ opt }}</text>
+					</view>
+				</scroll-view>
+				<view v-else class="tp-account-empty">
+					<text class="tp-account-empty-text">暂无账号</text>
+				</view>
+				<view class="tp-account-add-wrap">
+					<view class="tp-account-add-btn" @tap="goCreateAccount">
+						<cl-icon name="add-line" :size="22" color="#ffffff"></cl-icon>
+						<text class="tp-account-add-btn-text">添加账号</text>
+					</view>
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</view>
+		</cl-popup>
+
+		<cl-popup v-model="selectPopupVisible" direction="bottom" size="50%" :show-header="false">
+			<scroll-view class="tp-select-scroll" scroll-y="true" :show-scrollbar="false">
+				<view
+					class="tp-select-option"
+					v-for="(opt, si) in relationSelectList"
+					:key="si"
+					@tap="chooseRelationSelect(opt)"
+				>
+					<text class="tp-select-option-text">{{ opt }}</text>
+				</view>
+			</scroll-view>
+		</cl-popup>
+
+		<batch-backfill-popup
+			v-model="batchPopupVisible"
+			:project-id="projectId"
+			:keyword-id="keywordRecordId"
+			:limit="batchBackfillLimit"
+			@success="onBatchSubmitSuccess"
+		></batch-backfill-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	/** 作品回填页，对齐 youbao_mini pagesProject/common/publish */
+	import { computed, ref } from "vue";
+	import { getPublishField, getPublishFieldList, submitPublish } from "@/.cool/api/task";
+	import { normalizePickDisplayPath, uploadImage, uploadVideo } from "@/.cool/api/upload";
+	import { getApiMessage, isApiSuccess, router } from "@/.cool";
+	import type { KeywordPublishFormRow, KeywordSubmitFormItem, ParseVideoUrlItem } from "@/.cool/types/keyword";
+	import BatchBackfillPopup from "@/components/task/batch-backfill-popup.uvue";
+
+	type PublishDynamicOption = {
+		field_title: string;
+		field_type: number;
+		placeholder: string;
+		max_len: number;
+		min_len: number;
+		options: string;
+	};
+
+	type PublishDynamicField = {
+		field: string;
+		field_title: string;
+		type: number;
+		is_require: number;
+		placeholder: string;
+		max_len: number;
+		min_len: number | string;
+		options: string[];
+		optionList: PublishDynamicOption[];
+		typeList: string[];
+	};
+
+	type MediaPreviewItem = {
+		url: string;
+		localPath: string;
+	};
+
+	type PublishFileGroup = {
+		media_imageList: MediaPreviewItem[];
+		media_videoList: MediaPreviewItem[];
+	};
+
+	type PublishFormRow = KeywordPublishFormRow & {
+		is_xingtu: number;
+		publish_type: string;
+		options: string;
+		link: string;
+		publish_text: string;
+		work_num: string;
+	};
+
+	const PLAY_NUM_PROJECT_IDS = [73, 62, 5, 3, 10, 37, 38, 36, 66];
+	const xingtuList = ["否", "是"];
+	const VIDEO_MAX_SIZE = 314572800;
+
+	const keywordRecordId = ref(0);
+	const projectId = ref(0);
+	const isAdd = ref(0);
+	const pageLoading = ref(true);
+	const pageInitialized = ref(false);
+	const fieldListLoading = ref(false);
+	const submitting = ref(false);
+	const mediaUploading = ref(false);
+	const isShowNewField = ref(0);
+	const showUploadBox = ref(false);
+	const isPlayNum = ref(false);
+	/** 批量回填开关，来自 getFieldList.batch_backfill：0 不显示，1 显示 */
+	const batchBackfillEnabled = ref(false);
+	/** 批量回填上限，来自 getFieldList.batch_backfill_limit */
+	const batchBackfillLimit = ref(30);
+
+	const keywordInfo = ref<UTSJSONObject>({});
+	const fieldList = ref<PublishDynamicField[]>([]);
+	const formList = ref<PublishFormRow[]>([]);
+	const formFileList = ref<PublishFileGroup[]>([]);
+
+	const typeList = ref<string[]>([]);
+	const accountPopupVisible = ref(false);
+	const activeRowIndex = ref(-1);
+
+	const selectPopupVisible = ref(false);
+	const relationSelectList = ref<string[]>([]);
+	const relationRowIndex = ref(-1);
+	const batchPopupVisible = ref(false);
+
+	const submitBtnText = computed(() => (isAdd.value == 1 ? "确认追加回填" : "确认回填"));
+
+	const useLegacyForm = computed(() => {
+		return isShowNewField.value != 1 || fieldList.value.length == 0;
+	});
+
+	const headTitle = computed(() => {
+		const keyword = `${keywordInfo.value["keyword"] ?? ""}`.trim();
+		return keyword != "" ? keyword : "作品回填";
+	});
+
+	const headCreateTime = computed(() => {
+		const time = `${keywordInfo.value["create_time"] ?? ""}`.trim();
+		return time != "" ? time : "—";
+	});
+
+	const headBookId = computed(() => {
+		const text = `${keywordInfo.value["book_id"] ?? ""}`.trim();
+		return text != "" ? text : "—";
+	});
+
+	const headBookName = computed(() => {
+		const text = `${keywordInfo.value["book_name"] ?? ""}`.trim();
+		return text != "" ? text : "—";
+	});
+
+	const needPlayNum = computed(() => {
+		if (isPlayNum.value) {
+			return true;
+		}
+		for (let i = 0; i < PLAY_NUM_PROJECT_IDS.length; i++) {
+			if (projectId.value == PLAY_NUM_PROJECT_IDS[i]) {
+				return true;
+			}
+		}
+		return false;
+	});
+
+	function parseTypeListItem(item: any): string {
+		if (item == null) {
+			return "";
+		}
+		if (typeof item == "string") {
+			return `${item}`.trim();
+		}
+		const obj = item as UTSJSONObject;
+		const text = `${obj["name"] ?? obj["label"] ?? obj["title"] ?? obj["value"] ?? obj["text"] ?? ""}`.trim();
+		return text;
+	}
+
+	function parseRootTypeList(raw: any | null): string[] {
+		if (raw == null || !(raw instanceof Array)) {
+			return [];
+		}
+		const arr = raw as any[];
+		const result: string[] = [];
+		for (let i = 0; i < arr.length; i++) {
+			const text = parseTypeListItem(arr[i]);
+			if (text != "") {
+				result.push(text);
+			}
+		}
+		return result;
+	}
+
+	function todayDateStr(): string {
+		const d = new Date();
+		const y = d.getFullYear();
+		const m = d.getMonth() + 1;
+		const day = d.getDate();
+		const zm = m < 10 ? `0${m}` : `${m}`;
+		const zd = day < 10 ? `0${day}` : `${day}`;
+		return `${y}-${zm}-${zd}`;
+	}
+
+	function toNumber(val: any, fallback: number = 0): number {
+		if (val == null) {
+			return fallback;
+		}
+		const n = parseInt(`${val}`);
+		return isNaN(n) ? fallback : n;
+	}
+
+	function createEmptyFormRow(publishType: string = ""): PublishFormRow {
+		return {
+			is_xingtu: 3,
+			video_url: "",
+			play_num: 0,
+			like_num: 500,
+			publish_platform: "",
+			account_name: "",
+			account_id: "",
+			publish_time: todayDateStr(),
+			media_image: [],
+			media_video: [],
+			publish_type: publishType,
+			options: "",
+			link: "",
+			publish_text: "",
+			work_num: ""
+		};
+	}
+
+	function createEmptyFileGroup(): PublishFileGroup {
+		return {
+			media_imageList: [],
+			media_videoList: []
+		};
+	}
+
+	function initFormState() {
+		const firstType = fieldList.value.length > 0 ? fieldList.value[0].options[0] ?? "" : "";
+		formList.value = [createEmptyFormRow(firstType)];
+		formFileList.value = [createEmptyFileGroup()];
+	}
+
+	function parseStringArray(raw: any | null): string[] {
+		if (raw == null || !(raw instanceof Array)) {
+			return [];
+		}
+		const arr = raw as any[];
+		const result: string[] = [];
+		for (let i = 0; i < arr.length; i++) {
+			const text = `${arr[i] ?? ""}`.trim();
+			if (text != "") {
+				result.push(text);
+			}
+		}
+		return result;
+	}
+
+	function parseDynamicOptionList(raw: any | null): PublishDynamicOption[] {
+		if (raw == null || !(raw instanceof Array)) {
+			return [];
+		}
+		const arr = raw as any[];
+		const result: PublishDynamicOption[] = [];
+		for (let i = 0; i < arr.length; i++) {
+			const row = arr[i] as UTSJSONObject;
+			result.push({
+				field_title: `${row["field_title"] ?? ""}`,
+				field_type: toNumber(row["field_type"], 0),
+				placeholder: `${row["placeholder"] ?? ""}`,
+				max_len: toNumber(row["max_len"], 0),
+				min_len: toNumber(row["min_len"], 0),
+				options: `${row["options"] ?? ""}`
+			});
+		}
+		return result;
+	}
+
+	function parseFieldOptions(raw: any | null): string[] {
+		if (raw instanceof Array) {
+			return parseStringArray(raw);
+		}
+		const text = `${raw ?? ""}`.trim();
+		if (text == "") {
+			return [];
+		}
+		if (text.indexOf(",") >= 0 || text.indexOf("，") >= 0) {
+			const parts = text.split(/[,，]/) as string[];
+			const result: string[] = [];
+			for (let i = 0; i < parts.length; i++) {
+				const item = parts[i].trim();
+				if (item != "") {
+					result.push(item);
+				}
+			}
+			return result;
+		}
+		return [text];
+	}
+
+	function parseFieldTypeList(row: UTSJSONObject): string[] {
+		const fromList = parseRootTypeList(row["typeList"] ?? row["type_list"]);
+		if (fromList.length > 0) {
+			return fromList;
+		}
+		const typeText = `${row["type_text"] ?? ""}`.trim();
+		if (typeText == "") {
+			return [];
+		}
+		const parts = typeText.split(/[,，]/) as string[];
+		const result: string[] = [];
+		for (let i = 0; i < parts.length; i++) {
+			const text = parts[i].trim();
+			if (text != "") {
+				result.push(text);
+			}
+		}
+		return result;
+	}
+
+	function isAccountField(field: PublishDynamicField): boolean {
+		const key = field.field.trim();
+		return field.type == 2 || key == "account" || key == "platform_account";
+	}
+
+	function syncAccountTypeList(fields: PublishDynamicField[]) {
+		for (let i = 0; i < fields.length; i++) {
+			const field = fields[i];
+			if (isAccountField(field)) {
+				typeList.value = field.typeList;
+				return;
+			}
+		}
+		typeList.value = [];
+	}
+
+	function mapDynamicField(row: UTSJSONObject): PublishDynamicField {
+		return {
+			field: `${row["field"] ?? ""}`,
+			field_title: `${row["field_title"] ?? ""}`,
+			type: toNumber(row["type"], 0),
+			is_require: toNumber(row["is_require"], 0),
+			placeholder: `${row["placeholder"] ?? ""}`,
+			max_len: toNumber(row["max_len"], 9),
+			min_len: row["min_len"] ?? 0,
+			options: parseFieldOptions(row["options"]),
+			optionList: parseDynamicOptionList(row["optionList"]),
+			typeList: parseFieldTypeList(row)
+		};
+	}
+
+	function applyFieldListConfig(data: UTSJSONObject, preserveForm: boolean = false) {
+		isShowNewField.value = toNumber(data["status"], 0);
+		if (data["is_play_num"] != null) {
+			isPlayNum.value = toNumber(data["is_play_num"], 0) == 1;
+		}
+		batchBackfillEnabled.value = toNumber(data["batch_backfill"], 0) == 1;
+		const limitFromApi = toNumber(data["batch_backfill_limit"], 0);
+		if (limitFromApi > 0) {
+			batchBackfillLimit.value = limitFromApi;
+		}
+		const rows = data["fieldList"];
+		const mapped: PublishDynamicField[] = [];
+		if (rows instanceof Array) {
+			const arr = rows as any[];
+			for (let i = 0; i < arr.length; i++) {
+				mapped.push(mapDynamicField(arr[i] as UTSJSONObject));
+			}
+		}
+		fieldList.value = mapped;
+		syncAccountTypeList(mapped);
+		if (isShowNewField.value == 1 && mapped.length == 0) {
+			isShowNewField.value = 0;
+		}
+		if (!preserveForm) {
+			initFormState();
+			if (isShowNewField.value == 1) {
+				for (let i = 0; i < fieldList.value.length; i++) {
+					const field = fieldList.value[i];
+					if (field.options.length > 0) {
+						formList.value[0].publish_type = field.options[0];
+						field.max_len = 0;
+						field.min_len = field.options[0];
+					}
+				}
+			}
+		}
+	}
+
+	function unwrapApiData(res: any | null): UTSJSONObject | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		const code = envelope["code"];
+		if (code != null && !isApiSuccess(code)) {
+			return null;
+		}
+		const data = envelope["data"];
+		if (data != null && typeof data == "object") {
+			return data as UTSJSONObject;
+		}
+		return envelope;
+	}
+
+	/** 发布相关接口 project_id：取链接参数 project_id */
+	function resolveApiProjectId(): number {
+		return projectId.value;
+	}
+
+	function loadFieldListConfig(options: { silent?: boolean; preserveForm?: boolean } = {}) {
+		if (fieldListLoading.value) {
+			return;
+		}
+		const apiProjectId = resolveApiProjectId();
+		if (apiProjectId <= 0) {
+			pageLoading.value = false;
+			return;
+		}
+		const silent = options.silent == true;
+		const preserveForm = options.preserveForm == true;
+		fieldListLoading.value = true;
+		if (!silent) {
+			pageLoading.value = true;
+		}
+		getPublishFieldList(apiProjectId)
+			.then((res) => {
+				if (res == null) {
+					if (!preserveForm) {
+						initPageForm();
+					}
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					if (!silent) {
+						uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					}
+					if (!preserveForm) {
+						initPageForm();
+					}
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+				applyFieldListConfig(data, preserveForm);
+				pageInitialized.value = true;
+			})
+			.catch((err) => {
+				if (!silent) {
+					uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+				}
+				if (!preserveForm) {
+					initPageForm();
+				}
+			})
+			.finally(() => {
+				fieldListLoading.value = false;
+				if (!silent) {
+					pageLoading.value = false;
+				}
+			});
+	}
+
+	function loadPublishField() {
+		const apiProjectId = resolveApiProjectId();
+		if (apiProjectId <= 0) {
+			return;
+		}
+		getPublishField(apiProjectId)
+			.then((res) => {
+				const data = unwrapApiData(res);
+				if (data == null) {
+					return;
+				}
+				const rows = data instanceof Array ? (data as any[]) : [];
+				showUploadBox.value = rows.length > 0;
+			})
+			.catch(() => {
+				showUploadBox.value = false;
+			});
+	}
+
+	function initPageForm() {
+		isShowNewField.value = 0;
+		fieldList.value = [];
+		initFormState();
+		pageLoading.value = false;
+	}
+
+	function extractUrlFromText(text: string): string {
+		const raw = text.trim();
+		if (raw == "") {
+			return "";
+		}
+		const reg = /(https?:\/\/[^\s]+)/g;
+		const matched = raw.match(reg);
+		if (matched != null && matched.length > 0) {
+			return matched[0];
+		}
+		return raw;
+	}
+
+	function checkUrl(text: string, rowIndex: number): string {
+		const url = extractUrlFromText(text);
+		if (rowIndex >= 0 && rowIndex < formList.value.length) {
+			formList.value[rowIndex].video_url = url;
+		}
+		return url;
+	}
+
+	function openAccountPicker(rowIndex: number) {
+		activeRowIndex.value = rowIndex;
+		syncAccountTypeList(fieldList.value);
+		accountPopupVisible.value = true;
+	}
+
+	function chooseAccountOption(opt: string) {
+		const rowIndex = activeRowIndex.value;
+		if (rowIndex < 0 || rowIndex >= formList.value.length) {
+			accountPopupVisible.value = false;
+			return;
+		}
+		formList.value[rowIndex].account_id = opt;
+		formList.value[rowIndex].account_name = opt;
+		accountPopupVisible.value = false;
+	}
+
+	function goCreateAccount() {
+		accountPopupVisible.value = false;
+		router.push({ path: "/pages/account/add" });
+	}
+
+	function onDateChange(e: UniPickerChangeEvent, rowIndex: number) {
+		const val = e.detail.value as string | null;
+		if (val != null && `${val}`.trim() != "" && rowIndex >= 0 && rowIndex < formList.value.length) {
+			formList.value[rowIndex].publish_time = `${val}`.trim();
+		}
+	}
+
+	function changeXingtu(rowIndex: number, optionIndex: number) {
+		if (rowIndex >= 0 && rowIndex < formList.value.length) {
+			formList.value[rowIndex].is_xingtu = optionIndex;
+		}
+	}
+
+	function changePublishType(value: string, rowIndex: number, fieldIndex: number, optionIndex: number) {
+		if (rowIndex < 0 || rowIndex >= formList.value.length) {
+			return;
+		}
+		formList.value[rowIndex].publish_type = value;
+		formList.value[rowIndex].options = "";
+		if (fieldIndex >= 0 && fieldIndex < fieldList.value.length) {
+			fieldList.value[fieldIndex].max_len = optionIndex;
+			fieldList.value[fieldIndex].min_len = value;
+		}
+	}
+
+	function openRelationSelect(fieldIndex: number, subIndex: number, rowIndex: number) {
+		relationRowIndex.value = rowIndex;
+		relationSelectList.value = [];
+		if (fieldIndex >= 0 && fieldIndex < fieldList.value.length) {
+			const field = fieldList.value[fieldIndex];
+			if (subIndex >= 0 && subIndex < field.optionList.length) {
+				const optionsText = field.optionList[subIndex].options;
+				if (`${optionsText}`.trim() != "") {
+					const parts = `${optionsText}`.split(",") as string[];
+					const result: string[] = [];
+					for (let i = 0; i < parts.length; i++) {
+						const text = parts[i].trim();
+						if (text != "") {
+							result.push(text);
+						}
+					}
+					relationSelectList.value = result;
+				}
+			}
+		}
+		selectPopupVisible.value = true;
+	}
+
+	function chooseRelationSelect(opt: string) {
+		const rowIndex = relationRowIndex.value;
+		if (rowIndex >= 0 && rowIndex < formList.value.length) {
+			formList.value[rowIndex].options = opt;
+		}
+		selectPopupVisible.value = false;
+	}
+
+	function startScan(rowIndex: number) {
+		uni.scanCode({
+			success: (res) => {
+				const result = `${res.result ?? ""}`.trim();
+				if (result != "" && rowIndex >= 0 && rowIndex < formList.value.length) {
+					formList.value[rowIndex].video_url = result;
+					uni.showToast({ title: "识别成功", icon: "success" });
+				}
+			},
+			fail: () => {
+				uni.showToast({ title: "扫码失败", icon: "none" });
+			}
+		});
+	}
+
+	function syncMediaValue(rowIndex: number, mediaType: number) {
+		if (rowIndex < 0 || rowIndex >= formList.value.length || rowIndex >= formFileList.value.length) {
+			return;
+		}
+		const fileGroup = formFileList.value[rowIndex];
+		if (mediaType == 2) {
+			const urls: string[] = [];
+			for (let i = 0; i < fileGroup.media_videoList.length; i++) {
+				urls.push(fileGroup.media_videoList[i].url);
+			}
+			formList.value[rowIndex].media_video = urls;
+			return;
+		}
+		const urls: string[] = [];
+		for (let i = 0; i < fileGroup.media_imageList.length; i++) {
+			urls.push(fileGroup.media_imageList[i].url);
+		}
+		formList.value[rowIndex].media_image = urls;
+	}
+
+	function removeMedia(rowIndex: number, mediaType: number, itemIndex: number) {
+		if (rowIndex < 0 || rowIndex >= formFileList.value.length) {
+			return;
+		}
+		const fileGroup = formFileList.value[rowIndex];
+		if (mediaType == 2) {
+			fileGroup.media_videoList.splice(itemIndex, 1);
+		} else {
+			fileGroup.media_imageList.splice(itemIndex, 1);
+		}
+		syncMediaValue(rowIndex, mediaType);
+	}
+
+	function uploadMediaFile(path: string, mediaType: number): Promise<string> {
+		if (mediaType == 2) {
+			return uploadVideo(path);
+		}
+		return uploadImage(path);
+	}
+
+	function pickMedia(rowIndex: number, mediaType: number, maxCount: number) {
+		if (rowIndex < 0 || rowIndex >= formFileList.value.length) {
+			return;
+		}
+		const fileGroup = formFileList.value[rowIndex];
+		const currentLen = mediaType == 2 ? fileGroup.media_videoList.length : fileGroup.media_imageList.length;
+		const remain = maxCount - currentLen;
+		if (remain <= 0) {
+			return;
+		}
+		if (mediaType == 2) {
+			uni.chooseVideo({
+				sourceType: ["album", "camera"],
+				compressed: true,
+				success: (res) => {
+					const size = toNumber(res.size, 0);
+					if (size > VIDEO_MAX_SIZE) {
+						uni.showToast({ title: "视频大小超过限制300M,请重新选择上传", icon: "none" });
+						return;
+					}
+					const tempPath = `${res.tempFilePath ?? ""}`.trim();
+					if (tempPath == "") {
+						return;
+					}
+					mediaUploading.value = true;
+					uni.showLoading({ title: "上传中..." });
+					uploadMediaFile(tempPath, mediaType)
+						.then((url) => {
+							fileGroup.media_videoList.push({ url: url, localPath: tempPath });
+							syncMediaValue(rowIndex, mediaType);
+						})
+						.catch((err) => {
+							uni.showToast({ title: getApiMessage(err, "上传失败"), icon: "none" });
+						})
+						.finally(() => {
+							mediaUploading.value = false;
+							uni.hideLoading();
+						});
+				}
+			});
+			return;
+		}
+		uni.chooseImage({
+			count: remain,
+			sourceType: ["album", "camera"],
+			success: (res) => {
+				const paths = res.tempFilePaths as string[] | null;
+				if (paths == null || paths.length == 0) {
+					return;
+				}
+				mediaUploading.value = true;
+				uni.showLoading({ title: "上传中..." });
+				let index = 0;
+				const uploadNext = () => {
+					if (index >= paths.length) {
+						mediaUploading.value = false;
+						uni.hideLoading();
+						return;
+					}
+					const tempPath = paths[index];
+					index++;
+					uploadMediaFile(tempPath, mediaType)
+						.then((url) => {
+							return normalizePickDisplayPath(tempPath).then((displayPath) => {
+								fileGroup.media_imageList.push({
+									url: url,
+									localPath: displayPath != "" ? displayPath : tempPath
+								});
+								syncMediaValue(rowIndex, mediaType);
+							});
+						})
+						.catch((err) => {
+							uni.showToast({ title: getApiMessage(err, "上传失败"), icon: "none" });
+						})
+						.finally(() => {
+							uploadNext();
+						});
+				};
+				uploadNext();
+			}
+		});
+	}
+
+	function validateDynamicRow(row: PublishFormRow, rowIndex: number): boolean {
+		for (let i = 0; i < fieldList.value.length; i++) {
+			const field = fieldList.value[i];
+			if (field.is_require != 1) {
+				continue;
+			}
+			if (field.field == "video_url" && row.video_url.trim() == "") {
+				uni.showToast({ title: field.placeholder != "" ? field.placeholder : "请检查必填项", icon: "none" });
+				return false;
+			}
+			if (field.field == "account" && row.account_name.trim() == "") {
+				uni.showToast({ title: field.placeholder != "" ? field.placeholder : "请检查必填项", icon: "none" });
+				return false;
+			}
+			if (field.field == "type" && row.publish_type.trim() == "") {
+				uni.showToast({ title: field.placeholder != "" ? field.placeholder : "请检查必填项", icon: "none" });
+				return false;
+			}
+			if (field.field == "publish_time" && row.publish_time.trim() == "") {
+				uni.showToast({ title: field.placeholder != "" ? field.placeholder : "请检查必填项", icon: "none" });
+				return false;
+			}
+			if (field.field == "link" && row.link.trim() == "") {
+				uni.showToast({ title: field.placeholder != "" ? field.placeholder : "请检查必填项", icon: "none" });
+				return false;
+			}
+		}
+		return true;
+	}
+
+	function validateLegacyRow(row: PublishFormRow, workNo: number): boolean {
+		const videoUrl = checkUrl(row.video_url, -1);
+		if (videoUrl == "") {
+			uni.showToast({ title: `作品${workNo}视频链接不能为空`, icon: "none" });
+			return false;
+		}
+		if (row.publish_time.trim() == "") {
+			uni.showToast({ title: `作品${workNo}发布时间请选择`, icon: "none" });
+			return false;
+		}
+		if (needPlayNum.value) {
+			const playText = `${row.play_num}`.trim();
+			if (playText != "" && playText != "0") {
+				const playNum = toNumber(row.play_num, 0);
+				if (playNum < 200) {
+					uni.showToast({ title: "播放量不能低于200", icon: "none" });
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	function validateBeforeAdd(): boolean {
+		if (formList.value.length == 0) {
+			return true;
+		}
+		const row = formList.value[0];
+		if (!useLegacyForm.value) {
+			return validateDynamicRow(row, 0);
+		}
+		return validateLegacyRow(row, formList.value.length);
+	}
+
+	function openBatchPopup() {
+		if (!batchBackfillEnabled.value) {
+			return;
+		}
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		batchPopupVisible.value = true;
+	}
+
+	function onBatchSubmitSuccess(_items: ParseVideoUrlItem[]) {
+		setTimeout(() => {
+			uni.navigateBack();
+		}, 1200);
+	}
+
+	function addItem() {
+		if (!validateBeforeAdd()) {
+			return;
+		}
+		const publishType = formList.value.length > 0 ? formList.value[0].publish_type : "";
+		formList.value.unshift(createEmptyFormRow(publishType));
+		formFileList.value.unshift(createEmptyFileGroup());
+		const len = fieldList.value.length;
+		if (len > 0) {
+			fieldList.value[len - 1].max_len = 0;
+			fieldList.value[len - 1].min_len = publishType;
+		}
+	}
+
+	function delItem(index: number) {
+		formList.value.splice(index, 1);
+		if (index < formFileList.value.length) {
+			formFileList.value.splice(index, 1);
+		}
+		if (formList.value.length == 0) {
+			initFormState();
+		}
+	}
+
+	function joinMediaUrls(urls: string[]): string {
+		if (urls.length == 0) {
+			return "";
+		}
+		return urls.join(",");
+	}
+
+	function pushFormItem(
+		result: KeywordSubmitFormItem[],
+		name: string,
+		field: string,
+		value: string
+	) {
+		const text = value.trim();
+		if (text == "") {
+			return;
+		}
+		result.push({
+			name: name,
+			field: field,
+			value: text
+		});
+	}
+
+	function buildDynamicRowFormInfo(row: PublishFormRow): KeywordSubmitFormItem[] {
+		const result: KeywordSubmitFormItem[] = [];
+		for (let i = 0; i < fieldList.value.length; i++) {
+			const field = fieldList.value[i];
+			const fieldKey = field.field != "" ? field.field : `field_${field.type}`;
+			let value = "";
+			if (fieldKey == "video_url" || field.type == 1) {
+				value = extractUrlFromText(row.video_url);
+			} else if (fieldKey == "publish_platform") {
+				value = row.publish_platform;
+			} else if (fieldKey == "account" || field.type == 2) {
+				value = row.account_id;
+			} else if (fieldKey == "publish_time" || field.type == 3) {
+				value = row.publish_time;
+			} else if (fieldKey == "type" || field.type == 4) {
+				value = row.publish_type;
+			} else if (field.type == 5) {
+				value = joinMediaUrls(row.media_image);
+			} else if (field.type == 6) {
+				value = joinMediaUrls(row.media_video);
+			} else if (field.type == 7) {
+				value = row.link;
+			} else if (field.type == 8) {
+				value = row.publish_text;
+			} else if (field.type == 9) {
+				value = `${row.work_num}`.trim();
+			}
+			pushFormItem(result, field.field_title, fieldKey, value);
+			if (field.type == 4 && row.options.trim() != "") {
+				pushFormItem(result, "选项", "options", row.options);
+			}
+		}
+		return result;
+	}
+
+	function buildLegacyRowFormInfo(row: PublishFormRow): KeywordSubmitFormItem[] {
+		const result: KeywordSubmitFormItem[] = [];
+		pushFormItem(result, "视频链接", "video_url", extractUrlFromText(row.video_url));
+		if (needPlayNum.value) {
+			const playText = `${row.play_num}`.trim();
+			if (playText != "" && playText != "0") {
+				pushFormItem(result, "播放量", "play_num", playText);
+			}
+		}
+		if (projectId.value == 90) {
+			pushFormItem(result, "是否星图", "is_xingtu", `${row.is_xingtu}`);
+		}
+		pushFormItem(result, "发布平台", "publish_platform", row.publish_platform);
+		pushFormItem(result, "平台ID", "account_id_id", row.account_id);
+		pushFormItem(result, "发布日期", "publish_time", row.publish_time);
+		pushFormItem(result, "图片", "media_image", joinMediaUrls(row.media_image));
+		pushFormItem(result, "视频", "media_video", joinMediaUrls(row.media_video));
+		return result;
+	}
+
+	function buildPublishFormBatches(): KeywordSubmitFormItem[][] {
+		const batches: KeywordSubmitFormItem[][] = [];
+		const rows = formList.value;
+		for (let i = 0; i < rows.length; i++) {
+			const batch = useLegacyForm.value
+				? buildLegacyRowFormInfo(rows[i])
+				: buildDynamicRowFormInfo(rows[i]);
+			if (batch.length > 0) {
+				batches.push(batch);
+			}
+		}
+		return batches;
+	}
+
+	function onSubmit() {
+		if (submitting.value || mediaUploading.value) {
+			return;
+		}
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		if (keywordRecordId.value <= 0) {
+			uni.showToast({ title: "缺少关键词记录 ID", icon: "none" });
+			return;
+		}
+		const rows = formList.value;
+		if (rows.length == 0) {
+			uni.showToast({ title: "请添加作品", icon: "none" });
+			return;
+		}
+		for (let i = 0; i < rows.length; i++) {
+			const workNo = rows.length - i;
+			rows[i].video_url = checkUrl(rows[i].video_url, i);
+			if (!useLegacyForm.value) {
+				if (!validateDynamicRow(rows[i], i)) {
+					return;
+				}
+			} else if (!validateLegacyRow(rows[i], workNo)) {
+				return;
+			}
+		}
+		const formInfo = buildPublishFormBatches();
+		if (formInfo.length == 0) {
+			uni.showToast({ title: "请填写表单", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		submitPublish({
+			project_id: projectId.value,
+			keyword_id: keywordRecordId.value,
+			form_info: formInfo
+		})
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "提交失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(res, "提交成功"), icon: "success" });
+				setTimeout(() => {
+					uni.navigateBack();
+				}, 1200);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "提交失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	onLoad((options) => {
+		const idVal = options["id"] as string | null;
+		const projectIdVal = options["project_id"] as string | null;
+		const isAddVal = options["is_add"] as string | null;
+		const titleVal = options["title"] as string | null;
+		const keywordVal = options["keyword"] as string | null;
+		const createTimeVal = options["create_time"] as string | null;
+
+		if (idVal != null) {
+			keywordRecordId.value = toNumber(idVal, 0);
+		}
+		if (projectIdVal != null) {
+			projectId.value = toNumber(projectIdVal, 0);
+		}
+		if (isAddVal != null) {
+			isAdd.value = toNumber(isAddVal, 0);
+		}
+
+		const info = keywordInfo.value;
+		if (keywordRecordId.value > 0) {
+			info["id"] = keywordRecordId.value;
+		}
+		if (titleVal != null && `${titleVal}`.trim() != "") {
+			info["title"] = `${titleVal}`.trim();
+		}
+		if (keywordVal != null && `${keywordVal}`.trim() != "") {
+			info["keyword"] = `${keywordVal}`.trim();
+		}
+		if (createTimeVal != null && `${createTimeVal}`.trim() != "") {
+			info["create_time"] = `${createTimeVal}`.trim();
+		}
+		keywordInfo.value = info;
+
+		const navTitle = isAdd.value == 1 ? "追加回填" : "立即回填";
+		uni.setNavigationBarTitle({ title: navTitle });
+
+		loadPublishField();
+	});
+
+	onShow(() => {
+		loadFieldListConfig({
+			silent: pageInitialized.value,
+			preserveForm: pageInitialized.value
+		});
+	});
+</script>
+
+<style lang="scss" scoped>
+	.tp-page {
+		width: 100%;
+		height: 100vh;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		box-sizing: border-box;
+	}
+
+	.tp-loading {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tp-loading-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #999999;
+	}
+
+	.tp-body {
+		flex: 1;
+		height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.tp-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.tp-inner {
+		padding: 24rpx 30rpx 0;
+		box-sizing: border-box;
+	}
+
+	.tp-scroll-pad {
+		height: 180rpx;
+	}
+
+	.tp-head {
+		margin-bottom: 20rpx;
+		padding: 28rpx;
+		background-color: #fafbfd;
+		border-radius: 16rpx;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.tp-head-title {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 42rpx;
+		text-align: center;
+	}
+
+	.tp-head-meta {
+		margin-top: 8rpx;
+		font-size: 22rpx;
+		color: #7b8193;
+		line-height: 30rpx;
+		text-align: center;
+
+		&--warn {
+			color: #7b8193;
+		}
+	}
+
+	.tp-batch-card {
+		margin-bottom: 20rpx;
+		padding: 24rpx 28rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eff1f5;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		box-sizing: border-box;
+
+		.tp-batch-icon-wrap {
+			width: 80rpx;
+			height: 80rpx;
+			border-radius: 20rpx;
+			overflow: hidden;
+			flex-shrink: 0;
+
+			.tp-batch-icon {
+				width: 80rpx;
+				height: 80rpx;
+				display: block;
+			}
+		}
+
+		.tp-batch-main {
+			margin-left: 24rpx;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			flex: 1;
+			min-width: 0;
+
+			.tp-batch-title {
+				font-size: 32rpx;
+				font-weight: 600;
+				color: #141b36;
+				line-height: 44rpx;
+			}
+
+			.tp-batch-desc {
+				margin-top: 4rpx;
+				font-size: 24rpx;
+				color: #999999;
+				line-height: 34rpx;
+			}
+		}
+	}
+
+	.tp-block {
+		margin-bottom: 20rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		overflow: hidden;
+	}
+
+	.tp-block-head {
+		padding: 24rpx 28rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: #eff1f5;
+	}
+
+	.tp-block-title {
+		font-size: 26rpx;
+		font-weight: 700;
+		color: #141b36;
+		line-height: 36rpx;
+	}
+
+	.tp-block-actions {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.tp-block-action {
+		margin-left: 24rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.tp-block-action-text {
+		margin-left: 6rpx;
+		font-size: 24rpx;
+		color: #141b36;
+	}
+
+	.tp-block-body {
+		padding: 8rpx 28rpx 28rpx;
+	}
+
+	.tp-field {
+		margin-top: 20rpx;
+	}
+
+	.tp-label-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 12rpx;
+	}
+
+	.tp-label {
+		font-size: 24rpx;
+		color: #141b36;
+		line-height: 34rpx;
+	}
+
+	.tp-required {
+		margin-left: 4rpx;
+		font-size: 22rpx;
+		color: #ff203f;
+		line-height: 30rpx;
+	}
+
+	.tp-input-wrap,
+	.tp-picker-wrap {
+		width: 100%;
+	}
+
+	.tp-input,
+	.tp-picker {
+		width: 100%;
+		height: 88rpx;
+		padding: 0 20rpx;
+		background-color: #f7f8fa;
+		border-radius: 12rpx;
+		box-sizing: border-box;
+	}
+
+	.tp-input {
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.tp-picker {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.tp-picker-text {
+		flex: 1;
+		min-width: 0;
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+
+		&--placeholder {
+			color: #999999;
+		}
+	}
+
+	.tp-placeholder {
+		color: #999999;
+	}
+
+	.tp-type-wrap {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.tp-radio-grid {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.tp-radio-chip {
+		min-width: 202rpx;
+		height: 60rpx;
+		margin-right: 12rpx;
+		margin-bottom: 12rpx;
+		padding: 0 16rpx;
+		background-color: #f9fafc;
+		border-radius: 12rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #f9fafc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background-color: #fffaf8;
+			border-color: #ffd4c9;
+		}
+	}
+
+	.tp-radio-chip-text {
+		font-size: 26rpx;
+		color: #333333;
+	}
+
+	.tp-radio-chip--active .tp-radio-chip-text {
+		color: #ff6033;
+	}
+
+	.tp-sub-field {
+		margin-top: 16rpx;
+
+		.tp-input-wrap,
+		.tp-picker {
+			width: 100%;
+		}
+	}
+
+	.tp-radio-inline {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.tp-radio-inline-item {
+		margin-right: 50rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.tp-radio-icon {
+		width: 32rpx;
+		height: 32rpx;
+		border-radius: 16rpx;
+		border-width: 2rpx;
+		border-style: solid;
+		border-color: #cccccc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--checked {
+			border-color: #0651f8;
+			background-color: #0651f8;
+		}
+	}
+
+	.tp-radio-mark {
+		font-size: 20rpx;
+		color: #ffffff;
+		line-height: 20rpx;
+	}
+
+	.tp-radio-text {
+		margin-left: 8rpx;
+		font-size: 30rpx;
+		color: #333333;
+	}
+
+	.tp-upload-row {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.tp-upload-item {
+		position: relative;
+		width: 100rpx;
+		height: 100rpx;
+		margin-right: 12rpx;
+		margin-bottom: 12rpx;
+	}
+
+	.tp-upload-preview,
+	.tp-upload-video {
+		width: 100rpx;
+		height: 100rpx;
+		border-radius: 8rpx;
+		background-color: #f4f5f7;
+	}
+
+	.tp-upload-video {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tp-upload-remove {
+		position: absolute;
+		top: -8rpx;
+		right: -8rpx;
+		width: 28rpx;
+		height: 28rpx;
+		border-radius: 14rpx;
+		background-color: rgba(0, 0, 0, 0.55);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tp-upload-add {
+		width: 100rpx;
+		height: 100rpx;
+		margin-bottom: 12rpx;
+		border-radius: 8rpx;
+		background-color: #f4f5f7;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tp-upload-add-text {
+		margin-top: 4rpx;
+		font-size: 18rpx;
+		color: #0651f8;
+	}
+
+	.tp-upload-tip {
+		margin-top: 8rpx;
+		font-size: 20rpx;
+		color: rgba(0, 0, 0, 0.6);
+		line-height: 28rpx;
+	}
+
+	.tp-footer {
+		flex-shrink: 0;
+		padding: 20rpx 30rpx;
+		background-color: #ffffff;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #eeeeee;
+	}
+
+	.tp-submit-btn {
+		height: 96rpx;
+		background-color: #0651f8;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--disabled {
+			opacity: 0.6;
+		}
+	}
+
+	.tp-submit-btn-text {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 44rpx;
+	}
+
+	.tp-account-popup {
+		height: 100%;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		background-color: #ffffff;
+	}
+
+	.tp-account-head {
+		padding: 28rpx 30rpx 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.tp-account-title {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #1a1a1a;
+		line-height: 42rpx;
+	}
+
+	.tp-account-search-input {
+		flex: 1;
+		margin: 0 16rpx;
+		height: 72rpx;
+		padding: 0 20rpx;
+		background-color: #f7f8fa;
+		border-radius: 12rpx;
+		font-size: 24rpx;
+		color: #333333;
+	}
+
+	.tp-platform-scroll {
+		width: 100%;
+	}
+
+	.tp-platform-row {
+		padding: 0 30rpx 16rpx;
+		display: flex;
+		flex-direction: row;
+	}
+
+	.tp-platform-chip {
+		margin-right: 10rpx;
+		padding: 0 20rpx;
+		height: 60rpx;
+		background-color: #f2f2f2;
+		border-radius: 11rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&--active {
+			background: linear-gradient(90deg, #ff7600 0%, #f04222 100%);
+		}
+	}
+
+	.tp-platform-chip-text {
+		font-size: 24rpx;
+		color: #333333;
+	}
+
+	.tp-platform-chip--active .tp-platform-chip-text {
+		color: #ffffff;
+	}
+
+	.tp-account-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.tp-account-empty {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tp-account-empty-text {
+		font-size: 28rpx;
+		color: #999999;
+	}
+
+	.tp-account-item {
+		padding: 28rpx 30rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f2f2f2;
+
+		&--active {
+			background-color: #f0f5ff;
+		}
+	}
+
+	.tp-account-item-text {
+		flex: 1;
+		min-width: 0;
+		margin-right: 12rpx;
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+	}
+
+	.tp-account-add-wrap {
+		flex-shrink: 0;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #eeeeee;
+		box-sizing: border-box;
+	}
+
+	.tp-account-add-btn {
+		width: 100%;
+		height: 88rpx;
+		background-color: #0651f8;
+		border-radius: 16rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.tp-account-add-btn-text {
+		margin-left: 8rpx;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 40rpx;
+	}
+
+	.tp-select-scroll {
+		max-height: 500rpx;
+	}
+
+	.tp-select-option {
+		height: 100rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f2f2f2;
+	}
+
+	.tp-select-option-text {
+		font-size: 28rpx;
+		color: #333333;
+	}
+</style>

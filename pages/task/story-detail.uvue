@@ -1,0 +1,823 @@
+<template>
+	<cl-page :pt="{ className: 'sd-page' }" :back-top="false">
+		<view class="sd-page">
+			<view v-if="pageLoading" class="sd-loading">
+				<cl-loading :loading="true" :size="28" color="#0651f8"></cl-loading>
+				<text class="sd-loading-text">加载中...</text>
+			</view>
+
+			<block v-else>
+				<scroll-view class="sd-scroll" scroll-y="true" :show-scrollbar="false">
+					<view class="sd-inner">
+						<view class="sd-head">
+							<view class="sd-cover-wrap">
+								<image
+									v-if="hasText(detail.book_logo)"
+									class="sd-cover"
+									:src="detail.book_logo"
+									mode="aspectFill"
+								></image>
+								<view v-else class="sd-cover sd-cover--text">
+									<text class="sd-cover-text">{{ logoText }}</text>
+								</view>
+							</view>
+							<view class="sd-head-copy">
+								<text class="sd-title">{{ detail.book_name ?? "" }}</text>
+								<text v-if="hasText(detail.tags)" class="sd-meta">{{ detail.tags }}</text>
+								<text v-if="hasText(detail.category_name)" class="sd-tag">{{ detail.category_name }}</text>
+								<text v-if="hasText(detail.en_text)" class="sd-meta">{{ detail.en_text }}</text>
+							</view>
+						</view>
+
+						<view class="sd-code-card">
+							<view class="sd-code-head">
+								<text class="sd-code-label">口令码</text>
+								<view class="sd-code-actions">
+									<!-- <view
+										v-if="storyCodeList.length > 0"
+										class="sd-code-btn"
+										@tap="copyStoryCodes"
+									>
+										<text class="sd-code-btn-text">复制口令</text>
+									</view> -->
+									<view
+										class="sd-code-btn sd-code-btn--primary"
+										:class="{ 'sd-code-btn--disabled': !canApplyStoryCode }"
+										@tap="onApplyStoryCode"
+									>
+										<text class="sd-code-btn-text sd-code-btn-text--primary">申领口令</text>
+									</view>
+								</view>
+							</view>
+							<view v-if="storyCodeList.length > 0" class="sd-code-list">
+								<text
+									class="sd-code-value"
+									v-for="(item, index) in storyCodeList"
+									:key="index"
+									@tap="copyText(item)"
+								>{{ item }}{{ index < storyCodeList.length - 1 ? " · " : "" }}</text>
+							</view>
+							<text v-else class="sd-code-value sd-code-value--placeholder">暂未生成</text>
+							<text v-if="storyCodeList.length > 0" class="sd-code-tip">点击对应口令码即可复制</text>
+						</view>
+
+						<view v-if="hasText(detail.introduce)" class="sd-card">
+							<view class="sd-card-head">
+								<text class="sd-card-title">小说简介</text>
+								<view class="sd-card-btn" @tap="copyText(detail.introduce)">
+									<text class="sd-card-btn-text">复制文案</text>
+								</view>
+							</view>
+							<rich-text class="sd-rich" :nodes="detail.introduce"></rich-text>
+						</view>
+
+						<view v-if="hasText(detail.content)" class="sd-card">
+							<view class="sd-card-head">
+								<text class="sd-card-title">正文内容</text>
+								<view class="sd-card-btn" @tap="copyText(detail.content)">
+									<text class="sd-card-btn-text">一键复制</text>
+								</view>
+							</view>
+							<rich-text class="sd-rich" :nodes="detail.content"></rich-text>
+						</view>
+
+						<view v-if="hasText(detail.img_url)" class="sd-card">
+							<view class="sd-card-head">
+								<text class="sd-card-title">网盘素材</text>
+								<view class="sd-card-btn" @tap="copyText(detail.img_url)">
+									<text class="sd-card-btn-text">复制链接</text>
+								</view>
+							</view>
+							<text class="sd-link">{{ detail.img_url }}</text>
+						</view>
+
+						<view v-if="hasText(detail.spread_url)" class="sd-card">
+							<view class="sd-card-head">
+								<text class="sd-card-title">推广链接</text>
+								<view class="sd-card-btn" @tap="copyText(detail.spread_url)">
+									<text class="sd-card-btn-text">复制链接</text>
+								</view>
+							</view>
+							<text class="sd-link">{{ detail.spread_url }}</text>
+						</view>
+
+						<view v-if="episodesList.length > 0" class="sd-card">
+							<view class="sd-card-head">
+								<text class="sd-card-title">创作章节</text>
+							</view>
+							<view
+								class="sd-episode"
+								v-for="(item, index) in episodesList"
+								:key="index"
+								@tap="onEpisodeTap(item, index)"
+							>
+								<text class="sd-episode-text">第{{ index + 1 }}集</text>
+							</view>
+						</view>
+
+						<view
+							class="sd-collapse"
+							v-for="(sec, index) in infoSections"
+							:key="sec.key"
+						>
+							<view class="sd-collapse-head" @tap="toggleInfoSection(index)">
+								<text class="sd-collapse-title">{{ sec.title }}</text>
+								<cl-icon
+									:name="sec.open ? 'arrow-up-s-line' : 'arrow-down-s-line'"
+									:size="16"
+									color="#999999"
+								></cl-icon>
+							</view>
+							<view v-if="sec.open" class="sd-collapse-body">
+								<rich-text class="sd-rich" :nodes="sec.html"></rich-text>
+							</view>
+						</view>
+					</view>
+				</scroll-view>
+			</block>
+		</view>
+
+		<cl-popup
+			v-model="episodePopupVisible"
+			direction="bottom"
+			size="70%"
+			:show-header="false"
+		>
+			<view class="sd-popup">
+				<view class="sd-popup-head">
+					<text class="sd-popup-title">{{ episodePopupTitle }}</text>
+					<view class="sd-popup-close" @tap="episodePopupVisible = false">
+						<cl-icon name="close-line" :size="20" color="#666666"></cl-icon>
+					</view>
+				</view>
+				<scroll-view class="sd-popup-scroll" scroll-y="true" :show-scrollbar="false">
+					<rich-text
+						v-if="episodePopupHtml != ''"
+						class="sd-rich"
+						:nodes="episodePopupHtml"
+					></rich-text>
+					<view v-else class="sd-empty">
+						<text class="sd-empty-text">暂无内容</text>
+					</view>
+				</scroll-view>
+				<view v-if="episodePopupHtml != ''" class="sd-popup-foot" @tap="copyText(episodePopupHtml)">
+					<text class="sd-popup-copy">一键复制</text>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { applyStoryCode, getStoryDetail } from "@/.cool/api/task";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { Response, StoryDetail, StoryEpisodeItem } from "@/.cool";
+
+	type InfoSection = {
+		key: string;
+		title: string;
+		html: string;
+		open: boolean;
+	};
+
+	const storyId = ref(0);
+	const projectId = ref(0);
+	const pageLoading = ref(false);
+	const logoText = ref("故");
+	const detail = ref<StoryDetail>({});
+	const episodesList = ref<StoryEpisodeItem[]>([]);
+	const infoSections = ref<InfoSection[]>([]);
+	const episodePopupVisible = ref(false);
+	const episodePopupTitle = ref("");
+	const episodePopupHtml = ref("");
+	const applyingStoryCode = ref(false);
+	const DEFAULT_MAX_STORY_CODE_COUNT = 3;
+
+	const INFO_SECTIONS: InfoSection[] = [
+		{ key: "project_info", title: "项目说明", html: "", open: true },
+		{ key: "order_info", title: "订单", html: "", open: false },
+		{ key: "settlement_info", title: "结算", html: "", open: false },
+		{ key: "special_info", title: "特别注意", html: "", open: false }
+	];
+
+	function hasText(val: string | number | null | undefined): boolean {
+		return `${val ?? ""}`.trim() != "";
+	}
+
+	const maxStoryCodeCount = computed((): number => {
+		const raw = detail.value.max_code_count;
+		if (raw != null && raw > 0) {
+			return raw;
+		}
+		return DEFAULT_MAX_STORY_CODE_COUNT;
+	});
+
+	const storyCodeList = computed((): string[] => {
+		const codesRaw = detail.value.codes;
+		if (codesRaw != null && Array.isArray(codesRaw)) {
+			const list: string[] = [];
+			for (let i = 0; i < codesRaw.length; i++) {
+				const text = `${codesRaw[i] ?? ""}`.trim();
+				if (text != "") {
+					list.push(text);
+				}
+			}
+			if (list.length > 0) {
+				return list;
+			}
+		}
+		const code = `${detail.value.code ?? ""}`.trim();
+		if (code != "") {
+			return [code];
+		}
+		return [];
+	});
+
+	const canApplyStoryCode = computed((): boolean => {
+		if (applyingStoryCode.value || pageLoading.value) {
+			return false;
+		}
+		return storyCodeList.value.length < maxStoryCodeCount.value;
+	});
+
+	function getLogoText(title: string): string {
+		const text = title.trim();
+		if (text == "") {
+			return "故";
+		}
+		return text.substring(0, 1);
+	}
+
+	function parseStoryDetail(res: any | null): StoryDetail | null {
+		if (res == null) {
+			return null;
+		}
+		const envelope = res as UTSJSONObject;
+		let data = envelope["data"] ?? envelope;
+		if (data == null) {
+			return null;
+		}
+		if (Array.isArray(data)) {
+			const arr = data as any[];
+			if (arr.length == 0) {
+				return null;
+			}
+			data = arr[0];
+		}
+		return data as StoryDetail;
+	}
+
+	function readSectionHtml(data: StoryDetail, key: string): string {
+		const raw = data[key];
+		if (raw == null) {
+			return "";
+		}
+		const text = `${raw}`.trim();
+		if (text == "" || text == "null" || text == "undefined") {
+			return "";
+		}
+		return text;
+	}
+
+	function buildInfoSections(data: StoryDetail) {
+		const next: InfoSection[] = [];
+		for (let i = 0; i < INFO_SECTIONS.length; i++) {
+			const sec = INFO_SECTIONS[i];
+			const html = readSectionHtml(data, sec.key);
+			if (html == "") {
+				continue;
+			}
+			next.push({
+				key: sec.key,
+				title: sec.title,
+				html: html,
+				open: sec.open
+			});
+		}
+		infoSections.value = next;
+	}
+
+	function applyStoryDetail(data: StoryDetail) {
+		detail.value = data;
+		logoText.value = getLogoText(`${data.book_name ?? ""}`);
+		const episodesRaw = data.episodes_list;
+		if (episodesRaw != null && Array.isArray(episodesRaw)) {
+			episodesList.value = episodesRaw as StoryEpisodeItem[];
+		} else {
+			episodesList.value = [];
+		}
+		buildInfoSections(data);
+		if (hasText(data.book_name)) {
+			uni.setNavigationBarTitle({
+				title: `${data.book_name}`
+			});
+		}
+	}
+
+	function loadStoryDetail(id: number, pid: number, silent: boolean = false) {
+		if (id <= 0) {
+			return;
+		}
+		if (!silent && pageLoading.value) {
+			return;
+		}
+		if (pid <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		if (!silent) {
+			pageLoading.value = true;
+		}
+		getStoryDetail(id, pid)
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "加载失败"), icon: "none" });
+					return;
+				}
+				const row = parseStoryDetail(res);
+				if (row == null) {
+					if (!silent) {
+						uni.showToast({ title: "故事详情为空", icon: "none" });
+					}
+					return;
+				}
+				applyStoryDetail(row);
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				if (!silent) {
+					pageLoading.value = false;
+				}
+			});
+	}
+
+	function toggleInfoSection(index: number) {
+		const list = infoSections.value;
+		if (index < 0 || index >= list.length) {
+			return;
+		}
+		const sec = list[index];
+		sec.open = !sec.open;
+		infoSections.value = list;
+	}
+
+	function onEpisodeTap(item: StoryEpisodeItem, index: number) {
+		if (!hasText(item.content)) {
+			uni.showToast({ title: "暂无内容", icon: "none" });
+			return;
+		}
+		episodePopupTitle.value = `第${index + 1}集`;
+		episodePopupHtml.value = `${item.content}`;
+		episodePopupVisible.value = true;
+	}
+
+	function copyText(raw: string | null | undefined) {
+		const text = `${raw ?? ""}`.trim();
+		if (text == "") {
+			return;
+		}
+		uni.setClipboardData({
+			data: text,
+			success: () => {
+				uni.showToast({ title: "复制成功", icon: "none" });
+			}
+		});
+	}
+
+	function copyStoryCodes() {
+		const list = storyCodeList.value;
+		if (list.length == 0) {
+			return;
+		}
+		copyText(list.join(" · "));
+	}
+
+	function onApplyStoryCode() {
+		if (!canApplyStoryCode.value) {
+			return;
+		}
+		if (storyId.value <= 0) {
+			uni.showToast({ title: "缺少故事 ID", icon: "none" });
+			return;
+		}
+		if (projectId.value <= 0) {
+			uni.showToast({ title: "缺少项目 ID", icon: "none" });
+			return;
+		}
+		applyingStoryCode.value = true;
+		uni.showLoading({ title: "生成中..." });
+		applyStoryCode(storyId.value, projectId.value)
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "申领失败"), icon: "none" });
+					return;
+				}
+				uni.showToast({ title: getApiMessage(res, "申领成功"), icon: "success" });
+				loadStoryDetail(storyId.value, projectId.value, true);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "申领失败"), icon: "none" });
+			})
+			.finally(() => {
+				applyingStoryCode.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	onLoad((options) => {
+		const idVal = options["id"] as string | null;
+		const titleVal = options["book_name"] as string | null;
+		const logoVal = options["book_logo"] as string | null;
+		const projectIdVal = options["project_id"] as string | null;
+		const id = idVal != null ? parseInt(`${idVal}`) : 0;
+		if (projectIdVal != null) {
+			const pid = parseInt(`${projectIdVal}`);
+			projectId.value = isNaN(pid) ? 0 : pid;
+		}
+		if (titleVal != null && hasText(titleVal)) {
+			detail.value = {
+				book_name: `${titleVal}`.trim()
+			};
+			logoText.value = getLogoText(`${titleVal}`);
+			uni.setNavigationBarTitle({
+				title: `${titleVal}`.trim()
+			});
+		}
+		if (logoVal != null && hasText(logoVal)) {
+			detail.value.book_logo = `${logoVal}`.trim();
+		}
+		if (id <= 0) {
+			uni.showToast({ title: "缺少故事 ID", icon: "none" });
+			return;
+		}
+		storyId.value = id;
+		loadStoryDetail(id, projectId.value);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.sd-page {
+		width: 100%;
+		height: 100vh;
+		background-color: #f7f8fa;
+		box-sizing: border-box;
+		overflow: hidden;
+	}
+
+	.sd-loading {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sd-loading-text {
+		margin-top: 16rpx;
+		font-size: 26rpx;
+		color: #7b8193;
+		line-height: 36rpx;
+	}
+
+	.sd-scroll {
+		height: 100%;
+	}
+
+	.sd-inner {
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		box-sizing: border-box;
+	}
+
+	.sd-head {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		padding: 8rpx 0 24rpx;
+	}
+
+	.sd-cover-wrap {
+		width: 188rpx;
+		flex-shrink: 0;
+	}
+
+	.sd-cover {
+		width: 188rpx;
+		height: 250rpx;
+		border-radius: 14rpx;
+		overflow: hidden;
+	}
+
+	.sd-cover--text {
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sd-cover-text {
+		font-size: 48rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 64rpx;
+	}
+
+	.sd-head-copy {
+		flex: 1;
+		min-width: 0;
+		margin-left: 24rpx;
+	}
+
+	.sd-title {
+		font-size: 34rpx;
+		font-weight: 700;
+		color: #141b36;
+		line-height: 48rpx;
+	}
+
+	.sd-meta {
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		color: #7b8193;
+		line-height: 34rpx;
+	}
+
+	.sd-tag {
+		margin-top: 12rpx;
+		align-self: flex-start;
+		padding: 0 12rpx;
+		height: 38rpx;
+		line-height: 38rpx;
+		font-size: 20rpx;
+		color: #717dad;
+		background-color: #ffffff;
+		border-radius: 6rpx;
+	}
+
+	.sd-code-card {
+		margin-top: 4rpx;
+		padding: 24rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		box-sizing: border-box;
+	}
+
+	.sd-code-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 16rpx;
+	}
+
+	.sd-code-actions {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-shrink: 0;
+	}
+
+	.sd-code-label {
+		flex: 1;
+		min-width: 0;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 40rpx;
+	}
+
+	.sd-code-btn {
+		padding: 0 20rpx;
+		height: 48rpx;
+		border-radius: 24rpx;
+		background-color: #eef3fc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		margin-left: 12rpx;
+	}
+
+	.sd-code-btn--primary {
+		background-color: #2b59c3;
+	}
+
+	.sd-code-btn--disabled {
+		opacity: 0.35;
+	}
+
+	.sd-code-btn-text {
+		font-size: 22rpx;
+		font-weight: 600;
+		color: #2b59c3;
+		line-height: 32rpx;
+	}
+
+	.sd-code-btn-text--primary {
+		color: #ffffff;
+	}
+
+	.sd-code-list {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.sd-code-value {
+		font-size: 40rpx;
+		font-weight: 700;
+		color: #2b59c3;
+		line-height: 56rpx;
+		letter-spacing: 2rpx;
+	}
+
+	.sd-code-value--placeholder {
+		font-size: 28rpx;
+		font-weight: 500;
+		color: #999999;
+		letter-spacing: 0;
+	}
+
+	.sd-code-tip {
+		margin-top: 12rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.sd-card {
+		margin-top: 20rpx;
+		padding: 24rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		box-sizing: border-box;
+	}
+
+	.sd-card-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 20rpx;
+	}
+
+	.sd-card-title {
+		flex: 1;
+		min-width: 0;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 40rpx;
+	}
+
+	.sd-card-btn {
+		padding: 0 20rpx;
+		height: 48rpx;
+		border-radius: 24rpx;
+		background-color: #eef3fc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.sd-card-btn-text {
+		font-size: 22rpx;
+		font-weight: 600;
+		color: #2b59c3;
+		line-height: 32rpx;
+	}
+
+	.sd-link {
+		font-size: 24rpx;
+		color: #7b8193;
+		line-height: 36rpx;
+		word-break: break-all;
+	}
+
+	.sd-rich {
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 42rpx;
+	}
+
+	.sd-episode {
+		margin-top: 12rpx;
+		height: 80rpx;
+		border-radius: 16rpx;
+		background-color: #f6f7fb;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sd-episode-text {
+		font-size: 26rpx;
+		color: #141b36;
+		line-height: 36rpx;
+	}
+
+	.sd-collapse {
+		margin-top: 20rpx;
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		overflow: hidden;
+	}
+
+	.sd-collapse-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 0 24rpx;
+		height: 96rpx;
+		box-sizing: border-box;
+	}
+
+	.sd-collapse-title {
+		flex: 1;
+		min-width: 0;
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 40rpx;
+	}
+
+	.sd-collapse-body {
+		padding: 0 24rpx 24rpx;
+		box-sizing: border-box;
+	}
+
+	.sd-empty {
+		min-height: 200rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sd-empty-text {
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.sd-popup {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		box-sizing: border-box;
+		background-color: #ffffff;
+	}
+
+	.sd-popup-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 24rpx;
+	}
+
+	.sd-popup-title {
+		flex: 1;
+		min-width: 0;
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #141b36;
+		line-height: 44rpx;
+	}
+
+	.sd-popup-close {
+		width: 48rpx;
+		height: 48rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.sd-popup-scroll {
+		flex: 1;
+		min-height: 0;
+	}
+
+	.sd-popup-foot {
+		margin-top: 24rpx;
+		height: 88rpx;
+		border-radius: 44rpx;
+		background-color: #2b59c3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sd-popup-copy {
+		font-size: 28rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 40rpx;
+	}
+</style>

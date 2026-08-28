@@ -1,0 +1,225 @@
+<template>
+	<view
+		v-if="showTabbar"
+		class="ent-tabbar-root"
+		:class="{ 'ent-tabbar-root--overlay': !showSpacer }"
+	>
+		<view v-if="showSpacer" class="ent-tabbar-spacer"></view>
+		<view class="ent-tabbar">
+			<view
+				class="ent-tabbar-item"
+				v-for="item in tabs"
+				:key="item.path"
+				@tap="onSelect(item.path)"
+			>
+				<view v-if="isTabActive(item)" class="ent-tabbar-indicator"></view>
+				<view class="ent-tabbar-icon">
+					<image
+						v-if="resolveIconUrl(item) != ''"
+						class="ent-tabbar-icon-img"
+						:src="resolveIconUrl(item)"
+						mode="aspectFit"
+					></image>
+					<cl-icon
+						v-else
+						:name="item.icon"
+						:size="22"
+						:color="isTabActive(item) ? '#2b59c3' : '#999999'"
+					></cl-icon>
+					<view v-if="item.badge != ''" class="ent-tabbar-badge">
+						<text class="ent-tabbar-badge-text">{{ item.badge }}</text>
+					</view>
+				</view>
+				<text
+					class="ent-tabbar-text"
+					:class="{ 'ent-tabbar-text--active': isTabActive(item) }"
+				>
+					{{ item.text }}
+				</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script setup lang="ts">
+import { tabbar, tabbarMenus } from "@/.cool";
+import type { TabbarMenuItem } from "@/.cool/store/tabbar";
+import {
+	syncTabbarRoutePath,
+	tabbarRoutePath,
+	resolveActiveTabPath,
+	isTabPathActive
+} from "@/.cool/store/tabbar";
+import { computed, onMounted, watch } from "vue";
+
+defineOptions({
+	name: "custom-tabbar"
+});
+
+const props = defineProps({
+	/** 是否占位顶起内容（flex 布局页可关闭，改由列表 padding-bottom 避让底栏） */
+	showSpacer: {
+		type: Boolean,
+		default: false
+	}
+});
+
+const tabs = computed((): TabbarMenuItem[] => {
+	return tabbarMenus.value;
+});
+
+const showTabbar = computed(() => tabs.value.length > 1);
+
+const activePath = computed(() => {
+	return resolveActiveTabPath(tabbarRoutePath.value, tabs.value);
+});
+
+watch(
+	() => tabbarMenus.value.length,
+	() => {
+		syncTabbarRoutePath();
+	}
+);
+
+function isTabActive(item: TabbarMenuItem): boolean {
+	const active = activePath.value;
+	if (active != "") {
+		return active == item.path;
+	}
+	return isTabPathActive(item.path, tabbarRoutePath.value);
+}
+
+function resolveIconUrl(item: TabbarMenuItem): string {
+	const active = isTabActive(item);
+	if (active && item.iconActiveUrl != "") {
+		return item.iconActiveUrl;
+	}
+	if (item.iconUrl != "" && (item.iconUrl.indexOf("http") == 0 || item.iconUrl.indexOf("/") == 0)) {
+		return item.iconUrl;
+	}
+	return "";
+}
+
+function onSelect(pagePath: string) {
+	if (activePath.value == pagePath || isTabPathActive(pagePath, tabbarRoutePath.value)) {
+		return;
+	}
+	syncTabbarRoutePath();
+	uni.switchTab({
+		url: pagePath
+	});
+}
+
+onMounted(() => {
+	syncTabbarRoutePath();
+	tabbar.load();
+});
+</script>
+
+<style lang="scss" scoped>
+.ent-tabbar-root {
+	width: 100%;
+	max-width: 100%;
+	flex-shrink: 0;
+	background-color: #f7f8fa;
+
+	&--overlay {
+		height: 0;
+		overflow: visible;
+		background-color: transparent;
+	}
+}
+
+.ent-tabbar-spacer {
+	height: 112rpx;
+	padding-bottom: env(safe-area-inset-bottom);
+	background-color: #f7f8fa;
+}
+
+.ent-tabbar {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	width: 100%;
+	height: 112rpx;
+	padding-bottom: env(safe-area-inset-bottom);
+	background-color: #ffffff;
+	border-top-width: 1rpx;
+	border-top-style: solid;
+	border-top-color: #eeeeee;
+	display: flex;
+	flex-direction: row;
+	align-items: stretch;
+	box-sizing: border-box;
+	z-index: 100;
+
+	.ent-tabbar-item {
+		flex: 1;
+		height: 50px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		padding-top: 8rpx;
+	}
+
+	.ent-tabbar-indicator {
+		position: absolute;
+		top: 0;
+		left: 50%;
+		transform: translateX(-50%) translateY(-50%);
+		width: 48rpx;
+		height: 6rpx;
+		border-radius: 999rpx;
+		background-color: #2b59c3;
+	}
+
+	.ent-tabbar-icon {
+		width: 44rpx;
+		height: 44rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+	}
+
+	.ent-tabbar-icon-img {
+		width: 44rpx;
+		height: 44rpx;
+	}
+
+	.ent-tabbar-badge {
+		position: absolute;
+		top: -4rpx;
+		right: -8rpx;
+		min-width: 28rpx;
+		height: 28rpx;
+		padding: 0 6rpx;
+		border-radius: 999rpx;
+		background-color: #ff4d4f;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ent-tabbar-badge-text {
+		font-size: 18rpx;
+		color: #ffffff;
+		line-height: 24rpx;
+	}
+
+	.ent-tabbar-text {
+		margin-top: 4rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 30rpx;
+
+		&--active {
+			color: #2b59c3;
+			font-weight: 600;
+		}
+	}
+}
+</style>

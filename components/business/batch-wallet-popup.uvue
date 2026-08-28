@@ -1,0 +1,823 @@
+<!-- 批量设置钱包弹窗（估算对稿 375，待设计确认） -->
+<template>
+	<cl-popup
+		v-model="innerVisible"
+		direction="bottom"
+		size="auto"
+		:radius="24"
+		:show-header="false"
+		:show-close="false"
+		:mask-closable="true"
+		:padding="0"
+		:pt="{
+			className: 'bwp-popup',
+			inner: { className: 'bwp-popup-inner' }
+		}"
+	>
+		<view class="bwp">
+			<view class="bwp-body">
+				<view class="bwp-head">
+					<text class="bwp-title">批量设置钱包</text>
+					<view class="bwp-close" @tap="closePopup">
+						<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
+					</view>
+				</view>
+				<view class="bwp-tip-box">
+					<text class="bwp-desc">该功能支持一键开关多名员工钱包入口，默认类型下显示的为普通员工即未设置组长、组员身份的员工；按照已设置小组的名称作为展示类型；</text>
+					<view class="bwp-tip-row">
+						<text class="bwp-tip-star">*</text>
+						<text class="bwp-tip"> 请先开启员工的收益台后再设置钱包提现功能；</text>
+					</view>
+				</view>
+
+				<view class="bwp-tabs-panel">
+					<view v-if="groupsLoading" class="bwp-tabs-loading">
+						<cl-loading :loading="true" :size="20" color="#2b59c3"></cl-loading>
+					</view>
+					<cl-tabs
+						v-else-if="tabList.length > 0"
+						v-model="activeTabValue"
+						:list="tabList"
+						height="64rpx"
+						:gutter="0"
+						:show-line="false"
+						scroll-align="previous"
+						:pt="tabsPt"
+						@change="onTabChange"
+					>
+						<template #item="{ item, active }">
+							<view
+								class="bwp-tab-item"
+								:class="{ 'bwp-tab-item--active': active }"
+							>
+								<text
+									class="bwp-tab-text"
+									:class="{ 'bwp-tab-text--active': active }"
+								>{{ item.label }}</text>
+								<view v-if="active" class="bwp-tab-line"></view>
+							</view>
+						</template>
+					</cl-tabs>
+					<view v-else class="bwp-tabs-empty">
+						<text class="bwp-tabs-empty-text">暂无分组</text>
+					</view>
+				</view>
+
+				<scroll-view
+					class="bwp-list"
+					scroll-y="true"
+					:show-scrollbar="false"
+					:lower-threshold="80"
+					@scrolltolower="onMemberScrollToLower"
+				>
+					<view v-if="membersLoading && memberList.length == 0" class="bwp-empty">
+						<cl-loading :loading="true" :size="24" color="#2b59c3"></cl-loading>
+						<text class="bwp-empty-text">加载中...</text>
+					</view>
+					<block v-else>
+						<view
+							v-for="(item, index) in memberList"
+							:key="'m-' + index + '-' + memberRowId(item)"
+							class="bwp-row"
+						>
+							<view class="bwp-card">
+								<view class="bwp-card-main">
+									<view class="bwp-card-row">
+										<text class="bwp-card-label">用户昵称：</text>
+										<text class="bwp-card-value">{{ item.nickname }}</text>
+									</view>
+									<view class="bwp-card-row">
+										<text class="bwp-card-label">所属关系：</text>
+										<text class="bwp-card-value">{{ item.relation }}</text>
+									</view>
+								</view>
+								<view class="bwp-card-switch" @tap.stop>
+									<switch
+										:checked="isSelected(memberRowId(item))"
+										activeBackgroundColor="#2b59c3"
+										backgroundColor="#e8e8e8"
+										@change="onMemberSwitchChange(memberRowId(item), $event)"
+									/>
+								</view>
+							</view>
+						</view>
+						<view v-if="memberList.length == 0" class="bwp-empty">
+							<text class="bwp-empty-text">暂无员工</text>
+						</view>
+						<view v-else-if="membersLoadingMore" class="bwp-list-more">
+							<cl-loading :loading="true" :size="20" color="#2b59c3"></cl-loading>
+						</view>
+					</block>
+				</scroll-view>
+			</view>
+
+			<view class="bwp-footer">
+				<view
+					class="bwp-confirm"
+					:class="{ 'bwp-confirm--disabled': submitting }"
+					@tap="onConfirm"
+				>
+					<cl-loading v-if="submitting" :loading="true" :size="18" color="#ffffff"></cl-loading>
+					<text class="bwp-confirm-text">{{ submitting ? "提交中..." : "确认" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+	</cl-popup>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref, watch } from "vue";
+	import { getApiMessage } from "@/.cool";
+	import {
+		getStaffWithdrawPermissionGroups,
+		getStaffWithdrawPermissionList,
+		saveStaffWithdrawPermission
+	} from "@/.cool/api/staff";
+	import type {
+		Response,
+		StaffWithdrawPermissionGroupItem,
+		StaffWithdrawPermissionItem
+	} from "@/.cool";
+	import type { ClTabsItem } from "@/uni_modules/cool-ui/types/index";
+
+	const props = defineProps({
+		modelValue: { type: Boolean, default: false }
+	});
+
+	const emit = defineEmits(["update:modelValue", "confirm"]);
+
+	const innerVisible = computed({
+		get: (): boolean => {
+			return props.modelValue;
+		},
+		set: (val: boolean) => {
+			emit("update:modelValue", val);
+		}
+	});
+
+	/** 分组 Tab：接口 data.groups */
+	const groupList = ref<StaffWithdrawPermissionGroupItem[]>([]);
+	const groupsLoading = ref(false);
+	const activeTabValue = ref<string | number>(0);
+
+	/** 员工列表：接口 data.list，字段直接展示 */
+	const memberList = ref<StaffWithdrawPermissionItem[]>([]);
+	const membersLoading = ref(false);
+	const membersLoadingMore = ref(false);
+	const memberPage = ref(1);
+	const memberHasMore = ref(true);
+	const memberLimit = 20;
+	const selectedIds = ref<number[]>([]);
+	const submitting = ref(false);
+
+	const tabsPt = {
+		className: "bwp-cl-tabs",
+		item: {
+			className: "bwp-cl-tabs-item"
+		},
+		line: {
+			className: "bwp-cl-tabs-line"
+		}
+	};
+
+	const tabList = computed((): ClTabsItem[] => {
+		const result: ClTabsItem[] = [];
+		const groups = groupList.value;
+		for (let i = 0; i < groups.length; i++) {
+			const g = groups[i];
+			const name = g.name != null ? `${g.name}` : "";
+			const count = g.count != null ? g.count : 0;
+			result.push({
+				label: count > 0 ? `${name}(${count})` : name,
+				value: g.leader_user_id != null ? g.leader_user_id : i
+			} as ClTabsItem);
+		}
+		return result;
+	});
+
+	function memberRowId(item: StaffWithdrawPermissionItem): number {
+		if (item.id != null) {
+			return item.id as number;
+		}
+		if (item.staff_id != null) {
+			return item.staff_id as number;
+		}
+		if (item.user_id != null) {
+			return item.user_id as number;
+		}
+		return 0;
+	}
+
+	function pickGroupList(data: any): StaffWithdrawPermissionGroupItem[] {
+		if (data == null) {
+			return [];
+		}
+		if (Array.isArray(data)) {
+			return data as StaffWithdrawPermissionGroupItem[];
+		}
+		const obj = data as UTSJSONObject;
+		const groups = obj["groups"];
+		if (Array.isArray(groups)) {
+			return groups as StaffWithdrawPermissionGroupItem[];
+		}
+		const list = obj["list"];
+		if (Array.isArray(list)) {
+			return list as StaffWithdrawPermissionGroupItem[];
+		}
+		return [];
+	}
+
+	function pickMemberList(data: any): StaffWithdrawPermissionItem[] {
+		if (data == null) {
+			return [];
+		}
+		if (Array.isArray(data)) {
+			return data as StaffWithdrawPermissionItem[];
+		}
+		const obj = data as UTSJSONObject;
+		const list = obj["list"];
+		if (Array.isArray(list)) {
+			return list as StaffWithdrawPermissionItem[];
+		}
+		return [];
+	}
+
+	function pickMemberTotal(data: any, listLen: number): number {
+		if (data == null || Array.isArray(data)) {
+			return listLen;
+		}
+		const obj = data as UTSJSONObject;
+		const count = obj["count"];
+		if (typeof count == "number") {
+			return count;
+		}
+		const total = obj["total"];
+		if (typeof total == "number") {
+			return total;
+		}
+		return listLen;
+	}
+
+	function pickFirstTabValue(list: StaffWithdrawPermissionGroupItem[]): string | number {
+		if (list.length == 0) {
+			return 0;
+		}
+		const first = list[0];
+		if (first.leader_user_id != null) {
+			return first.leader_user_id as number;
+		}
+		return 0;
+	}
+
+	function toLeaderUserId(value: string | number): number {
+		if (typeof value == "number") {
+			return value;
+		}
+		const n = parseInt(`${value}`);
+		return isNaN(n) ? 0 : n;
+	}
+
+	function memberWithdrawOn(item: StaffWithdrawPermissionItem): boolean {
+		const v = item.can_withdraw;
+		if (v == null) {
+			return false;
+		}
+		if (typeof v == "number") {
+			return v == 1;
+		}
+		return `${v}` == "1" || `${v}` == "true";
+	}
+
+	function mergeSelectedFromRows(rows: StaffWithdrawPermissionItem[], reset: boolean) {
+		const next: number[] = reset ? [] : selectedIds.value.slice();
+		for (let i = 0; i < rows.length; i++) {
+			const id = memberRowId(rows[i]);
+			if (id <= 0) {
+				continue;
+			}
+			const idx = next.indexOf(id);
+			if (memberWithdrawOn(rows[i])) {
+				if (idx < 0) {
+					next.push(id);
+				}
+			} else if (reset && idx >= 0) {
+				next.splice(idx, 1);
+			}
+		}
+		selectedIds.value = next;
+	}
+
+	function loadMembers(reset: boolean) {
+		if (reset) {
+			memberPage.value = 1;
+			memberHasMore.value = true;
+			membersLoading.value = true;
+		} else {
+			if (!memberHasMore.value || membersLoadingMore.value || membersLoading.value) {
+				return;
+			}
+			membersLoadingMore.value = true;
+		}
+		const page = reset ? 1 : memberPage.value;
+		getStaffWithdrawPermissionList({
+			leader_user_id: toLeaderUserId(activeTabValue.value),
+			page: page,
+			limit: memberLimit
+		})
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && code != 1) {
+					if (reset) {
+						memberList.value = [];
+						selectedIds.value = [];
+					}
+					uni.showToast({
+						title: getApiMessage(envelope, "加载员工失败"),
+						icon: "none"
+					});
+					return;
+				}
+				const payload = envelope["data"] ?? envelope;
+				const rows = pickMemberList(payload);
+				const total = pickMemberTotal(payload, rows.length);
+				if (reset) {
+					memberList.value = rows;
+				} else {
+					memberList.value = memberList.value.concat(rows);
+				}
+				mergeSelectedFromRows(rows, reset);
+				memberPage.value = page + 1;
+				memberHasMore.value = memberList.value.length < total && rows.length > 0;
+			})
+			.catch((err) => {
+				if (reset) {
+					memberList.value = [];
+					selectedIds.value = [];
+				}
+				const res = err as Response;
+				uni.showToast({
+					title: getApiMessage(res, "加载员工失败"),
+					icon: "none"
+				});
+			})
+			.finally(() => {
+				membersLoading.value = false;
+				membersLoadingMore.value = false;
+			});
+	}
+
+	function loadGroups() {
+		groupsLoading.value = true;
+		memberList.value = [];
+		getStaffWithdrawPermissionGroups()
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && code != 1) {
+					groupList.value = [];
+					activeTabValue.value = 0;
+					uni.showToast({
+						title: getApiMessage(envelope, "加载分组失败"),
+						icon: "none"
+					});
+					return;
+				}
+				const payload = envelope["data"] ?? envelope;
+				const list = pickGroupList(payload);
+				groupList.value = list;
+				activeTabValue.value = pickFirstTabValue(list);
+				selectedIds.value = [];
+				loadMembers(true);
+			})
+			.catch((err) => {
+				groupList.value = [];
+				activeTabValue.value = 0;
+				memberList.value = [];
+				const res = err as Response;
+				uni.showToast({
+					title: getApiMessage(res, "加载分组失败"),
+					icon: "none"
+				});
+			})
+			.finally(() => {
+				groupsLoading.value = false;
+			});
+	}
+
+	function onTabChange(value: string | number) {
+		activeTabValue.value = value;
+		selectedIds.value = [];
+		loadMembers(true);
+	}
+
+	function onMemberScrollToLower() {
+		loadMembers(false);
+	}
+
+	function isSelected(id: number): boolean {
+		if (id <= 0) {
+			return false;
+		}
+		return selectedIds.value.indexOf(id) >= 0;
+	}
+
+	function onMemberSwitchChange(id: number, e: UniSwitchChangeEvent) {
+		if (id <= 0) {
+			return;
+		}
+		const on = e.detail.value;
+		const list = selectedIds.value.slice();
+		const idx = list.indexOf(id);
+		if (on) {
+			if (idx < 0) {
+				list.push(id);
+			}
+		} else if (idx >= 0) {
+			list.splice(idx, 1);
+		}
+		selectedIds.value = list;
+	}
+
+	function closePopup() {
+		if (submitting.value) {
+			return;
+		}
+		innerVisible.value = false;
+	}
+
+	function saveWithdrawBatch(ids: number[], canWithdraw: number): Promise<boolean> {
+		if (ids.length == 0) {
+			return Promise.resolve(true);
+		}
+		return saveStaffWithdrawPermission({
+			ids: ids,
+			can_withdraw: canWithdraw
+		}).then((res) => {
+			const envelope = res as UTSJSONObject;
+			const code = envelope["code"];
+			if (code != null && code != 1) {
+				uni.showToast({
+					title: getApiMessage(envelope, "保存失败"),
+					icon: "none"
+				});
+				return false;
+			}
+			return true;
+		});
+	}
+
+	function onConfirm() {
+		if (submitting.value) {
+			return;
+		}
+		const enableIds: number[] = [];
+		const disableIds: number[] = [];
+		const members = memberList.value;
+		for (let i = 0; i < members.length; i++) {
+			const item = members[i];
+			const id = memberRowId(item);
+			if (id <= 0) {
+				continue;
+			}
+			const nowOn = isSelected(id);
+			const wasOn = memberWithdrawOn(item);
+			if (nowOn && !wasOn) {
+				enableIds.push(id);
+			} else if (!nowOn && wasOn) {
+				disableIds.push(id);
+			}
+		}
+		if (enableIds.length == 0 && disableIds.length == 0) {
+			uni.showToast({ title: "未修改提现权限", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		saveWithdrawBatch(enableIds, 1)
+			.then((okEnable) => {
+				if (!okEnable) {
+					return false;
+				}
+				return saveWithdrawBatch(disableIds, 0);
+			})
+			.then((ok) => {
+				if (ok != true) {
+					return;
+				}
+				uni.showToast({ title: "保存成功", icon: "none" });
+				emit("confirm", {
+					tabId: activeTabValue.value,
+					selectedIds: selectedIds.value.slice(),
+					enableIds: enableIds,
+					disableIds: disableIds
+				});
+				innerVisible.value = false;
+			})
+			.catch((err) => {
+				const res = err as Response;
+				uni.showToast({
+					title: getApiMessage(res, "保存失败"),
+					icon: "none"
+				});
+			})
+			.finally(() => {
+				submitting.value = false;
+			});
+	}
+
+	watch(
+		() => props.modelValue,
+		(visible) => {
+			if (visible) {
+				selectedIds.value = [];
+				loadGroups();
+			}
+		}
+	);
+</script>
+
+<style lang="scss">
+	.bwp-popup-inner {
+		background-color: transparent !important;
+	}
+</style>
+
+<style lang="scss" scoped>
+	.bwp {
+		width: 100%;
+		border-radius: 24rpx 24rpx 0 0;
+		background-color: #ffffff;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.bwp-body {
+		padding: 32rpx 30rpx 0;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.bwp-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.bwp-title {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #111111;
+		line-height: 44rpx;
+	}
+
+	.bwp-close {
+		width: 48rpx;
+		height: 48rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.bwp-tip-box {
+		margin-top: 20rpx;
+		padding: 20rpx 24rpx;
+		border-radius: 12rpx;
+		background-color: #f7f8fa;
+		box-sizing: border-box;
+	}
+
+	.bwp-desc {
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.bwp-tip-row {
+		margin-top: 8rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		flex-wrap: wrap;
+	}
+
+	.bwp-tip-star {
+		font-size: 22rpx;
+		color: #ef4444;
+		line-height: 34rpx;
+	}
+
+	.bwp-tip {
+		flex: 1;
+		min-width: 0;
+		font-size: 22rpx;
+		color: #666666;
+		line-height: 34rpx;
+	}
+
+	.bwp-tabs-panel {
+		margin-top: 20rpx;
+		width: 100%;
+		min-width: 0;
+		border-bottom-width: 1rpx;
+		border-bottom-style: solid;
+		border-bottom-color: #e5e5e5;
+	}
+
+	.bwp-tabs-loading,
+	.bwp-tabs-empty {
+		height: 64rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.bwp-tabs-empty-text {
+		font-size: 24rpx;
+		color: #999999;
+	}
+
+	.bwp-tab-item {
+		position: relative;
+		padding-bottom: 12rpx;
+		margin-right: 32rpx;
+		flex-shrink: 0;
+	}
+
+	.bwp-tab-text {
+		font-size: 26rpx;
+		line-height: 36rpx;
+		color: #999999;
+		white-space: nowrap;
+
+		&--active {
+			color: #333333;
+			font-weight: 700;
+		}
+	}
+
+	.bwp-tab-line {
+		position: absolute;
+		left: 50%;
+		bottom: 0;
+		width: 36rpx;
+		height: 4rpx;
+		margin-left: -18rpx;
+		border-radius: 4rpx;
+		background-color: #333333;
+	}
+
+	.bwp-tabs-panel :deep(.bwp-cl-tabs) {
+		width: 100%;
+	}
+
+	.bwp-tabs-panel :deep(.cl-tabs__scrollbar) {
+		width: 100%;
+	}
+
+	.bwp-tabs-panel :deep(.cl-tabs__inner) {
+		align-items: flex-end;
+	}
+
+	.bwp-tabs-panel :deep(.cl-tabs__line),
+	.bwp-tabs-panel :deep(.cl-tabs__slider) {
+		display: none;
+	}
+
+	.bwp-tabs-panel :deep(.bwp-cl-tabs-item) {
+		height: auto !important;
+		padding: 0 !important;
+		flex-shrink: 0;
+
+		.cl-text {
+			display: none;
+		}
+
+		&:last-child .bwp-tab-item {
+			margin-right: 0;
+		}
+	}
+
+	.bwp-list {
+		margin-top: 20rpx;
+		height: 520rpx;
+		width: 100%;
+	}
+
+	.bwp-row {
+		margin-bottom: 16rpx;
+	}
+
+	.bwp-card {
+		width: 100%;
+		padding: 18rpx 20rpx;
+		border-radius: 8rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #dddddd;
+		background-color: #ffffff;
+		box-sizing: border-box;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.bwp-card-main {
+		flex: 1;
+		min-width: 0;
+		margin-right: 16rpx;
+	}
+
+	.bwp-card-switch {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transform: scale(0.88);
+	}
+
+	.bwp-card-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		flex-wrap: nowrap;
+	}
+
+	.bwp-card-row + .bwp-card-row {
+		margin-top: 8rpx;
+	}
+
+	.bwp-card-label,
+	.bwp-card-value {
+		font-size: 26rpx;
+		line-height: 36rpx;
+		color: #333333;
+		white-space: nowrap;
+	}
+
+	.bwp-card-value {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.bwp-empty {
+		padding: 80rpx 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12rpx;
+	}
+
+	.bwp-empty-text {
+		font-size: 26rpx;
+		color: #999999;
+	}
+
+	.bwp-list-more {
+		padding: 16rpx 0 24rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.bwp-footer {
+		flex-shrink: 0;
+		padding: 24rpx 40rpx;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f0f0f0;
+		background-color: #ffffff;
+		box-sizing: border-box;
+	}
+
+	.bwp-confirm {
+		height: 96rpx;
+		border-radius: 24rpx;
+		background-color: #2b59c3;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 12rpx;
+		box-shadow: 0 16rpx 40rpx -12rpx rgba(43, 89, 195, 0.45);
+
+		&--disabled {
+			opacity: 0.7;
+		}
+	}
+
+	.bwp-confirm-text {
+		font-size: 30rpx;
+		font-weight: 700;
+		color: #ffffff;
+		line-height: 42rpx;
+	}
+</style>

@@ -1,0 +1,628 @@
+<template>
+	<cl-page :pt="{ className: 'ac-add-page' }">
+		<view class="ac-add-page">
+
+			<scroll-view class="ac-add-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="ac-add-body">
+					<view class="ac-field-card">
+					<view class="ac-field">
+						<view class="ac-label-row">
+							<text class="ac-label">平台</text>
+							<text class="ac-required">*</text>
+						</view>
+						<view class="ac-select" @tap="openPlatformPopup">
+							<text v-if="form.platform_name != ''" class="ac-select-text">{{ form.platform_name }}</text>
+							<text v-else class="ac-select-placeholder">请选择平台</text>
+							<cl-icon name="arrow-down-s-line" :size="16" color="#aeb1bd"></cl-icon>
+						</view>
+					</view>
+
+					<view class="ac-field">
+						<view class="ac-label-row">
+							<text class="ac-label">账号 ID</text>
+							<text class="ac-required">*</text>
+						</view>
+						<input
+							class="ac-input"
+							v-model="form.account_id"
+							placeholder="请输入账号 ID"
+							placeholder-class="ac-input-placeholder"
+							maxlength="120"
+						/>
+					</view>
+
+					<view class="ac-field">
+						<view class="ac-label-row">
+							<text class="ac-label">账号名称</text>
+							<text class="ac-required">*</text>
+						</view>
+						<input
+							class="ac-input"
+							v-model="form.account_title"
+							placeholder="请输入账号名称"
+							placeholder-class="ac-input-placeholder"
+							maxlength="120"
+						/>
+					</view>
+
+					<view class="ac-field">
+						<view class="ac-label-row">
+							<text class="ac-label">账号UID</text>
+							<text class="ac-required">*</text>
+						</view>
+						<input
+							class="ac-input"
+							v-model="form.account_uid"
+							:placeholder="accountUidPlaceholder"
+							placeholder-class="ac-input-placeholder"
+							:maxlength="accountUidMaxLength"
+						/>
+						<text v-if="isCapCutPlatform" class="ac-field-tip">CapCut账号UID须为19位</text>
+					</view>
+
+					<view class="ac-field">
+						<view class="ac-label-row">
+							<text class="ac-label">账号DID</text>
+						</view>
+						<input
+							class="ac-input"
+							v-model="form.account_did"
+							placeholder="请输入账号DID"
+							placeholder-class="ac-input-placeholder"
+							maxlength="120"
+						/>
+					</view>
+
+					<view class="ac-field">
+						<view class="ac-label-row">
+							<text class="ac-label">粉丝数量</text>
+							<text class="ac-required">*</text>
+						</view>
+						<input
+							class="ac-input"
+							v-model="form.fans"
+							type="number"
+							placeholder="请输入粉丝数量"
+							placeholder-class="ac-input-placeholder"
+							maxlength="20"
+						/>
+					</view>
+
+					<view class="ac-field ac-field--last">
+						<view class="ac-label-row">
+							<text class="ac-label">主页链接</text>
+						</view>
+						<input
+							class="ac-input"
+							v-model="form.account_home"
+							placeholder="请输入主页链接"
+							placeholder-class="ac-input-placeholder"
+							maxlength="200"
+						/>
+					</view>
+				</view>
+				</view>
+			</scroll-view>
+		</view>
+
+		<view class="ac-footer">
+			<view
+				class="ac-submit"
+				:class="{ 'ac-submit--disabled': submitting || pageLoading }"
+				@tap="onSubmit"
+			>
+				<text class="ac-submit-text">{{ submitting ? "保存中..." : "保存" }}</text>
+			</view>
+		</view>
+
+		<cl-popup v-model="platformPopupVisible" direction="bottom" :show-header="false">
+			<view class="ac-picker-popup">
+				<view class="ac-picker-head">
+					<text class="ac-picker-title">选择平台</text>
+					<cl-icon name="close-line" :size="18" color="#999999" @tap="platformPopupVisible = false"></cl-icon>
+				</view>
+				<view v-if="dictLoading" class="ac-picker-empty">
+					<text class="ac-picker-empty-text">加载中...</text>
+				</view>
+				<view v-else-if="platformDictList.length == 0" class="ac-picker-empty">
+					<text class="ac-picker-empty-text">暂无选项</text>
+				</view>
+				<scroll-view v-else class="ac-picker-scroll" scroll-y="true">
+					<view
+						v-for="(item, index) in platformDictList"
+						:key="index"
+						class="ac-picker-item"
+						:class="{ 'ac-picker-item--active': form.platform_name == item.name }"
+						@tap="onPickPlatform(item.name)"
+					>
+						<text class="ac-picker-item-text">{{ item.name }}</text>
+					</view>
+				</scroll-view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { addAccount, editAccount, getAccountList, getDictList } from "@/.cool/api/account";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { AccountDictItem } from "@/.cool/types/account";
+
+	type FormData = {
+		platform_name: string;
+		account_id: string;
+		account_title: string;
+		account_uid: string;
+		account_did: string;
+		fans: string;
+		account_home: string;
+	};
+
+	const editId = ref(0);
+	const form = ref<FormData>({
+		platform_name: "",
+		account_id: "",
+		account_title: "",
+		account_uid: "",
+		account_did: "",
+		fans: "",
+		account_home: ""
+	});
+	const platformDictList = ref<AccountDictItem[]>([]);
+	const platformPopupVisible = ref(false);
+	const dictLoading = ref(false);
+	const pageLoading = ref(false);
+	const submitting = ref(false);
+	const CAPCUT_PLATFORM_NAME = "CapCut";
+	const CAPCUT_UID_LENGTH = 19;
+
+	const pageTitle = computed((): string => {
+		return editId.value > 0 ? "编辑账号" : "新增账号";
+	});
+
+	const isCapCutPlatform = computed((): boolean => {
+		return form.value.platform_name.trim() == CAPCUT_PLATFORM_NAME;
+	});
+
+	const accountUidMaxLength = computed((): number => {
+		return isCapCutPlatform.value ? CAPCUT_UID_LENGTH : 120;
+	});
+
+	const accountUidPlaceholder = computed((): string => {
+		return isCapCutPlatform.value ? "请输入19位账号UID" : "请输入账号UID";
+	});
+
+	function sortDictList(list: AccountDictItem[]): AccountDictItem[] {
+		return list.slice().sort((a, b) => {
+			const sortDiff = (b.sort ?? 0) - (a.sort ?? 0);
+			if (sortDiff != 0) {
+				return sortDiff;
+			}
+			return (a.id ?? 0) - (b.id ?? 0);
+		});
+	}
+
+	function parseDictList(payload: any | null): AccountDictItem[] {
+		if (payload == null) {
+			return [];
+		}
+		const envelope = payload as UTSJSONObject;
+		const data = envelope["data"] ?? envelope;
+		let listRaw: any | null = null;
+		if (data instanceof Array) {
+			listRaw = data;
+		} else {
+			const dataObj = data as UTSJSONObject;
+			listRaw = dataObj["list"];
+		}
+		if (!(listRaw instanceof Array)) {
+			return [];
+		}
+		const result: AccountDictItem[] = [];
+		for (let i = 0; i < listRaw.length; i++) {
+			const row = listRaw[i] as UTSJSONObject;
+			result.push({
+				id: parseInt(`${row["id"] ?? 0}`),
+				name: `${row["name"] ?? ""}`,
+				sort: parseInt(`${row["sort"] ?? 0}`)
+			});
+		}
+		return sortDictList(result);
+	}
+
+	function loadDictOptions() {
+		dictLoading.value = true;
+		getDictList("account_platform")
+			.then((res) => {
+				platformDictList.value = parseDictList(res);
+			})
+			.catch(() => {
+				platformDictList.value = [];
+			})
+			.finally(() => {
+				dictLoading.value = false;
+			});
+	}
+
+	function loadAccountDetail(id: number) {
+		pageLoading.value = true;
+		uni.showLoading({ title: "加载中..." });
+		getAccountList({})
+			.then((res) => {
+				const envelope = res as UTSJSONObject;
+				const data = envelope["data"] ?? envelope;
+				const dataObj = data as UTSJSONObject;
+				const listRaw = dataObj["list"];
+				if (!(listRaw instanceof Array)) {
+					return;
+				}
+				for (let i = 0; i < listRaw.length; i++) {
+					const row = listRaw[i] as UTSJSONObject;
+					if (parseInt(`${row["id"] ?? 0}`) == id) {
+						form.value = {
+							platform_name: `${row["platform_name"] ?? ""}`,
+							account_id: `${row["account_id"] ?? ""}`,
+							account_title: `${row["account_title"] ?? ""}`,
+							account_uid: `${row["account_uid"] ?? ""}`,
+							account_did: `${row["account_did"] ?? ""}`,
+							fans: `${row["fans"] ?? 0}`,
+							account_home: `${row["account_home"] ?? ""}`
+						};
+						break;
+					}
+				}
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				pageLoading.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function openPlatformPopup() {
+		if (pageLoading.value) {
+			return;
+		}
+		if (platformDictList.value.length == 0 && !dictLoading.value) {
+			loadDictOptions();
+		}
+		platformPopupVisible.value = true;
+	}
+
+	function onPickPlatform(name: string) {
+		const text = name.trim();
+		if (text == "") {
+			return;
+		}
+		form.value.platform_name = text;
+		platformPopupVisible.value = false;
+	}
+
+	function validate(): string {
+		if (form.value.platform_name.trim() == "") {
+			return "请选择平台";
+		}
+		if (form.value.account_id.trim() == "") {
+			return "请输入账号 ID";
+		}
+		if (form.value.account_title.trim() == "") {
+			return "请输入账号名称";
+		}
+		if (form.value.account_uid.trim() == "") {
+			return "请输入账号UID";
+		}
+		const accountUid = form.value.account_uid.trim();
+		if (form.value.platform_name.trim() == CAPCUT_PLATFORM_NAME) {
+			if (accountUid.length != CAPCUT_UID_LENGTH) {
+				return "CapCut账号UID须为19位";
+			}
+		}
+		const fansRaw = form.value.fans.trim();
+		if (fansRaw == "") {
+			return "请输入粉丝数量";
+		}
+		const fans = parseInt(fansRaw);
+		if (isNaN(fans) || fans < 0) {
+			return "粉丝数量须为非负整数";
+		}
+		return "";
+	}
+
+	function buildSubmitParams() {
+		return {
+			platform_name: form.value.platform_name.trim(),
+			account_id: form.value.account_id.trim(),
+			account_title: form.value.account_title.trim(),
+			account_uid: form.value.account_uid.trim(),
+			account_did: form.value.account_did.trim(),
+			account_home: form.value.account_home.trim(),
+			fans: parseInt(form.value.fans.trim())
+		};
+	}
+
+	function onSubmit() {
+		if (submitting.value || pageLoading.value) {
+			return;
+		}
+		const err = validate();
+		if (err != "") {
+			uni.showToast({ title: err, icon: "none" });
+			return;
+		}
+		const payload = buildSubmitParams();
+		submitting.value = true;
+		uni.showLoading({ title: "保存中..." });
+		const request =
+			editId.value > 0
+				? editAccount({
+						id: editId.value,
+						...payload
+					})
+				: addAccount(payload);
+		request
+			.then((res) => {
+				if (res != null) {
+					const envelope = res as UTSJSONObject;
+					const code = envelope["code"];
+					if (code != null && !isApiSuccess(code)) {
+						uni.showToast({ title: getApiMessage(res, "保存失败"), icon: "none" });
+						return;
+					}
+				}
+				uni.showToast({
+					title: editId.value > 0 ? "保存成功" : "添加成功",
+					icon: "success"
+				});
+				setTimeout(() => {
+					uni.navigateBack();
+				}, 2000);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "保存失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	onLoad((options) => {
+		loadDictOptions();
+		const query = options as UTSJSONObject;
+		const id = parseInt(`${query["id"] ?? 0}`);
+		if (id > 0) {
+			editId.value = id;
+			uni.setNavigationBarTitle({ title: pageTitle.value });
+			const platformName = `${query["platform_name"] ?? ""}`.trim();
+			const accountId = `${query["account_id"] ?? ""}`.trim();
+			const accountTitle = `${query["account_title"] ?? ""}`.trim();
+			if (platformName != "" || accountId != "" || accountTitle != "") {
+				form.value = {
+					platform_name: platformName,
+					account_id: accountId,
+					account_title: accountTitle,
+					account_uid: `${query["account_uid"] ?? ""}`,
+					account_did: `${query["account_did"] ?? ""}`,
+					fans: `${query["fans"] ?? ""}`,
+					account_home: `${query["account_home"] ?? ""}`
+				};
+			} else {
+				loadAccountDetail(id);
+			}
+			return;
+		}
+		const presetPlatform = `${query["platform_name"] ?? ""}`.trim();
+		if (presetPlatform != "") {
+			form.value.platform_name = presetPlatform;
+		}
+	});
+</script>
+
+<style lang="scss" scoped>
+	.ac-add-page {
+		min-height: 100vh;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.ac-add-scroll {
+		flex: 1;
+		height: 0;
+	}
+
+	.ac-add-body {
+		padding: 26rpx 30rpx calc(140rpx + env(safe-area-inset-bottom));
+		box-sizing: border-box;
+	}
+
+	.ac-field-card {
+		background-color: #ffffff;
+		border-radius: 16rpx;
+		padding: 30rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-field {
+		margin-bottom: 30rpx;
+
+		&--last {
+			margin-bottom: 0;
+		}
+	}
+
+	.ac-label-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin-bottom: 20rpx;
+	}
+
+	.ac-label {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #141b36;
+	}
+
+	.ac-required {
+		margin-left: 8rpx;
+		font-size: 30rpx;
+		color: #ff3362;
+	}
+
+	.ac-input,
+	.ac-select {
+		width: 100%;
+		height: 80rpx;
+		padding: 0 20rpx;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #e0e2e7;
+		border-radius: 10rpx;
+		background-color: #ffffff;
+		box-sizing: border-box;
+	}
+
+	.ac-input {
+		font-size: 28rpx;
+		color: #141b36;
+	}
+
+	.ac-input-placeholder {
+		color: #aeb1bd;
+		font-size: 28rpx;
+	}
+
+	.ac-field-tip {
+		margin-top: 12rpx;
+		font-size: 22rpx;
+		color: #999999;
+		line-height: 32rpx;
+	}
+
+	.ac-select {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.ac-select-text {
+		font-size: 28rpx;
+		color: #141b36;
+	}
+
+	.ac-select-placeholder {
+		font-size: 28rpx;
+		color: #aeb1bd;
+	}
+
+	.ac-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 100;
+		padding: 24rpx 30rpx calc(24rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #eeeeee;
+		box-sizing: border-box;
+	}
+
+	.ac-submit {
+		width: 100%;
+		height: 96rpx;
+		border-radius: 16rpx;
+		background-color: #0651f8;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+
+		&--disabled {
+			opacity: 0.55;
+		}
+	}
+
+	.ac-submit-text {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #ffffff;
+		line-height: 44rpx;
+	}
+
+	.ac-picker-popup {
+		padding: 30rpx 0 calc(10rpx + env(safe-area-inset-bottom));
+		background-color: #ffffff;
+		min-height: 300rpx;
+		max-height: 700rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-picker-head {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 16rpx;
+		padding: 0 30rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-picker-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #141b36;
+	}
+
+	.ac-picker-empty {
+		padding: 48rpx 30rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
+	.ac-picker-empty-text {
+		font-size: 28rpx;
+		color: #7b8193;
+	}
+
+	.ac-picker-scroll {
+		width: 100%;
+		max-height: 500rpx;
+		min-height: 200rpx;
+		box-sizing: border-box;
+	}
+
+	.ac-picker-item {
+		padding-left: 30rpx;
+		padding-right: 0;
+		height: 100rpx;
+		display: flex;
+		align-items: center;
+        justify-content: center;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f2f2f2;
+		box-sizing: border-box;
+
+		&--active {
+			.ac-picker-item-text {
+				color: #ef4222;
+				font-weight: 600;
+			}
+		}
+	}
+
+	.ac-picker-item-text {
+		font-size: 28rpx;
+		color: #141b36;
+	}
+</style>

@@ -1,0 +1,658 @@
+<template>
+	<cl-page :pt="{ className: 'aa-page' }" :back-top="false">
+		<view class="aa-page">
+			<view v-if="pageLoading" class="aa-loading">
+				<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
+				<text class="aa-loading-text">加载中...</text>
+			</view>
+
+			<scroll-view v-else class="aa-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="aa-body">
+					<view class="aa-card">
+						<view class="aa-head">
+							<view class="aa-icon">
+								<text class="aa-icon-text">{{ logoText }}</text>
+							</view>
+							<view class="aa-head-copy">
+								<text class="aa-title">{{ enterpriseName }}</text>
+								<text class="aa-sub">{{ nickname != "" ? nickname : "—" }}</text>
+							</view>
+							<view class="aa-status-tag" :class="'aa-status-tag--' + statusTagType">
+								<text class="aa-status-text" :class="'aa-status-text--' + statusTagType">{{ statusText }}</text>
+							</view>
+						</view>
+
+						<view class="aa-row">
+							<text class="aa-label">申请单号</text>
+							<text class="aa-value">{{ applyNo }}</text>
+						</view>
+						<view v-if="mobile != ''" class="aa-row">
+							<text class="aa-label">手机号</text>
+							<text class="aa-value">{{ mobile }}</text>
+						</view>
+						<view class="aa-row">
+							<text class="aa-label">提交时间</text>
+							<text class="aa-value">{{ createTime }}</text>
+						</view>
+						<view v-if="auditTime != ''" class="aa-row">
+							<text class="aa-label">审核时间</text>
+							<text class="aa-value">{{ auditTime }}</text>
+						</view>
+						<view v-if="rejectReason != ''" class="aa-reject-box">
+							<text class="aa-reject-label">驳回原因</text>
+							<text class="aa-reject-text">{{ rejectReason }}</text>
+						</view>
+					</view>
+
+					<view v-if="!canAudit" class="aa-done-tip">
+						<text class="aa-done-tip-text">该申请已处理，无需重复审核</text>
+					</view>
+
+					<cl-safe-area type="bottom"></cl-safe-area>
+				</view>
+			</scroll-view>
+
+			<view v-if="!pageLoading && canAudit" class="aa-footer">
+				<view class="aa-btn aa-btn--reject" @tap="openRejectPopup">
+					<text class="aa-btn-text aa-btn-text--reject">驳回</text>
+				</view>
+				<view class="aa-btn aa-btn--approve" @tap="onApprove">
+					<text class="aa-btn-text aa-btn-text--approve">{{ submitting ? "提交中..." : "通过" }}</text>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</view>
+
+		<cl-popup
+			v-model="rejectPopupVisible"
+			direction="center"
+			size="640rpx"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="true"
+		>
+			<view class="aa-popup">
+				<text class="aa-popup-title">驳回申请</text>
+				<text class="aa-popup-desc">请填写驳回原因，申请人可据此补充后重新提交</text>
+				<textarea
+					class="aa-popup-textarea"
+					v-model="rejectReasonInput"
+					placeholder="请输入驳回原因"
+					placeholder-class="aa-popup-placeholder"
+					maxlength="200"
+				></textarea>
+				<view class="aa-popup-actions">
+					<view class="aa-popup-btn aa-popup-btn--ghost" @tap="closeRejectPopup">
+						<text class="aa-popup-btn-text aa-popup-btn-text--ghost">取消</text>
+					</view>
+					<view class="aa-popup-btn aa-popup-btn--danger" @tap="onConfirmReject">
+						<text class="aa-popup-btn-text aa-popup-btn-text--danger">{{ submitting ? "提交中..." : "确认驳回" }}</text>
+					</view>
+				</view>
+			</view>
+		</cl-popup>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { auditEnterpriseJoinApply, getEnterpriseJoinApplyDetail } from "@/.cool/api/join";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { JoinApplyDetail } from "@/.cool/types/join";
+
+	const JOIN_APPLY_LIST_REFRESH_KEY = "joinApplyListNeedRefresh";
+
+	const applyId = ref("");
+	const applyNo = ref("—");
+	const enterpriseName = ref("加入企业申请");
+	const nickname = ref("");
+	const mobile = ref("");
+	const createTime = ref("—");
+	const auditTime = ref("");
+	const statusText = ref("—");
+	const rejectReason = ref("");
+	const status = ref(-1);
+	const rejectPopupVisible = ref(false);
+	const rejectReasonInput = ref("");
+	const submitting = ref(false);
+	const pageLoading = ref(false);
+
+	const canAudit = computed((): boolean => {
+		return status.value == 0;
+	});
+
+	const statusTagType = computed((): string => {
+		if (status.value == 1) {
+			return "success";
+		}
+		if (status.value == 2) {
+			return "danger";
+		}
+		return "primary";
+	});
+
+	const logoText = computed((): string => {
+		const text = enterpriseName.value.trim();
+		if (text == "") {
+			return "企";
+		}
+		return text.substring(0, 1);
+	});
+
+	function pickQuery(options: UTSJSONObject, key: string): string {
+		const val = options[key] as string | null;
+		return val != null ? `${val}`.trim() : "";
+	}
+
+	function pickField(row: UTSJSONObject, key: string): string {
+		const val = row[key];
+		return val != null ? `${val}`.trim() : "";
+	}
+
+	function toStatusNumber(val: any): number {
+		if (val == null) {
+			return -1;
+		}
+		const n = parseInt(`${val}`);
+		return isNaN(n) ? -1 : n;
+	}
+
+	function resolveStatusText(statusNum: number, statusTextRaw: string): string {
+		if (statusTextRaw != "") {
+			return statusTextRaw;
+		}
+		if (statusNum == 0) {
+			return "待审核";
+		}
+		if (statusNum == 1) {
+			return "审核通过";
+		}
+		if (statusNum == 2) {
+			return "驳回";
+		}
+		return "—";
+	}
+
+	function applyDetailToView(detail: JoinApplyDetail) {
+		const row = detail as UTSJSONObject;
+		const statusNum = toStatusNumber(row["status"]);
+		status.value = statusNum;
+		statusText.value = resolveStatusText(statusNum, pickField(row, "status_text"));
+
+		const applyNoVal = pickField(row, "apply_no");
+		if (applyNoVal != "") {
+			applyNo.value = applyNoVal;
+		}
+		const entName = pickField(row, "enterprise_name");
+		if (entName != "") {
+			enterpriseName.value = entName;
+		}
+		const nicknameVal = pickField(row, "nickname");
+		if (nicknameVal != "") {
+			nickname.value = nicknameVal;
+		}
+		const mobileVal = pickField(row, "mobile");
+		if (mobileVal != "") {
+			mobile.value = mobileVal;
+		}
+		const createTimeVal = pickField(row, "create_time");
+		if (createTimeVal != "") {
+			createTime.value = createTimeVal;
+		}
+		auditTime.value = pickField(row, "audit_time");
+		rejectReason.value = pickField(row, "reject_reason");
+	}
+
+	function loadApplyDetail(id: string) {
+		if (pageLoading.value) {
+			return;
+		}
+		if (id == "") {
+			uni.showToast({ title: "参数错误", icon: "none" });
+			setTimeout(() => {
+				uni.navigateBack();
+			}, 600);
+			return;
+		}
+		pageLoading.value = true;
+		getEnterpriseJoinApplyDetail(id)
+			.then((res) => {
+				if (res == null) {
+					return;
+				}
+				const envelope = res as UTSJSONObject;
+				const code = envelope["code"];
+				if (code != null && !isApiSuccess(code)) {
+					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
+					return;
+				}
+				const data = (envelope["data"] ?? envelope) as JoinApplyDetail | null;
+				if (data == null) {
+					uni.showToast({ title: "申请详情为空", icon: "none" });
+					return;
+				}
+				applyDetailToView(data);
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
+			})
+			.finally(() => {
+				pageLoading.value = false;
+			});
+	}
+
+	function markListNeedRefresh() {
+		uni.setStorageSync(JOIN_APPLY_LIST_REFRESH_KEY, "1");
+	}
+
+	function finishAuditSuccess(tip: string) {
+		markListNeedRefresh();
+		uni.showToast({ title: tip, icon: "success" });
+		setTimeout(() => {
+			uni.navigateBack();
+		}, 400);
+	}
+
+	function submitAudit(action: "approve" | "reject", reason: string) {
+		if (submitting.value) {
+			return;
+		}
+		if (applyId.value == "") {
+			uni.showToast({ title: "缺少申请单 ID", icon: "none" });
+			return;
+		}
+		submitting.value = true;
+		uni.showLoading({ title: "提交中..." });
+		auditEnterpriseJoinApply({
+			apply_id: applyId.value,
+			action: action,
+			reject_reason: reason
+		})
+			.then((res) => {
+				const envelope = res as UTSJSONObject | null;
+				if (envelope != null && envelope["code"] != null && !isApiSuccess(envelope["code"])) {
+					uni.showToast({ title: getApiMessage(res, "操作失败"), icon: "none" });
+					return;
+				}
+				rejectPopupVisible.value = false;
+				finishAuditSuccess(action == "approve" ? "已通过" : "已驳回");
+			})
+			.catch((err) => {
+				uni.showToast({ title: getApiMessage(err, "操作失败"), icon: "none" });
+			})
+			.finally(() => {
+				submitting.value = false;
+				uni.hideLoading();
+			});
+	}
+
+	function onApprove() {
+		if (!canAudit.value) {
+			return;
+		}
+		uni.showModal({
+			title: "确认通过",
+			content: "确认通过该员工的加入申请？",
+			success: (res) => {
+				if (res.confirm) {
+					submitAudit("approve", "");
+				}
+			}
+		});
+	}
+
+	function openRejectPopup() {
+		if (!canAudit.value || submitting.value) {
+			return;
+		}
+		rejectReasonInput.value = "";
+		rejectPopupVisible.value = true;
+	}
+
+	function closeRejectPopup() {
+		if (submitting.value) {
+			return;
+		}
+		rejectPopupVisible.value = false;
+	}
+
+	function onConfirmReject() {
+		const reason = rejectReasonInput.value.trim();
+		if (reason == "") {
+			uni.showToast({ title: "请填写驳回原因", icon: "none" });
+			return;
+		}
+		submitAudit("reject", reason);
+	}
+
+	onLoad((options) => {
+		const opts = (options ?? {}) as UTSJSONObject;
+		applyId.value = pickQuery(opts, "apply_id");
+		if (applyId.value == "") {
+			applyId.value = pickQuery(opts, "id");
+		}
+		loadApplyDetail(applyId.value);
+	});
+</script>
+
+<style lang="scss" scoped>
+	.aa-page {
+		width: 100%;
+		height: 100vh;
+		overflow: hidden;
+		background-color: #f7f8fa;
+		display: flex;
+		flex-direction: column;
+		box-sizing: border-box;
+	}
+
+	.aa-loading {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.aa-loading-text {
+		margin-top: 16rpx;
+		font-size: 28rpx;
+		color: #999999;
+		line-height: 40rpx;
+	}
+
+	.aa-scroll {
+		flex: 1;
+		height: 0;
+		width: 100%;
+	}
+
+	.aa-body {
+		padding: 24rpx 30rpx 200rpx;
+		box-sizing: border-box;
+	}
+
+	.aa-card {
+		padding: 28rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+	}
+
+	.aa-head {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		margin-bottom: 24rpx;
+	}
+
+	.aa-icon {
+		width: 72rpx;
+		height: 72rpx;
+		border-radius: 36rpx;
+		background-color: #eef3fc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.aa-icon-text {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #2b59c3;
+		line-height: 40rpx;
+	}
+
+	.aa-head-copy {
+		flex: 1;
+		min-width: 0;
+		margin: 0 16rpx;
+	}
+
+	.aa-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.aa-sub {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.aa-status-tag {
+		padding: 6rpx 14rpx;
+		border-radius: 8rpx;
+		flex-shrink: 0;
+	}
+
+	.aa-status-tag--primary {
+		background-color: #eef3fc;
+	}
+
+	.aa-status-tag--success {
+		background-color: #ecfdf5;
+	}
+
+	.aa-status-tag--danger {
+		background-color: #fef2f2;
+	}
+
+	.aa-status-text {
+		font-size: 22rpx;
+		line-height: 30rpx;
+	}
+
+	.aa-status-text--primary {
+		color: #2b59c3;
+	}
+
+	.aa-status-text--success {
+		color: #16a34a;
+	}
+
+	.aa-status-text--danger {
+		color: #ef4444;
+	}
+
+	.aa-row {
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		justify-content: space-between;
+		padding: 16rpx 0;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: #f0f0f0;
+	}
+
+	.aa-label {
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+		flex-shrink: 0;
+		margin-right: 24rpx;
+	}
+
+	.aa-value {
+		flex: 1;
+		font-size: 26rpx;
+		color: #333333;
+		line-height: 36rpx;
+		text-align: right;
+	}
+
+	.aa-reject-box {
+		margin-top: 16rpx;
+		padding: 20rpx;
+		border-radius: 12rpx;
+		background-color: #fef2f2;
+	}
+
+	.aa-reject-label {
+		font-size: 24rpx;
+		color: #ef4444;
+		line-height: 34rpx;
+		margin-bottom: 8rpx;
+	}
+
+	.aa-reject-text {
+		font-size: 24rpx;
+		color: #7c2d12;
+		line-height: 36rpx;
+	}
+
+	.aa-done-tip {
+		margin-top: 24rpx;
+		padding: 24rpx;
+		border-radius: 16rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #eeeeee;
+	}
+
+	.aa-done-tip-text {
+		font-size: 26rpx;
+		color: #999999;
+		line-height: 36rpx;
+		text-align: center;
+	}
+
+	.aa-footer {
+		flex-shrink: 0;
+		padding: 16rpx 30rpx 24rpx;
+		background-color: #ffffff;
+		border-top-width: 1rpx;
+		border-top-style: solid;
+		border-top-color: rgba(0, 0, 0, 0.06);
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.aa-btn {
+		flex: 1;
+		height: 88rpx;
+		border-radius: 16rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.aa-btn--reject {
+		margin-right: 20rpx;
+		background-color: #ffffff;
+		border-width: 1rpx;
+		border-style: solid;
+		border-color: #ef4444;
+	}
+
+	.aa-btn--approve {
+		background-color: #2b59c3;
+	}
+
+	.aa-btn-text {
+		font-size: 30rpx;
+		font-weight: 600;
+		line-height: 42rpx;
+	}
+
+	.aa-btn-text--reject {
+		color: #ef4444;
+	}
+
+	.aa-btn-text--approve {
+		color: #ffffff;
+	}
+
+	.aa-popup {
+		padding: 32rpx 28rpx 28rpx;
+		background-color: #ffffff;
+		border-radius: 24rpx;
+	}
+
+	.aa-popup-title {
+		font-size: 32rpx;
+		font-weight: 600;
+		color: #333333;
+		line-height: 44rpx;
+	}
+
+	.aa-popup-desc {
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		color: #999999;
+		line-height: 34rpx;
+	}
+
+	.aa-popup-textarea {
+		width: 100%;
+		height: 200rpx;
+		margin-top: 24rpx;
+		padding: 20rpx;
+		box-sizing: border-box;
+		border-radius: 12rpx;
+		background-color: #f7f8fa;
+		font-size: 28rpx;
+		color: #333333;
+		line-height: 40rpx;
+	}
+
+	.aa-popup-placeholder {
+		color: #cccccc;
+		font-size: 28rpx;
+	}
+
+	.aa-popup-actions {
+		margin-top: 28rpx;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.aa-popup-btn {
+		flex: 1;
+		height: 80rpx;
+		border-radius: 14rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.aa-popup-btn--ghost {
+		margin-right: 16rpx;
+		background-color: #f7f8fa;
+	}
+
+	.aa-popup-btn--danger {
+		background-color: #ef4444;
+	}
+
+	.aa-popup-btn-text {
+		font-size: 28rpx;
+		font-weight: 600;
+		line-height: 40rpx;
+	}
+
+	.aa-popup-btn-text--ghost {
+		color: #666666;
+	}
+
+	.aa-popup-btn-text--danger {
+		color: #ffffff;
+	}
+</style>
+
+<style lang="scss">
+	page {
+		height: 100%;
+		background-color: #f7f8fa;
+	}
+</style>
