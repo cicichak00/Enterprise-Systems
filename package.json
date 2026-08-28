@@ -1,21 +1,40 @@
 {
-	"name": "企业号",
+	"name": "h5-enterprise",
 	"version": "1.0.0",
+	"private": true,
 	"license": "MIT",
+	"packageManager": "pnpm@11.19.0",
+	"scripts": {
+		"dev:h5": "node scripts/uni-h5.mjs",
+		"build:h5": "node scripts/uni-h5.mjs build",
+		"preview:h5": "vite preview --host 127.0.0.1 --port 9900"
+	},
 	"dependencies": {
+		"@dcloudio/uni-app": "3.0.0-5010520260709002",
+		"@dcloudio/uni-components": "3.0.0-5010520260709002",
+		"@dcloudio/uni-h5": "3.0.0-5010520260709002",
 		"hammer-touchemulator": "^0.0.2",
 		"jsqr": "^1.4.0",
-		"vue": "^3.5.13",
+		"vue": "3.4.21",
+		"vue-i18n": "^9.1.9",
 		"weixin-js-sdk": "^1.6.5"
 	},
 	"devDependencies": {
 		"@cool-vue/unix": "^1.1.0-beta.6",
-		"@dcloudio/types": "^3.4.16",
+		"@dcloudio/types": "3.4.31",
+		"@dcloudio/uni-cli-shared": "3.0.0-5010520260709002",
+		"@dcloudio/uni-stacktracey": "3.0.0-5010520260709002",
+		"@dcloudio/uni-uts-v1": "3.0.0-5010520260709002",
+		"@dcloudio/vite-plugin-uni": "3.0.0-5010520260709002",
 		"@types/node": "^24.0.15",
+		"@vue/compiler-sfc": "3.4.21",
 		"@vue/tsconfig": "^0.7.0",
 		"postcss": "^8.5.3",
 		"prettier": "^3.5.3",
+		"rollup": "4.14.3",
+		"sass": "^1.77.8",
 		"tailwindcss": "3.4.17",
-		"vite": "^6.3.5"
+		"typescript": "^5.7.3",
+		"vite": "5.2.8"
 	}
 }
