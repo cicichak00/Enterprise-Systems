@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<link rel="stylesheet" href="/Enterprise-Systems/assets/uni.e96278c8.css">
+
+		<meta charset="UTF-8" />
+		<script>
+			var coverSupport =
+				"CSS" in window &&
+				typeof CSS.supports === "function" &&
+				(CSS.supports("top: env(a)") || CSS.supports("top: constant(a)"));
+			document.write(
+				'<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0' +
+					(coverSupport ? ", viewport-fit=cover" : "") +
+					'" />'
+			);
+		</script>
+		<meta name="app-build-version" content="1789151059969" />
+		<script>
+(function () {
+	var LOCAL_VERSION = "1789151059969";
+	var CHECK_MS = 60000;
+	var MODAL_ROOT_ID = "h5-version-modal-root";
+	var NO_CACHE_HEADERS = {
+		"Cache-Control": "no-cache, no-store, must-revalidate",
+		Pragma: "no-cache",
+		Expires: "0"
+	};
+	var chunkCheckPending = false;
+
+	function resolveLocalVersion() {
+		var meta = document.querySelector('meta[name="app-build-version"]');
+		if (meta) {
+			var content = meta.getAttribute("content");
+			if (content) return content;
+		}
+		return LOCAL_VERSION;
+	}
+
+	function getLocalEntryHash() {
+		var src = getLocalEntryScriptSrc();
+		if (!src) return "";
+		var match = src.match(/\/assets\/index-([A-Za-z0-9_-]+)\.js/i);
+		return match ? match[1] : "";
+	}
+
+	function getLocalEntryScriptSrc() {
+		var scripts = document.getElementsByTagName("script");
+		for (var i = 0; i < scripts.length; i++) {
+			var src = scripts[i].getAttribute("src") || scripts[i].src || "";
+			if (/\/assets\/index-[A-Za-z0-9_-]+\.js/i.test(src)) {
+				return src.indexOf("http") === 0 ? src : new URL(src, location.origin).href;
+			}
+		}
+		return "";
+	}
+
+	function buildAssetUrl(fileName) {
+		var href = String(location.href || "");
+		var hashIndex = href.indexOf("#");
+		var baseHref = hashIndex >= 0 ? href.substring(0, hashIndex) : href;
+		var url = new URL(fileName || "./", baseHref);
+		url.searchParams.set("t", String(Date.now()));
+		url.searchParams.set("r", String(Math.random()));
+		return url.href;
+	}
+
+	function isModalVisible() {
+		return !!document.getElementById(MODAL_ROOT_ID);
+	}
+
+	function showModal() {
+		if (isModalVisible()) return;
+		function render(retry) {
+			if (isModalVisible()) return;
+			var host = document.body || document.documentElement;
+			if (!host) {
+				if (retry < 100) setTimeout(function () { render(retry + 1); }, 50);
+				return;
+			}
+			var mask = document.createElement("div");
+			mask.id = MODAL_ROOT_ID;
+			mask.setAttribute(
+				"style",
+				"position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);"
+			);
+			mask.innerHTML =
+				'<div style="width:280px;max-width:86vw;background:#fff;border-radius:12px;overflow:hidden;">' +
+				'<div style="padding:24px 20px 10px;font-size:17px;font-weight:600;color:#000;text-align:center;">更新提示</div>' +
+				'<div style="padding:0 20px 20px;font-size:15px;color:#888;text-align:center;line-height:1.5;">发现新版本，请刷新页面以获取最新内容</div>' +
+				'<div style="border-top:1px solid #e5e5e5;">' +
+				'<div id="h5-version-modal-btn" style="height:50px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:500;color:#576b95;cursor:pointer;">立即刷新</div>' +
+				"</div></div>";
+			var btn = mask.querySelector("#h5-version-modal-btn");
+			if (btn) {
+				btn.addEventListener("click", function () {
+					location.reload();
+				});
+			}
+			host.appendChild(mask);
+		}
+		render(0);
+	}
+
+	function parseVersionBody(body) {
+		if (!body) return "";
+		if (typeof body === "string" && body.trim().charAt(0) === "<") return "";
+		try {
+			var data = typeof body === "string" ? JSON.parse(body.trim()) : body;
+			return data && data.version ? String(data.version) : "";
+		} catch (e) {
+			return "";
+		}
+	}
+
+	function extractVersionFromHtml(html) {
+		var match = html.match(/app-build-version["']\s+content=["']([^"']+)["']/);
+		return match && match[1] ? match[1] : "";
+	}
+
+	function extractEntryHashFromHtml(html) {
+		var match = html.match(/\/assets\/index-([A-Za-z0-9_-]+)\.js/i);
+		return match ? match[1] : "";
+	}
+
+	function requestText(url, done) {
+		if (window.fetch) {
+			fetch(url, { cache: "reload", headers: NO_CACHE_HEADERS })
+				.then(function (res) {
+					if (!res || !res.ok) return "";
+					return res.text();
+				})
+				.then(function (text) {
+					done(text || "");
+				})
+				.catch(function () {
+					requestTextByXhr(url, done);
+				});
+			return;
+		}
+		requestTextByXhr(url, done);
+	}
+
+	function requestTextByXhr(url, done) {
+		try {
+			var xhr = new XMLHttpRequest();
+			xhr.open("GET", url, true);
+			xhr.setRequestHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+			xhr.setRequestHeader("Pragma", "no-cache");
+			xhr.setRequestHeader("Expires", "0");
+			xhr.onload = function () {
+				done(xhr.status === 200 ? xhr.responseText : "");
+			};
+			xhr.onerror = function () {
+				done("");
+			};
+			xhr.send();
+		} catch (e) {
+			done("");
+		}
+	}
+
+	function fetchRemoteSnapshot(done) {
+		var remoteVersion = "";
+		var remoteHash = "";
+		var pending = 3;
+		function finish() {
+			pending--;
+			if (pending <= 0) done(remoteVersion, remoteHash);
+		}
+		requestText(buildAssetUrl("version.json"), function (body) {
+			remoteVersion = parseVersionBody(body);
+			finish();
+		});
+		requestText(buildAssetUrl("index.html"), function (html) {
+			if (!remoteVersion) remoteVersion = extractVersionFromHtml(html);
+			if (!remoteHash) remoteHash = extractEntryHashFromHtml(html);
+			finish();
+		});
+		requestText(buildAssetUrl(""), function (html) {
+			if (!remoteVersion) remoteVersion = extractVersionFromHtml(html);
+			if (!remoteHash) remoteHash = extractEntryHashFromHtml(html);
+			finish();
+		});
+	}
+
+	/** 仅当远端版本明确更新时提示；网络失败/旧缓存不弹窗 */
+	function shouldUpdate(localVersion, localHash, remoteVersion, remoteHash) {
+		if (!remoteVersion || !localVersion) return false;
+		var remoteNum = Number(remoteVersion);
+		var localNum = Number(localVersion);
+		if (!isNaN(remoteNum) && !isNaN(localNum)) {
+			return remoteNum > localNum;
+		}
+		if (remoteVersion !== localVersion) return true;
+		if (remoteHash && localHash && remoteHash !== localHash) return true;
+		return false;
+	}
+
+	function checkVersion() {
+		if (isModalVisible()) return;
+		var localVersion = resolveLocalVersion();
+		var localHash = getLocalEntryHash();
+		if (!localVersion || localVersion === "dev") return;
+
+		fetchRemoteSnapshot(function (remoteVersion, remoteHash) {
+			if (shouldUpdate(localVersion, localHash, remoteVersion, remoteHash)) {
+				console.warn("[h5-version] update detected", {
+					localVersion: localVersion,
+					remoteVersion: remoteVersion,
+					localHash: localHash,
+					remoteHash: remoteHash
+				});
+				showModal();
+			}
+		});
+	}
+
+	/** chunk 加载失败时先确认远端是否真有新版本，避免弱网误弹 */
+	function checkVersionAfterChunkError() {
+		if (isModalVisible() || chunkCheckPending) return;
+		chunkCheckPending = true;
+		var localVersion = resolveLocalVersion();
+		var localHash = getLocalEntryHash();
+		if (!localVersion || localVersion === "dev") {
+			chunkCheckPending = false;
+			return;
+		}
+		fetchRemoteSnapshot(function (remoteVersion, remoteHash) {
+			chunkCheckPending = false;
+			if (shouldUpdate(localVersion, localHash, remoteVersion, remoteHash)) {
+				console.warn("[h5-version] chunk error + update confirmed", {
+					localVersion: localVersion,
+					remoteVersion: remoteVersion
+				});
+				showModal();
+			} else {
+				console.warn("[h5-version] chunk error ignored (no newer remote version)");
+			}
+		});
+	}
+
+	function isChunkLoadError(msg) {
+		return (
+			msg.indexOf("Failed to fetch dynamically imported module") >= 0 ||
+			msg.indexOf("Loading chunk") >= 0 ||
+			msg.indexOf("Importing a module script failed") >= 0 ||
+			msg.indexOf("error loading dynamically imported module") >= 0
+		);
+	}
+
+	checkVersion();
+	setInterval(checkVersion, CHECK_MS);
+	document.addEventListener("visibilitychange", function () {
+		if (document.visibilityState === "visible") checkVersion();
+	});
+	window.addEventListener(
+		"error",
+		function (event) {
+			var msg = String((event && event.message) || "");
+			if (isChunkLoadError(msg)) {
+				checkVersionAfterChunkError();
+			}
+		},
+		true
+	);
+	window.addEventListener("unhandledrejection", function (event) {
+		var reason = String((event && event.reason) || "");
+		if (isChunkLoadError(reason)) {
+			checkVersionAfterChunkError();
+		}
+	});
+	window.__h5CheckVersion = checkVersion;
+	window.__h5ShowUpdateModal = showModal;
+})();
+</script>
+		<title>企业号</title>
+		<!--preload-links-->
+		<!--app-context-->
+		<style>
+			body,
+			html {
+				scrollbar-width: none;
+
+				&::-webkit-scrollbar {
+					display: none;
+					width: 0;
+					height: 0;
+					color: transparent;
+				}
+			}
+		</style>
+		<script type="module" crossorigin src="/Enterprise-Systems/assets/index-BcsGcGDM.js"></script>
+		<link rel="stylesheet" crossorigin href="/Enterprise-Systems/assets/index-BuLuQwL7.css">
+	</head>
+	<body>
+		<div id="app"><!--app-html--></div>
+	</body>
+</html>
