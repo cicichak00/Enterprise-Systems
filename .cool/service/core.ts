@@ -135,7 +135,10 @@ export function request(options: RequestOptions): Promise<any | null> {
 	}
 
 	return new Promise((resolve, reject) => {
-		uni.request({
+		const requestMethod = method.toUpperCase();
+		const maxRetries = requestMethod == "GET" ? 2 : 0;
+		const runRequest = (attempt: number): void => {
+			uni.request({
 			url,
 			method,
 			data,
@@ -175,9 +178,17 @@ export function request(options: RequestOptions): Promise<any | null> {
 				reject({ message: t("服务异常") } as Response);
 			},
 			fail(err) {
-				reject({ message: err.errMsg } as Response);
+				if (attempt < maxRetries) {
+					setTimeout(() => runRequest(attempt + 1), 350 * (attempt + 1));
+					return;
+				}
+				const raw = `${err.errMsg ?? ""}`.trim();
+				const message = raw.indexOf("timeout") >= 0 ? "请求超时，请点击重试" : "网络连接不稳定，请点击重试";
+				reject({ message, msg: message } as Response);
 			}
-		});
+			});
+		};
+		runRequest(0);
 	});
 }
 

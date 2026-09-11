@@ -131,6 +131,7 @@ export type SaveEnterpriseSettingsParams = {
 export type SaveEnterpriseInviteConfigParams = {
 	name: string;
 	preset_can_view_revenue: string;
+	preset_commission_rate: number;
 };
 
 /** 同步项目预设 POST /api/enterprise/invite/config（仅传禁用项目 ID） */

@@ -1,5 +1,6 @@
 {
 	"pages": [
+{ "path": "pages/user/tutorial", "style": { "navigationBarTitleText": "使用教程", "navigationBarBackgroundColor": "#f4f5f7", "navigationBarTextStyle": "black" } },
 		{
 			"path": "pages/launch/index",
 			"style": {
@@ -95,6 +96,15 @@
 			"meta": {
 				"isAuth": false
 			}
+		},
+		{
+			"path": "pages/tabbar/ranking/index",
+			"style": {
+				"navigationStyle": "custom"
+			},
+			"meta": {
+				"isAuth": false
+			}
 		}
 	],
 	"globalStyle": {
@@ -125,6 +135,10 @@
 				"text": "收益"
 			},
 			{
+				"pagePath": "pages/tabbar/ranking/index",
+				"text": "排行榜"
+			},
+			{
 				"pagePath": "pages/tabbar/my/index",
 				"text": "我"
 			},
@@ -140,6 +154,21 @@
 		]
 	},
 	"subPackages": [
+		{
+			"root": "pages/revenue",
+			"pages": [
+				{
+					"path": "calendar",
+					"style": { "navigationStyle": "custom" },
+					"meta": { "isAuth": false }
+				},
+				{
+					"path": "detail",
+					"style": { "navigationStyle": "custom" },
+					"meta": { "isAuth": false }
+				}
+			]
+		},
 		{
 			"root": "pages/login",
 			"pages": [

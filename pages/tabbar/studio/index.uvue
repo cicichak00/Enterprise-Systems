@@ -3,6 +3,7 @@
 		<view class="st-page">
 			<view class="st-top-panel">
 				<view class="st-top-inner">
+<view class="employee-heading"><text>首页</text><button class="employee-help" @tap="openTutorial">使用教程</button></view>
 					<view class="st-hero-card">
 						<view class="st-hero-top">
 							<view class="st-brand-row">
@@ -20,13 +21,27 @@
 									<text v-if="enterpriseIntro != ''" class="st-brand-sub">{{ enterpriseIntro }}</text>
 								</view>
 							</view>
-							<view class="st-settings-btn" @tap="onSettingsTap">
-								<cl-icon name="settings-line" :size="22" color="#333333"></cl-icon>
+							<view class="st-settings-btn" @tap="onNotificationsTap" role="button" aria-label="消息通知">
+								<cl-icon name="notification-4-line" :size="19" color="#5375ed"></cl-icon>
 							</view>
 						</view>
 					</view>
 
-					<view class="st-type-card">
+						<view v-if="promptToolsEnabled" class="st-prompt-tools">
+							<view class="st-prompt-tool" @tap="openComposePrompt">
+								<view class="st-prompt-tool-icon"><cl-icon name="apps-2-line" :size="20" color="#5375ed"></cl-icon></view>
+								<view class="st-prompt-tool-copy"><text class="st-prompt-tool-title">组合提词</text><text class="st-prompt-tool-sub">多项目组合生成</text></view>
+								<cl-icon name="arrow-right-s-line" :size="17" color="#a2a9b5"></cl-icon>
+							</view>
+							<view class="st-prompt-tool" @tap="openQuickPrompt">
+								<view class="st-prompt-tool-icon st-prompt-tool-icon--quick"><cl-icon name="image-2-line" :size="20" color="#5375ed"></cl-icon></view>
+								<view class="st-prompt-tool-copy"><text class="st-prompt-tool-title">快捷提词</text><text class="st-prompt-tool-sub">查看并快速复用</text></view>
+								<cl-icon name="arrow-right-s-line" :size="17" color="#a2a9b5"></cl-icon>
+							</view>
+						</view>
+
+						<view class="st-layout-bar"><text class="st-layout-label">全部任务</text><view class="st-layout-options"><button :class="{ selected: taskLayout == 'grid' }" @tap="setTaskLayout('grid')">双列</button><button :class="{ selected: taskLayout == 'list' }" @tap="setTaskLayout('list')">列表</button></view></view>
+<view class="st-type-card">
 						<cl-tabs
 							v-model="activeTypeId"
 							:list="typeFilterTabList"
@@ -71,7 +86,7 @@
 						<text class="st-task-state-text">暂无任务</text>
 					</view>
 
-					<view v-else class="st-task-grid">
+					<view v-else class="st-task-grid" :class="{ 'st-task-grid--list': taskLayout == 'list' }">
 						<view
 							class="st-task-card"
 							v-for="(item, index) in taskRows"
@@ -80,7 +95,7 @@
 							<view class="st-task-head" @tap="onTaskDetail(item)">
 								<view class="st-task-copy">
 									<text class="st-task-title">{{ item.title }}</text>
-									<text class="st-task-date">数据更新: {{ formatTaskUpdateDate(`${item.update_time ?? ""}`) }}</text>
+									<text class="st-task-date">更新 {{ formatTaskUpdateDate(`${item.update_time ?? ""}`) }}</text>
 								</view>
 								<image
 									v-if="getTaskLogoUrl(item) != ''"
@@ -133,7 +148,7 @@
 							</view>
 							<text v-if="enterpriseFooterLine != ''" class="st-footer-line">{{ enterpriseFooterLine }}</text>
 						</view>
-						<text class="st-footer-copy">© 2026 · 服务于您的事业</text>
+
 					</view>
 				</view>
 			</scroll-view>
@@ -163,6 +178,7 @@
 <script lang="ts" setup>
 	import { computed, nextTick, ref } from "vue";
 	import { getEnterpriseInfo } from "@/.cool/api/enterprise";
+	import { getUserProfile } from "@/.cool/api/login";
 	import { getAppSystem } from "@/.cool/api/app";
 	import { getProjectTypes } from "@/.cool/api/project";
 	import { getTaskList } from "@/.cool/api/task";
@@ -179,6 +195,13 @@
 	import CustomTabbar from "@/components/tabbar.uvue";
 	import { syncTabbarRoutePath } from "@/.cool/store/tabbar";
 
+	const taskLayout = ref("grid");
+	try { if (uni.getStorageSync("employee-task-layout") == "list") taskLayout.value = "list"; } catch (_) {}
+	function setTaskLayout(value: string) {
+		taskLayout.value = value;
+		try { uni.setStorageSync("employee-task-layout", value); } catch (_) {}
+	}
+	function openTutorial() { router.push({ path: "/pages/user/tutorial" }); }
 	const TASK_PAGE_LIMIT = 20;
 	const TYPE_FILTER_ALL_ID = 0;
 	const TASK_ICON_PALETTE = [
@@ -216,6 +239,32 @@
 	};
 
 	const taskRows = ref<TaskListItem[]>([]);
+	const promptToolsEnabled = ref(true);
+	const composeEntryTask = computed((): TaskListItem | null => {
+		for (let i = 0; i < taskRows.value.length; i++) {
+			const item = taskRows.value[i];
+			if (`${item.item_type ?? ""}`.toLowerCase() == "compose" || `${item.id ?? ""}` == "900001") return item;
+		}
+		return null;
+	});
+	function openComposePrompt() {
+		const item = composeEntryTask.value;
+		router.push({ path: "/pages/task/combo-prompt", query: { id: item?.id ?? 900001, title: item?.title ?? "组合提词" } });
+	}
+	function openQuickPrompt() {
+		const item = composeEntryTask.value;
+		router.push({ path: "/pages/task/prompt-record", query: { id: item?.id ?? 900001, title: item?.title ?? "快捷提词" } });
+	}
+	function loadPromptPermission() {
+		getUserProfile().then((res) => {
+			if (res == null) return;
+			const envelope = res as UTSJSONObject;
+			const data = (envelope["data"] ?? envelope) as UTSJSONObject;
+			const staff = data["staff"] as UTSJSONObject | null;
+			const raw = data["can_quick_prompt"] ?? data["quick_prompt_enabled"] ?? staff?.["can_quick_prompt"] ?? staff?.["quick_prompt_enabled"];
+			if (raw != null) promptToolsEnabled.value = raw === true || `${raw}` == "1";
+		}).catch(() => {});
+	}
 	const taskLoading = ref(false);
 	const taskLoadingMore = ref(false);
 	const taskPage = ref(1);
@@ -572,6 +621,7 @@
 			id: `${item.id}`,
 			title: item.title ?? "",
 			category_id: item.category_id,
+			category_text: item.category_text ?? item.type_text ?? "",
 			logo: getTaskLogoUrl(item)
 		};
 		if (item.project_id != null && item.project_id > 0) {
@@ -629,8 +679,8 @@
 		});
 	}
 
-	function onSettingsTap() {
-		router.push({ path: "/pages/user/account" });
+	function onNotificationsTap() {
+		router.push({ path: "/pages/notice/index", query: { audience: "employee" } });
 	}
 
 	function syncResignedNotice() {
@@ -648,6 +698,7 @@
 		syncTabbarRoutePath();
 		syncResignedNotice();
 		loadEnterpriseInfo();
+		loadPromptPermission();
 		loadProjectTypes(true);
 	});
 </script>
@@ -1088,4 +1139,55 @@
 			overflow: hidden;
 		}
 	}
+</style>
+
+<style lang="scss" scoped>
+@import "@/styles/employee-workbench.scss";
+.st-page, .st-top-panel { background: $background; }
+.st-top-inner { width: 100%; padding: 14px 14px 0; max-width: 800px; margin: 0 auto; }
+.st-scroll-inner { width: 100%; padding: 0 14px calc(80px + env(safe-area-inset-bottom)); max-width: 800px; margin: 0 auto; }
+.st-hero-card { @include feature; margin-bottom: 12px; }
+.st-hero-top { background: transparent; padding: 14px 12px; }
+.st-brand-logo, .st-brand-logo-img { width: 44px; height: 44px; border-radius: 12px; }
+.st-brand-copy { margin-left: 10px; }
+.st-brand-name { display: block; font-size: 16px; line-height: 22px; color: $text; overflow-wrap: anywhere; }
+.st-brand-sub { display: block; font-size: 12px; line-height: 18px; color: $muted; overflow-wrap: anywhere; }
+.st-settings-btn { width: 34px; height: 34px; border-radius: 9px; background: #ffffffb3; }
+.st-type-card { @include card; padding: 5px 4px; margin-bottom: 12px; }
+.st-type-text { font-size: 12px; }
+.st-layout-bar { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin: 0 0 10px; }
+.st-layout-label { @include section; }
+.st-layout-options { display: flex; flex-direction: row; padding: 3px; background: #e9ecf2; border-radius: 9px; gap: 2px; }
+.st-layout-options button { margin: 0; padding: 0 12px; font-size: 12px; line-height: 30px; color: $muted; background: transparent; border-radius: 7px; }
+.st-layout-options button::after { border: none; }
+.st-layout-options button.selected { background: white; color: $primary; font-weight: 600; }
+.st-task-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.st-task-card { @include card; display: flex; flex-direction: column; width: auto; min-width: 0; padding: 12px; margin: 0; }
+.st-task-head { flex: 1; min-height: 52px; margin-bottom: 10px; }
+.st-task-title { display: block; font-size: 14px; line-height: 20px; color: $text; overflow-wrap: anywhere; }
+.st-task-date { display: block; font-size: 11px; line-height: 17px; color: $muted; margin-top: 4px; }
+.st-task-logo, .st-task-icon { width: 28px; height: 28px; border-radius: 8px; }
+.st-task-icon-text { font-size: 13px; }
+.st-task-actions { gap: 6px; }
+.st-task-btn { flex: 1; width: auto; min-width: 0; height: 34px; border-radius: 8px; }
+.st-task-btn-text { font-size: 11px; white-space: nowrap; }
+.st-task-btn--primary { background: $primary; }
+.st-task-btn--light { background: #eef2ff; }
+.st-task-btn-text--primary { color: $primary; }
+.st-task-grid--list { grid-template-columns: minmax(0,1fr); }
+.st-task-grid--list .st-task-head { min-height: 0; align-items: center; }
+.st-task-grid--list .st-task-actions { justify-content: flex-end; }
+.st-task-grid--list .st-task-btn { flex: 0 1 100px; }
+.st-task-grid--list .st-task-btn-text { font-size: 12px; }
+.st-footer { padding-top: 18px; }
+	@media (max-width: 350px) { .st-task-card { padding: 10px; } .st-task-logo, .st-task-icon { width: 24px; height: 24px; } }
+	.st-prompt-tools { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 10px; }
+	.st-prompt-tool { min-width: 0; min-height: 58px; padding: 10px; display: flex; flex-direction: row; align-items: center; box-sizing: border-box; border: 1px solid #e7ebf5; border-radius: 12px; background: #fff; }
+	.st-prompt-tool:active { background: #f6f8ff; }
+	.st-prompt-tool-icon { width: 34px; height: 34px; margin-right: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: #eef2ff; }
+	.st-prompt-tool-icon--quick { background: #edf5ff; }
+	.st-prompt-tool-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+	.st-prompt-tool-title { font-size: 13px; line-height: 19px; font-weight: 600; color: $text; white-space: nowrap; }
+	.st-prompt-tool-sub { margin-top: 2px; font-size: 10px; line-height: 15px; color: $muted; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	@media (max-width: 350px) { .st-prompt-tool { padding: 8px; } .st-prompt-tool-icon { width: 30px; height: 30px; margin-right: 6px; } .st-prompt-tool-sub { display: none; } }
 </style>

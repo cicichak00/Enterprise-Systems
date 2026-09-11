@@ -2,6 +2,7 @@
 <template>
 	<cl-page :pt="{ className: 'sme-page' }">
 		<view class="sme-page">
+<view class="employee-heading"><text>我的</text></view>
 			<view class="sme-profile" @tap="toAccount">
 				<view class="sme-avatar">
 					<image
@@ -74,6 +75,7 @@
 	const profileLoading = ref(false);
 
 	const moreItems: MenuItem[] = [
+{ title: "使用教程", path: "/pages/user/tutorial" },
 		{ title: "账号报备", path: "/pages/account/list" },
 		{ title: "我的词库", path: "/pages/task/record-list" }
 	];
@@ -344,4 +346,21 @@
 			}
 		}
 	}
+</style>
+
+<style lang="scss" scoped>
+@import "@/styles/employee-workbench.scss";
+.sme-page { background: $background; padding: 14px 14px calc(80px + env(safe-area-inset-bottom)); }
+.sme-page .sme-profile { @include feature; padding: 16px 12px; margin-bottom: 20px; }
+.sme-page .sme-profile .sme-avatar, .sme-page .sme-profile .sme-avatar-img { width: 46px; height: 46px; }
+.sme-page .sme-profile .sme-avatar { margin-right: 12px; }
+.sme-page .sme-profile .sme-name { font-size: 17px; line-height: 24px; color: $text; overflow-wrap: anywhere; }
+.sme-page .sme-profile .sme-meta { font-size: 12px; line-height: 18px; color: $muted; overflow-wrap: anywhere; }
+.sme-page .sme-profile .sme-role { background: #eef2ff; }
+.sme-page .sme-profile .sme-role-text { color: $primary; font-size: 11px; }
+.sme-page .sme-section { margin-bottom: 20px; }
+.sme-page .sme-section .sme-section-label { @include section; padding: 0; margin-bottom: 10px; }
+.sme-page .sme-section .sme-menu-card { @include card; height: 54px; padding: 0 14px; margin-bottom: 8px; }
+.sme-page .sme-section .sme-menu-text { font-size: 14px; color: $text; }
+@media (min-width: 800px) { .sme-page { max-width: 800px; margin: auto; } }
 </style>

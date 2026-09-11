@@ -1,34 +1,28 @@
 <template>
 	<cl-page :pt="{ className: 'inc-page' }" :back-top="false">
 		<view class="inc-page">
+<view class="employee-heading inc-fixed-heading"><text>收益台</text></view>
 			<scroll-view class="inc-scroll" scroll-y="true" :show-scrollbar="false" :lower-threshold="120"
 				@scrolltolower="onOrderScrollToLower">
 				<view class="inc-scroll-inner">
-					<view class="inc-summary-card">
-						<view class="inc-summary-top">
-							<view class="inc-summary-label-row">
-								<view class="inc-summary-dot"></view>
-								<text class="inc-summary-label">累计收益(元)</text>
-							</view>
-							<view v-if="canWithdraw == 1" class="inc-wallet-entry" @tap.stop="toWallet">
-								<text class="inc-wallet-entry-text">进入钱包</text>
-								<cl-icon name="arrow-right-s-line" :size="14" color="rgba(255,255,255,0.75)"></cl-icon>
-							</view>
-						</view>
-						<text class="inc-summary-amount">{{ staffSummary.total_revenue || '0.00' }}</text>
-						<view class="inc-summary-stats">
-							<view class="inc-summary-stat">
-								<text class="inc-summary-stat-label">待结算</text>
-								<text class="inc-summary-stat-value">{{ staffSummary.pending_settlement || '0.00' }}元</text>
-							</view>
-							<view class="inc-summary-stat inc-summary-stat--divider">
-								<text class="inc-summary-stat-label">已结算</text>
-								<text class="inc-summary-stat-value">{{ staffSummary.settled_revenue || '0.00' }}元</text>
-							</view>
-						</view>
-					</view>
 
-					<view class="inc-panel">
+					<view class="inc-summary-card">
+<view class="inc-summary-top"><text class="inc-summary-label">个人收益（元）</text><text class="inc-wallet-entry-text" @tap="toWallet">钱包 ›</text></view>
+<view class="inc-compact-totals">
+<text class="inc-summary-amount">{{ staffSummary.total_revenue || '0.00' }}</text>
+<view class="inc-compact-status"><text class="inc-summary-stat-label">待结算</text><text class="inc-summary-stat-value">{{ staffSummary.pending_settlement || '0.00' }}</text></view>
+<view class="inc-compact-status"><text class="inc-summary-stat-label">已结算</text><text class="inc-summary-stat-value">{{ staffSummary.settled_revenue || '0.00' }}</text></view>
+</view>
+<view class="inc-time-stats">
+<view class="inc-time-stat"><text class="inc-summary-stat-label">今日收益</text><text class="inc-time-value">{{ todayRevenue }}<text class="inc-unit">元</text></text></view>
+<view class="inc-time-stat"><text class="inc-summary-stat-label">近7天收益</text><text class="inc-time-value">{{ weekRevenue }}<text class="inc-unit">元</text></text></view>
+</view>
+<text v-if="revenueError" class="inc-revenue-error" @tap="retryRevenue">统计暂不可用 · 重试</text>
+</view>
+
+<view v-if="showTeamSummary" class="inc-team-card"><view class="inc-team-head"><text>组员统计</text><text>{{ teamMemberCount }} 人</text></view><view class="inc-team-stats"><view><text>组员订单收益</text><text>{{ teamOrderRevenue }}元</text></view><view><text>我的团队分佣</text><text>{{ teamCommissionRevenue }}元</text></view></view></view>
+
+<view class="inc-panel">
 						<view class="inc-period-bar">
 							<view class="inc-period-row">
 								<view v-for="(item, index) in periodTabs" :key="index" class="inc-period-item"
@@ -44,22 +38,17 @@
 							</view>
 						</view>
 
-						<view v-if="isCustomRange" class="inc-range-bar">
-							<view class="inc-range-main">
-								<cl-icon name="calendar-line" :size="14" color="#2b59c3"></cl-icon>
-								<text class="inc-range-label">区间</text>
-								<text class="inc-range-value">{{ rangeStart }} 至 {{ rangeEnd }}</text>
-							</view>
-							<text class="inc-range-edit" @tap="openRangePopup(true)">修改</text>
-						</view>
+<view v-if="selectedPeriodLabel != ''" class="inc-selected-stat">
+<view class="inc-selected-copy"><text class="inc-summary-stat-label">{{ isCustomRange ? '时间段收益' : periodTabs[activePeriod] + '收益' }}</text><text class="inc-selected-date">{{ selectedPeriodLabel }}</text></view>
+<text class="inc-time-value">{{ selectedRevenue }}<text class="inc-unit">元</text></text>
+</view>
 					</view>
 
 					<view class="inc-body">
-						<view class="inc-section-head">
-							<text class="inc-section-title">订单收益</text>
-						</view>
+							<view class="inc-list-tabs"><view :class="{ active: incomeListTab == 'orders' }" @tap="incomeListTab = 'orders'"><text>订单明细</text></view><view :class="{ active: incomeListTab == 'keywords' }" @tap="incomeListTab = 'keywords'"><text>关键词统计</text></view></view>
+							<view v-if="incomeListTab == 'keywords'" class="inc-keyword-list"><view v-if="keywordLoading" class="inc-list-state"><cl-loading :loading="true" :size="24" color="#5375ed"></cl-loading></view><view v-else-if="keywordStats.length == 0" class="inc-list-state"><text class="inc-list-state-text">暂无关键词数据</text></view><view v-for="item in keywordStats" :key="item.name" class="inc-keyword-row"><view><text class="inc-keyword-name">{{ item.name }}</text><text class="inc-keyword-count">{{ item.count }} 笔订单</text></view><text class="inc-keyword-amount">{{ item.amount }}元</text></view></view>
 
-						<view v-if="listLoading && orderList.length == 0" class="inc-list-state">
+							<view v-else-if="listLoading && orderList.length == 0" class="inc-list-state">
 							<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
 							<text class="inc-list-state-text">加载中...</text>
 						</view>
@@ -201,6 +190,8 @@
 	type QuickRangeKey = "last_7_days" | "last_30_days" | "this_month" | "last_month" | "this_year";
 	type QuickRange = { label : string; key : QuickRangeKey };
 	type OrderStatusTone = "success" | "pending" | "danger" | "default";
+	type CalendarDimension = "day" | "month" | "year";
+	type CalendarCell = { key: string; label: string; amount: string; placeholder: boolean; isToday: boolean };
 
 	const staffSummary = ref<StaffStats>({});
 	/** profile.can_withdraw：1 才展示进入钱包 */
@@ -213,6 +204,71 @@
 	const listLoading = ref(false);
 	const listLoadingMore = ref(false);
 	const staffSummaryLoading = ref(false);
+	const todayRevenue = ref("—");
+	const weekRevenue = ref("—");
+	const selectedRevenue = ref("—");
+	const revenueError = ref(false);
+	const incomeListTab = ref("orders");
+	type KeywordStat = { name: string; count: number; amount: string };
+	const keywordStats = ref<KeywordStat[]>([]);
+	const keywordLoading = ref(false);
+	let keywordSeq = 0;
+	const teamMemberCount = computed(() => `${staffSummary.value.related_member_count ?? staffSummary.value.group_member_count ?? 0}`);
+	const teamOrderRevenue = computed(() => formatRevenueAmount(staffSummary.value.team_order_revenue ?? staffSummary.value.group_order_revenue ?? 0));
+	const teamCommissionRevenue = computed(() => formatRevenueAmount(staffSummary.value.team_commission_revenue ?? staffSummary.value.group_commission_revenue ?? 0));
+	const showTeamSummary = computed(() => Number(teamMemberCount.value) > 0 || Number(teamOrderRevenue.value) > 0 || Number(teamCommissionRevenue.value) > 0);
+	let revenueSeq = 0;
+	const selectedPeriodLabel = computed(() => {
+		if (isCustomRange.value) return `${rangeStart.value.replace(/-/g, ".")} ~ ${rangeEnd.value.replace(/-/g, ".")}`;
+		if (activePeriod.value == 4) return "";
+		const today = dayUts();
+		const offsets = [0, 1, 6, 29];
+		const start = today.subtract(offsets[activePeriod.value] ?? 0, "day").format("YYYY.MM.DD");
+		const end = activePeriod.value == 1 ? start : today.format("YYYY.MM.DD");
+		return `${start} ~ ${end}`;
+	});
+	function readRevenue(payload: OrderListPayload | null): string {
+		const raw = payload?.summary?.staff_revenue;
+		if (raw == null || `${raw}`.trim() == "" || !Number.isFinite(Number(raw))) throw new Error("Missing revenue summary");
+		return Number(raw).toFixed(2);
+	}
+	async function loadPeriodRevenue() {
+		const seq = ++revenueSeq;
+		todayRevenue.value = "—"; weekRevenue.value = "—"; revenueError.value = false;
+		const query = buildOrderListParams(1);
+		delete query.start_date; delete query.end_date;
+		await Promise.all(["today", "last_7_days"].map(async (period) => {
+			try {
+				const result = await getOrderList({ ...query, limit: 1, period });
+				if (seq != revenueSeq) return;
+				const amount = readRevenue(parseOrderListPayload(result));
+				if (period == "today") todayRevenue.value = amount; else weekRevenue.value = amount;
+			} catch (_) { if (seq == revenueSeq) revenueError.value = true; }
+		}));
+	}
+	function retryRevenue() { loadPeriodRevenue(); loadOrderList(); }
+	function formatRevenueAmount(value: string | number | null | undefined): string {
+		const amount = Number(value ?? 0);
+		return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+	}
+	function loadKeywordStats() {
+		const seq = ++keywordSeq;
+		keywordLoading.value = true;
+		keywordStats.value = [];
+		getOrderList({ ...buildOrderListParams(1), limit: 500 }).then((res) => {
+			if (seq != keywordSeq) return;
+			const rows = parseOrderListPayload(res)?.list ?? [];
+			const grouped: Record<string, { count: number; amount: number }> = {};
+			for (let i = 0; i < rows.length; i++) {
+				const name = `${rows[i].keyword ?? "未填写关键词"}`.trim() || "未填写关键词";
+				if (grouped[name] == null) grouped[name] = { count: 0, amount: 0 };
+				grouped[name].count += 1;
+				grouped[name].amount += Number(rows[i].user_profit ?? 0) || 0;
+			}
+			keywordStats.value = Object.keys(grouped).map((name) => ({ name, count: grouped[name].count, amount: grouped[name].amount.toFixed(2) })).sort((a, b) => b.count - a.count);
+		}).catch(() => { if (seq == keywordSeq) keywordStats.value = []; }).finally(() => { if (seq == keywordSeq) keywordLoading.value = false; });
+	}
+
 	let orderListSeq = 0;
 
 	const activePeriod = ref<number>(4);
@@ -222,6 +278,103 @@
 	const draftStartSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
 	const draftEndSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
 	const periodTabs = ["今日", "昨日", "近7天", "近30天", "累计"];
+	const calendarDimensions: { key: CalendarDimension; label: string }[] = [
+		{ key: "day", label: "日" }, { key: "month", label: "月" }, { key: "year", label: "年度" }
+	];
+	const calendarWeekdays = ["日", "一", "二", "三", "四", "五", "六"];
+	const calendarDimension = ref<CalendarDimension>("day");
+	const calendarCursor = ref(new Date());
+	const selectedCalendarKey = ref("");
+
+	function padCalendar(value: number): string { return value < 10 ? `0${value}` : `${value}`; }
+	function dateKey(date: Date): string { return `${date.getFullYear()}-${padCalendar(date.getMonth() + 1)}-${padCalendar(date.getDate())}`; }
+	function monthKey(date: Date): string { return `${date.getFullYear()}-${padCalendar(date.getMonth() + 1)}`; }
+	function orderSettlementKey(item: OrderListItem): string {
+		const value = `${item.settlement_time ?? item.payment_time ?? item.audit_time ?? ""}`;
+		return value.length >= 10 ? value.substring(0, 10) : "";
+	}
+	function calendarAmount(key: string, dimension: CalendarDimension): string {
+		let total = 0;
+		for (let i = 0; i < orderList.value.length; i++) {
+			const settlementKey = orderSettlementKey(orderList.value[i]);
+			const matched = dimension == "day" ? settlementKey == key : settlementKey.indexOf(key) == 0;
+			if (matched) total += parseFloat(`${orderList.value[i].user_profit ?? 0}`) || 0;
+		}
+		return total.toFixed(2);
+	}
+	function sumCalendarRange(start: Date, end: Date): string {
+		let total = 0;
+		for (let i = 0; i < orderList.value.length; i++) {
+			const key = orderSettlementKey(orderList.value[i]);
+			if (key == "") continue;
+			const date = new Date(key.replace(/-/g, "/"));
+			if (date.getTime() >= start.getTime() && date.getTime() <= end.getTime()) total += parseFloat(`${orderList.value[i].user_profit ?? 0}`) || 0;
+		}
+		return total.toFixed(2);
+	}
+	const calendarSummary = computed(() => {
+		const today = new Date();
+		const day = today.getDay();
+		const mondayOffset = day == 0 ? -6 : 1 - day;
+		const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() + mondayOffset);
+		const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+		const yearStart = new Date(today.getFullYear(), 0, 1);
+		const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+		return { week: sumCalendarRange(weekStart, end), month: sumCalendarRange(monthStart, end), year: sumCalendarRange(yearStart, end) };
+	});
+
+	const calendarPeriodTitle = computed(() => {
+		const date = calendarCursor.value;
+		if (calendarDimension.value == "year") return `${date.getFullYear() - 5} - ${date.getFullYear() + 6}`;
+		if (calendarDimension.value == "month") return `${date.getFullYear()}年`;
+		return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+	});
+
+	const calendarCells = computed((): CalendarCell[] => {
+		const result: CalendarCell[] = [];
+		const cursor = calendarCursor.value;
+		const todayKey = dateKey(new Date());
+		if (calendarDimension.value == "year") {
+			for (let offset = -5; offset <= 6; offset++) {
+				const year = cursor.getFullYear() + offset;
+				result.push({ key: `${year}`, label: `${year}年`, amount: calendarAmount(`${year}`, "year"), placeholder: false, isToday: year == new Date().getFullYear() });
+			}
+			return result;
+		}
+		if (calendarDimension.value == "month") {
+			for (let month = 0; month < 12; month++) {
+				const date = new Date(cursor.getFullYear(), month, 1);
+				const key = monthKey(date);
+				result.push({ key: key, label: `${month + 1}月`, amount: calendarAmount(key, "month"), placeholder: false, isToday: key == monthKey(new Date()) });
+			}
+			return result;
+		}
+		const firstWeekday = new Date(cursor.getFullYear(), cursor.getMonth(), 1).getDay();
+		for (let blank = 0; blank < firstWeekday; blank++) result.push({ key: `blank-${blank}`, label: "", amount: "", placeholder: true, isToday: false });
+		const days = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+		for (let day = 1; day <= days; day++) {
+			const date = new Date(cursor.getFullYear(), cursor.getMonth(), day);
+			const key = dateKey(date);
+			result.push({ key: key, label: `${day}`, amount: calendarAmount(key, "day"), placeholder: false, isToday: key == todayKey });
+		}
+		return result;
+	});
+
+	function syncCalendarSelection() {
+		const date = calendarCursor.value;
+		selectedCalendarKey.value = calendarDimension.value == "year" ? `${date.getFullYear()}` : calendarDimension.value == "month" ? monthKey(date) : dateKey(date);
+	}
+	function selectCalendarDimension(value: CalendarDimension) { calendarDimension.value = value; syncCalendarSelection(); }
+	function selectCalendarCell(cell: CalendarCell) { if (!cell.placeholder) selectedCalendarKey.value = cell.key; }
+	function moveCalendar(direction: number) {
+		const date = new Date(calendarCursor.value.getTime());
+		if (calendarDimension.value == "day") date.setMonth(date.getMonth() + direction);
+		else if (calendarDimension.value == "month") date.setFullYear(date.getFullYear() + direction);
+		else date.setFullYear(date.getFullYear() + direction * 3);
+		calendarCursor.value = date;
+		syncCalendarSelection();
+	}
+	syncCalendarSelection();
 
 	function getDefaultCustomRange() : { start : string; end : string } {
 		const today = dayUts();
@@ -305,7 +458,10 @@
 		const params : OrderListParams = {
 			page: page,
 			limit: ORDER_LIMIT,
-			period: getPeriodKey()
+			period: getPeriodKey(),
+			audit_status: "approved",
+			settlement_status: "settled",
+			time_field: "settlement_time"
 		};
 		if (isCustomRange.value) {
 			params.start_date = rangeStart.value;
@@ -345,6 +501,8 @@
 	function fetchOrderList(reset : boolean) {
 		if (reset) {
 			orderListSeq++;
+			selectedRevenue.value = "—";
+			listLoadingMore.value = false;
 			listLoading.value = true;
 			orderList.value = [];
 			orderPage.value = 1;
@@ -360,7 +518,7 @@
 		const reqPage = reset ? 1 : orderPage.value + 1;
 		getOrderList(buildOrderListParams(reqPage))
 			.then((res) => {
-				if (reset && currentSeq != orderListSeq) {
+				if (currentSeq != orderListSeq) {
 					return;
 				}
 				const payload = parseOrderListPayload(res);
@@ -377,6 +535,9 @@
 					hasMore.value = false;
 					return;
 				}
+				if (reset && selectedPeriodLabel.value != "") {
+					try { selectedRevenue.value = readRevenue(payload); } catch (_) { revenueError.value = true; }
+				}
 				const listRaw = payload.list ?? [];
 				if (reset) {
 					orderList.value = listRaw as OrderListItem[];
@@ -392,12 +553,14 @@
 				updateOrderHasMore(listRaw.length, count, reqPage);
 			})
 			.catch((err) => {
-				if (reset && currentSeq != orderListSeq) {
+				if (currentSeq != orderListSeq) {
 					return;
 				}
+				revenueError.value = true;
 				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
 			})
 			.finally(() => {
+				if (currentSeq != orderListSeq) return;
 				if (reset) {
 					if (currentSeq != orderListSeq) {
 						return;
@@ -411,6 +574,7 @@
 
 	function loadOrderList() {
 		fetchOrderList(true);
+		loadKeywordStats();
 	}
 
 	function loadMoreOrderList() {
@@ -557,13 +721,12 @@
 	}
 
 	function onCalendarTap() {
-		isCustomRange.value = true;
-		activePeriod.value = -1;
 		openRangePopup();
 	}
 
 	function toWallet() {
 		if (canWithdraw.value != 1) {
+			uni.showToast({ title: "当前账号暂未开通钱包", icon: "none" });
 			return;
 		}
 		router.push({ path: "/pages/wallet/index" });
@@ -651,6 +814,7 @@
 		syncTabbarRoutePath();
 		loadCanWithdraw();
 		loadStaffSummary();
+		loadPeriodRevenue();
 		loadOrderList();
 	});
 </script>
@@ -681,10 +845,10 @@
 
 	.inc-summary-card {
 		margin: 0 30rpx 20rpx;
-		padding: 32rpx 28rpx 28rpx;
+		padding: 28rpx 28rpx 24rpx;
 		border-radius: 24rpx;
-		background-image: linear-gradient(135deg, #1a1f3a 0%, #2b3a6b 55%, #3a3268 100%);
-		box-shadow: 0 12rpx 32rpx rgba(26, 31, 58, 0.18);
+		background-color: #ffffff;
+		box-shadow: 0 8rpx 24rpx rgba(30, 45, 78, 0.05);
 	}
 
 	.inc-summary-top {
@@ -694,62 +858,45 @@
 		justify-content: space-between;
 	}
 
-	.inc-summary-label-row {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		flex: 1;
-		min-width: 0;
-	}
-
 	.inc-wallet-entry {
 		flex-shrink: 0;
 		margin-left: 16rpx;
-		padding: 8rpx 16rpx 8rpx 18rpx;
+		padding: 6rpx 12rpx 6rpx 16rpx;
 		border-radius: 999rpx;
-		background-color: rgba(255, 255, 255, 0.14);
+		background-color: #f1f4f9;
 		display: flex;
 		flex-direction: row;
 		align-items: center;
 	}
 
 	.inc-wallet-entry-text {
-		margin-left: 8rpx;
 		margin-right: 2rpx;
-		font-size: 24rpx;
-		color: #ffffff;
+		font-size: 22rpx;
+		color: #768197;
 		line-height: 34rpx;
 	}
 
-	.inc-summary-dot {
-		width: 12rpx;
-		height: 12rpx;
-		border-radius: 999rpx;
-		background-color: #7dd3fc;
-		margin-right: 12rpx;
-	}
-
 	.inc-summary-label {
-		font-size: 24rpx;
-		color: rgba(255, 255, 255, 0.72);
+		font-size: 22rpx;
+		color: #70809a;
 		line-height: 34rpx;
 	}
 
 	.inc-summary-amount {
-		margin-top: 16rpx;
-		font-size: 56rpx;
+		margin-top: 4rpx;
+		font-size: 48rpx;
 		font-weight: 700;
-		color: #ffffff;
-		line-height: 72rpx;
-		min-height: 72rpx;
+		color: #1d2942;
+		line-height: 64rpx;
+		min-height: 64rpx;
 	}
 
 	.inc-summary-stats {
-		margin-top: 28rpx;
-		padding-top: 24rpx;
+		margin-top: 18rpx;
+		padding-top: 20rpx;
 		border-top-width: 1rpx;
 		border-top-style: solid;
-		border-top-color: rgba(255, 255, 255, 0.12);
+		border-top-color: #edf0f5;
 		display: flex;
 		flex-direction: row;
 		align-items: stretch;
@@ -760,31 +907,182 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		justify-content: flex-start;
-		min-height: 84rpx;
+		align-items: center;
+		justify-content: center;
+		min-height: 72rpx;
 
 		&--divider {
 			border-left-width: 1rpx;
 			border-left-style: solid;
-			border-left-color: rgba(255, 255, 255, 0.12);
-			padding-left: 24rpx;
+			border-left-color: #edf0f5;
 		}
 	}
 
 	.inc-summary-stat-label {
-		font-size: 22rpx;
-		color: rgba(255, 255, 255, 0.55);
+		font-size: 20rpx;
+		color: #75829a;
 		line-height: 30rpx;
 		min-height: 30rpx;
 	}
 
 	.inc-summary-stat-value {
-		margin-top: 8rpx;
-		font-size: 28rpx;
+		margin-top: 4rpx;
+		font-size: 26rpx;
 		font-weight: 600;
-		color: #ffffff;
+		color: #ff4d4f;
 		line-height: 38rpx;
 		min-height: 38rpx;
+	}
+
+	.inc-calendar-card {
+		margin: 0 30rpx 20rpx;
+		padding: 28rpx 24rpx 24rpx;
+		border-radius: 24rpx;
+		background-color: #ffffff;
+		box-shadow: 0 8rpx 24rpx rgba(30, 45, 78, 0.05);
+	}
+
+	.inc-calendar-toolbar {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 22rpx;
+	}
+
+	.inc-calendar-dimensions {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 5rpx;
+		border-radius: 14rpx;
+		background-color: #f2f4f8;
+	}
+
+	.inc-calendar-dimension {
+		min-width: 52rpx;
+		height: 44rpx;
+		padding: 0 10rpx;
+		border-radius: 10rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 21rpx;
+		color: #7b879b;
+
+		&--active {
+			background-color: #ffffff;
+			color: #2b59c3;
+			font-weight: 600;
+			box-shadow: 0 2rpx 8rpx rgba(43, 89, 195, 0.12);
+		}
+	}
+
+	.inc-calendar-nav {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.inc-calendar-nav-btn {
+		width: 46rpx;
+		height: 46rpx;
+		border-radius: 14rpx;
+		background-color: #f2f4f8;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.inc-calendar-period {
+		min-width: 150rpx;
+		padding: 0 10rpx;
+		font-size: 24rpx;
+		font-weight: 600;
+		color: #26324a;
+		line-height: 46rpx;
+		text-align: center;
+		white-space: nowrap;
+	}
+
+	.inc-calendar-weekdays {
+		display: grid;
+		grid-template-columns: repeat(7, 1fr);
+		margin-bottom: 10rpx;
+	}
+
+	.inc-calendar-weekday {
+		font-size: 20rpx;
+		color: #71809a;
+		line-height: 34rpx;
+		text-align: center;
+	}
+
+	.inc-calendar-cells {
+		display: grid;
+		gap: 8rpx;
+
+		&--day {
+			grid-template-columns: repeat(7, 1fr);
+		}
+
+		&--month,
+		&--year {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 12rpx;
+		}
+	}
+
+	.inc-calendar-cell {
+		min-width: 0;
+		height: 78rpx;
+		padding: 7rpx 5rpx;
+		box-sizing: border-box;
+		border: 1rpx solid transparent;
+		border-radius: 14rpx;
+		background-color: #f5f7fa;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		justify-content: space-between;
+
+		&--placeholder {
+			background-color: transparent;
+		}
+
+		&--today {
+			border-color: #2b59c3;
+			background-color: #ffffff;
+		}
+
+		&--active {
+			border-color: #2b59c3;
+			background-color: #eef3ff;
+		}
+	}
+
+	.inc-calendar-cells--month .inc-calendar-cell,
+	.inc-calendar-cells--year .inc-calendar-cell {
+		height: 94rpx;
+		padding: 14rpx 16rpx;
+	}
+
+	.inc-calendar-cell-label {
+		font-size: 20rpx;
+		font-weight: 600;
+		color: #26324a;
+		line-height: 28rpx;
+	}
+
+	.inc-calendar-cell-amount {
+		max-width: 100%;
+		font-size: 16rpx;
+		color: #6f809f;
+		line-height: 24rpx;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.inc-panel {
@@ -1246,4 +1544,75 @@
 		color: #ffffff;
 		line-height: 42rpx;
 	}
+</style><style lang="scss" scoped>
+@import "@/styles/employee-workbench.scss";
+.inc-page { background: $background; }
+.inc-scroll-inner { width: 100%; padding-top: 14px; padding-bottom: calc(80px + env(safe-area-inset-bottom)); max-width: 800px; margin: 0 auto; }
+.employee-heading { margin-left: 14px; margin-right: 14px; }
+.inc-summary-card { @include feature; margin: 0 14px 12px; padding: 16px; }
+.inc-summary-amount { color: $primary; font-size: 32px; line-height: 42px; }
+.inc-summary-label, .inc-summary-stat-label { font-size: 12px; color: $muted; }
+.inc-summary-stat-value { font-size: 16px; color: $text; }
+.inc-panel { @include card; margin: 0 14px 12px; padding: 12px; }
+.inc-body { padding: 0 14px; }
+.inc-section-title { @include section; }
+.inc-order-card { @include card; padding: 14px; margin-bottom: 10px; }
+.inc-order-card .inc-order-title { font-size: 14px; color: $text; }
+.inc-order-card .inc-order-field-label { font-size: 12px; color: $muted; }
+.inc-order-card .inc-order-field-value { font-size: 13px; overflow-wrap: anywhere; }
+</style>
+<style lang="scss" scoped>
+.inc-fixed-heading { flex-shrink: 0; width: 100%; max-width: 800px; box-sizing: border-box; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) 14px 10px; background: #f4f5f7; }
+.inc-scroll-inner { padding-top: 0; }
+.inc-summary-stats { margin-top: 12px; padding-top: 12px; }
+.inc-time-stats { display: flex; flex-direction: row; gap: 12px; border-top: 1px solid #dfe4f3; padding-top: 14px; margin-top: 14px; }
+.inc-time-stat { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.inc-time-value { display: block; color: #5375ed; font-size: 21px; line-height: 28px; font-weight: 600; overflow-wrap: anywhere; }
+.inc-unit { font-size: 12px; font-weight: 400; margin-left: 4px; }
+.inc-selected-stat { margin-top: 14px; padding: 12px; border-radius: 10px; background: #ffffffa8; }
+.inc-selected-head { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 8px; }
+.inc-select-action { font-size: 12px; color: #5375ed; }
+.inc-select-hint { display: block; margin-top: 8px; font-size: 12px; line-height: 20px; color: #89909e; }
+.inc-selected-date { display: block; margin: 8px 0 4px; font-size: 12px; line-height: 20px; color: #71798b; }
+.inc-revenue-error { display: block; color: #ad642d; font-size: 12px; line-height: 20px; margin-top: 8px; }
+</style>
+
+<style lang="scss" scoped>
+.inc-summary-card { padding: 12px 14px; margin-bottom: 10px; }
+.inc-summary-top { margin-bottom: 2px; }
+.inc-summary-label, .inc-summary-stat-label { font-size: 11px; line-height: 17px; }
+.inc-compact-totals { display: grid; grid-template-columns: 1.25fr 1fr 1fr; align-items: center; gap: 8px; }
+.inc-summary-amount { font-size: 27px; line-height: 35px; margin: 0; overflow-wrap: anywhere; }
+.inc-compact-status { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; gap: 2px; }
+.inc-summary-stat-value { font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+.inc-time-stats { margin-top: 10px; padding-top: 9px; gap: 14px; }
+.inc-time-stat { flex-direction: row; align-items: center; justify-content: space-between; gap: 5px; }
+.inc-time-value { font-size: 17px; line-height: 24px; }
+.inc-unit { font-size: 10px; margin-left: 2px; }
+.inc-panel { padding: 8px 10px; margin-bottom: 12px; }
+.inc-selected-stat { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; background: transparent; border-radius: 0; border-top: 1px solid #edf0f5; margin-top: 8px; padding: 8px 0 0; }
+.inc-selected-copy { min-width: 0; }
+.inc-selected-date { margin: 2px 0 0; font-size: 10px; line-height: 16px; }
+.inc-selected-stat .inc-time-value { flex-shrink: 0; }
+.inc-revenue-error { margin-top: 5px; font-size: 11px; line-height: 17px; }
+@media(max-width:350px) { .inc-time-stat { gap: 2px; } .inc-time-value { font-size: 15px; } }
+.inc-team-card { margin: 0 14px 10px; padding: 12px 14px; border-radius: 12px; background: #fff; }
+.inc-team-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding-bottom: 9px; border-bottom: 1px solid #edf0f5; }
+.inc-team-head > text:first-child { font-size: 14px; line-height: 21px; font-weight: 600; color: #303649; }
+.inc-team-head > text:last-child { font-size: 12px; color: #5375ed; }
+.inc-team-stats { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding-top: 10px; }
+.inc-team-stats > view { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.inc-team-stats > view > text:first-child { font-size: 11px; line-height: 17px; color: #89909e; }
+.inc-team-stats > view > text:last-child { font-size: 16px; line-height: 23px; color: #5375ed; font-weight: 600; overflow-wrap: anywhere; }
+.inc-list-tabs { display: flex; flex-direction: row; gap: 4px; padding: 3px; margin-bottom: 10px; border-radius: 9px; background: #e9ecf2; }
+.inc-list-tabs > view { flex: 1; padding: 6px 0; text-align: center; border-radius: 7px; }
+.inc-list-tabs > view > text { font-size: 12px; line-height: 18px; color: #7b8499; }
+.inc-list-tabs > view.active { background: #fff; }
+.inc-list-tabs > view.active > text { color: #5375ed; font-weight: 600; }
+.inc-keyword-list { display: flex; flex-direction: column; gap: 8px; }
+.inc-keyword-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 10px; background: #fff; }
+.inc-keyword-row > view { min-width: 0; }
+.inc-keyword-name { display: block; font-size: 13px; line-height: 20px; color: #303649; overflow-wrap: anywhere; }
+.inc-keyword-count { display: block; margin-top: 2px; font-size: 11px; line-height: 17px; color: #89909e; }
+.inc-keyword-amount { flex-shrink: 0; font-size: 15px; line-height: 22px; color: #5375ed; font-weight: 600; }
 </style>

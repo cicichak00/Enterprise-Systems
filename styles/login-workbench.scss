@@ -1,0 +1,41 @@
+@import "./owner-workbench.scss";
+// A single open canvas keeps the brand and login form together.
+.lg-page { min-height: 100vh; background: #fff; }
+.lg-body { max-width: 460px; width: 100%; box-sizing: border-box; margin: 0 auto; padding: calc(52px + env(safe-area-inset-top)) 28px calc(28px + env(safe-area-inset-bottom)); }
+.lg-welcome { padding: 0; margin-bottom: 36px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.lg-brand { position: relative; width: 88px; height: 88px; margin: 0 0 30px 4px; }
+.lg-brand-accent { position: absolute; width: 72px; height: 72px; left: 12px; top: 12px; border-radius: 23px; background: #eef0ff; transform: rotate(12deg); }
+.lg-brand-logo { position: relative; display: block; width: 76px; height: 76px; border-radius: 23px; transform: rotate(-8deg); box-shadow: 0 8px 18px rgba(20, 26, 46, .10); }
+.lg-title { display: block; font-size: 28px; line-height: 38px; font-weight: 700; color: $text; }
+.lg-sub { display: block; margin: 10px 0 0; font-size: 14px; line-height: 23px; color: #7b8499; }
+.lg-form { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.lg-field { margin-bottom: 22px; }
+.lg-label { font-size: 13px; line-height: 20px; color: $text; margin-bottom: 8px; font-weight: 500; }
+.lg-input { height: 46px; padding: 0 12px; box-sizing: border-box; border-radius: 9px; border: 1px solid $border; background: #f8f9fb; color: $text; font-size: 16px; }
+.lg-input:focus-within { border-color: $primary; background: #fff; }
+.lg-placeholder { font-size: 13px; color: #a0a7b4; }
+.lg-code-row { gap: 8px; }
+.lg-code-btn { margin-left: 0; height: 46px; padding: 0 12px; border-radius: 9px; background: #eef2ff; }
+.lg-code-btn-text { font-size: 12px; line-height: 20px; color: $primary; }
+.lg-agreement { margin-top: 2px; align-items: flex-start; gap: 7px; }
+.lg-checkbox { width: 16px; height: 16px; margin-top: 2px; box-sizing: border-box; border-radius: 5px; border-color: #d2d8e4; }
+.lg-checkbox.is-checked { background: $primary; border-color: $primary; }
+.lg-checkbox-mark { font-size: 11px; line-height: 14px; }
+.lg-agreement-copy { flex: 1; min-width: 0; margin-left: 0; }
+.lg-agreement-text, .lg-agreement-link { font-size: 11px; line-height: 20px; }
+.lg-agreement-text { color: $muted; }
+.lg-agreement-link { color: $primary; }
+.lg-submit { height: 48px; margin-top: 24px; border-radius: 10px; background: $primary; box-shadow: none; }
+.lg-submit-text { font-size: 15px; line-height: 22px; font-weight: 600; }
+.lg-switch { margin-top: 6px; padding: 12px 0; }
+.lg-switch-text { font-size: 12px; line-height: 20px; color: $primary; }
+.lg-agree-modal { padding: 20px 16px 16px; }
+.lg-agree-modal-title { font-size: 17px; line-height: 24px; color: $text; }
+.lg-agree-modal-text, .lg-agree-modal-link, .lg-agree-modal-desc { font-size: 13px; line-height: 22px; }
+.lg-agree-modal-link { color: $primary; }
+.lg-agree-modal-desc { color: $muted; }
+.lg-agree-modal-btn { height: 42px; border-radius: 9px; }
+.lg-agree-modal-btn--primary { background: $primary; }
+.lg-agree-modal-btn-text { font-size: 14px; }
+@media (max-height: 600px) { .lg-body { padding-top: calc(20px + env(safe-area-inset-top)); } .lg-brand { width: 72px; height: 72px; margin-bottom: 20px; } .lg-brand-logo { width: 62px; height: 62px; border-radius: 19px; } .lg-brand-accent { width: 58px; height: 58px; border-radius: 19px; left: 10px; top: 10px; } .lg-welcome { margin-bottom: 24px; } }
+@media (max-width: 360px) { .lg-body { padding-left: 22px; padding-right: 22px; } .lg-sub { font-size: 13px; } }

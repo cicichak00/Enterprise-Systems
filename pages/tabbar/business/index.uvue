@@ -83,7 +83,7 @@
 								</view>
 							</view>
 							<view class="bs-emp-card-toggle" @tap="toggleEmployeeCardDisplay">
-								<text class="bs-emp-card-toggle-text">{{ employeeCardsCollapsed ? "展开" : "折叠" }}</text>
+								<text class="bs-emp-card-toggle-text">{{ employeeCardsCollapsed ? "展开数据" : "收起数据" }}</text>
 								<cl-icon :name="employeeCardsCollapsed ? 'arrow-down-s-line' : 'arrow-up-s-line'" :size="14" color="#2b59c3"></cl-icon>
 							</view>
 						</view>
@@ -137,7 +137,7 @@
 									:key="'emp-' + item.id"
 									:class="{
 										'bs-acc-card--batch-active': employeeBatchMode && isEmployeeBatchSelected(item.id),
-										'bs-emp-card--collapsed': employeeCardsCollapsed && !employeeBatchMode
+										'bs-emp-card--collapsed': employeeCardsCollapsed || employeeBatchMode
 									}"
 									@tap="onEmployeeCardTap(item)"
 								>
@@ -178,7 +178,7 @@
 											>
 												<text class="bs-role-tag-text">{{ item.displayRoleText }}</text>
 											</view>
-											<text class="bs-emp-id">协作ID: {{ item.collabId }}</text>
+											<text class="bs-emp-settlement" :class="'bs-emp-settlement--' + (item.settlementMethod || 'unset')">{{ item.settlementText }}</text>
 										</view>
 										<text v-if="item.groupNames != ''" class="bs-emp-group">关联小组：{{ item.groupNames }}</text>
 									</view>
@@ -192,12 +192,16 @@
 										</view>
 									</view>
 								</view>
-								<view v-if="!employeeCardsCollapsed || employeeBatchMode" class="bs-emp-grid">
+								<view v-if="!employeeCardsCollapsed && !employeeBatchMode" class="bs-emp-grid">
 									<view class="bs-stat" v-for="(stat, si) in item.stats" :key="si">
 										<text class="bs-stat-label">{{ stat.label }}</text>
 										<text class="bs-stat-value">{{ stat.value }}</text>
-										<text class="bs-stat-rise">{{ stat.rise }}</text>
+										<text v-if="stat.rise != ''" class="bs-stat-rise">{{ stat.rise }}</text>
 									</view>
+								</view>
+								<view v-if="!employeeCardsCollapsed && !employeeBatchMode" class="bs-emp-footnote">
+									<text class="bs-emp-id">协作 ID：{{ item.collabId }}</text>
+									<text class="bs-emp-join-time">加入于 {{ item.joinTime }}</text>
 								</view>
 							</view>
 
@@ -549,22 +553,23 @@
 		<cl-popup
 			v-model="permPopupVisible"
 			direction="bottom"
-			size="78%"
+			size="92%"
 			:show-header="false"
 			:show-close="false"
 			:swipeClose="false"
 			:pt="{ className: 'bs-perm-popup-wrap' }"
 			:maskClosable="false"
 		>
-			<view class="bs-perm-popup">
+			<view class="bs-perm-popup" :class="{ 'bs-perm-popup--batch-project': employeeBatchProjectStaffIds.length > 0 }">
 				<view class="bs-perm-header">
-					<text class="bs-perm-title">权限管理</text>
+					<text class="bs-perm-title">{{ employeeBatchProjectStaffIds.length > 0 ? "项目管理" : "权限管理" }}</text>
+					<text class="bs-perm-employee-name">{{ employeeBatchProjectStaffIds.length > 0 ? "已选 " + employeeBatchProjectStaffIds.length + " 人 · 保存后统一生效" : currentEmployeeName }}</text>
 					<view class="bs-perm-close" @tap="onPermCloseTap">
 						<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
 					</view>
 				</view>
 
-				<view class="bs-perm-tabs">
+				<view v-if="employeeBatchProjectStaffIds.length == 0" class="bs-perm-tabs">
 					<view
 						class="bs-perm-tab"
 						:class="{ 'bs-perm-tab--active': permTab == 'perm' }"
@@ -616,6 +621,15 @@
 								/>
 							</view>
 						</view>
+						<view class="bs-perm-settlement-block">
+							<text class="bs-perm-settlement-title">员工结算方式</text>
+							<text class="bs-perm-settlement-subtitle">仅调整结算归属与钱包权限，不改变分成比例计算</text>
+							<view class="bs-perm-settlement-options">
+								<view class="bs-perm-settlement-option" :class="{ 'bs-perm-settlement-option--active': currentSettlementMethod == 'offline' }" @tap="currentSettlementMethod = 'offline'"><view><text class="bs-perm-settlement-name">线下结算</text><text class="bs-perm-settlement-desc">订单可见，收益归企业主</text></view><view class="bs-perm-settlement-radio" :class="{ 'bs-perm-settlement-radio--active': currentSettlementMethod == 'offline' }"></view></view>
+								<view class="bs-perm-settlement-option" :class="{ 'bs-perm-settlement-option--active': currentSettlementMethod == 'online' }" @tap="currentSettlementMethod = 'online'"><view><text class="bs-perm-settlement-name">线上结算</text><text class="bs-perm-settlement-desc">订单归员工，可提现</text></view><view class="bs-perm-settlement-radio" :class="{ 'bs-perm-settlement-radio--active': currentSettlementMethod == 'online' }"></view></view>
+							</view>
+							<text v-if="currentSettlementMethod == 'online'" class="bs-perm-settlement-online-tip">员工钱包允许开启，分成订单可提现，并将新订单数据推送主站</text>
+						</view>
 
 						<view class="bs-perm-slider-block">
 							<view class="bs-perm-slider-head">
@@ -657,7 +671,7 @@
 							<view class="bs-perm-switch-row bs-perm-switch-row--advanced">
 								<view class="bs-perm-switch-copy">
 									<text class="bs-perm-switch-title">进阶管理</text>
-									<text class="bs-perm-switch-desc">开启后原有分成规则失效，后续新订单按进阶设置的规则核算分佣；如需关闭恢复普通员工身份，组长需先解除全部关联组员。</text>
+									<text class="bs-perm-switch-desc">按员工身份与归属关系设置分佣</text>
 								</view>
 								<view class="bs-perm-native-switch">
 									<switch
@@ -674,15 +688,13 @@
 								<text class="bs-advanced-manage-loading-text">读取进阶配置中...</text>
 							</view>
 							<view v-else-if="advancedManageEnabled" class="bs-advanced-manage-on">
-								<text class="bs-advanced-rule-text">开启后普通员工升级为小组长或组员，订单按新身份、归属和分佣规则计算；仅作用于保存后的新订单，历史订单不追溯。关闭后恢复普通员工并解除层级关系。</text>
 
 								<view class="bs-inline-field">
 									<view class="bs-inline-field-copy">
 										<view class="bs-inline-step-title">
-											<text class="bs-inline-step-badge">步骤 1</text>
-											<text class="bs-inline-field-label">{{ currentEmployeeName }}身份调整</text>
+											<text class="bs-inline-field-label">员工身份</text>
 										</view>
-										<text class="bs-inline-field-desc">请先将当前员工设置为小组长，再进行组员关联</text>
+										<text class="bs-inline-field-desc">选择身份后设置对应的归属关系</text>
 									</view>
 									<view class="bs-inline-role-options">
 										<view
@@ -699,28 +711,22 @@
 								</view>
 
 								<view
-									v-if="advancedManageRole != 'member'"
+									v-if="advancedManageRole == 'leader'"
 									class="bs-inline-field bs-inline-field--relation"
-									:class="{ 'bs-inline-field--locked': advancedManageRole != 'leader' }"
 								>
 									<view class="bs-inline-field-copy">
 										<view class="bs-inline-step-title">
-											<text
-												class="bs-inline-step-badge"
-												:class="{ 'bs-inline-step-badge--done': advancedManageRole == 'leader' }"
-											>步骤 2</text>
 											<text class="bs-inline-field-label">关联组员</text>
 										</view>
 										<text class="bs-inline-field-desc">
-											{{ advancedManageRole == 'leader' ? '小组长身份已设置，可关联在职普通员工' : '请先完成步骤 1，选择“小组长”身份' }}
+											可选择多名在职普通员工
 										</text>
 									</view>
 									<view
 										class="bs-inline-select"
-										:class="{ 'bs-inline-select--disabled': advancedManageRole != 'leader' }"
 										@tap="openInlineAdvancedCandidate('member')"
 									>
-										<text>{{ advancedManageRole != 'leader' ? '待设置角色' : advancedManageMemberCount > 0 ? '已选 ' + advancedManageMemberCount + ' 人' : '选择员工' }}</text>
+										<text>{{ advancedManageMemberCount > 0 ? '已选 ' + advancedManageMemberCount + ' 人' : '选择员工' }}</text>
 										<cl-icon name="arrow-down-s-line" :size="16" color="#6b7280"></cl-icon>
 									</view>
 								</view>
@@ -802,6 +808,7 @@
 									</view>
 								</view>
 							</view>
+							<text v-if="advancedManageEnabled" class="bs-advanced-rule-text">保存后，新订单按进阶规则分佣，历史订单不变。关闭后恢复普通员工；小组长需先解除全部关联组员。</text>
 						</view>
 						</view>
 						</scroll-view>
@@ -813,6 +820,10 @@
 					</view>
 
 					<view v-show="permTab == 'project'" class="bs-perm-panel bs-perm-panel--project">
+						<view v-if="employeeBatchProjectStaffIds.length > 0" class="bs-batch-project-targets">
+							<cl-icon name="information-line" :size="16" color="#5375ed"></cl-icon>
+							<text class="bs-batch-project-target-tip">当前以首位员工配置为模板，修改后将覆盖全部已选员工</text>
+						</view>
 						<view class="bs-perm-search">
 							<view class="bs-perm-search-field">
 								<view class="bs-perm-search-icon">
@@ -821,13 +832,13 @@
 								<input
 									class="bs-perm-search-input"
 									v-model="projKeyword"
-									placeholder="请输入项目名称"
+									placeholder="搜索项目名称"
 									placeholder-class="bs-perm-search-placeholder"
 									confirm-type="search"
 									@confirm="searchStaffProjectList"
 								/>
 							</view>
-							<view class="bs-perm-search-btn" @tap="searchStaffProjectList">
+							<view v-if="employeeBatchProjectStaffIds.length == 0" class="bs-perm-search-btn" @tap="searchStaffProjectList">
 								<text class="bs-perm-search-btn-text">搜索</text>
 							</view>
 						</view>
@@ -865,7 +876,7 @@
 						</view>
 
 						<view v-if="projectPermList.length > 0" class="bs-perm-bulk-row">
-							<text class="bs-perm-bulk-title">一键操作</text>
+							<view class="bs-perm-bulk-copy"><text class="bs-perm-bulk-title">{{ employeeBatchProjectStaffIds.length > 0 ? "本分类全选" : "一键操作" }}</text><text v-if="employeeBatchProjectStaffIds.length > 0" class="bs-perm-bulk-desc">统一开启或关闭</text></view>
 							<view class="bs-perm-project-switch">
 								<view class="bs-perm-native-switch">
 									<switch
@@ -952,7 +963,7 @@
 						@tap="savePermConfig"
 					>
 						<cl-loading v-if="permSaving" :loading="true" :size="18" color="#ffffff"></cl-loading>
-						<text class="bs-perm-save-text">{{ permSaving ? "保存中..." : initialManagePermEnabled && !managePermEnabled ? "确认离职并保存" : "保存并启用配置" }}</text>
+						<text class="bs-perm-save-text">{{ permSaving ? "保存中..." : employeeBatchProjectStaffIds.length > 0 ? "保存并统一到 " + employeeBatchProjectStaffIds.length + " 人" : initialManagePermEnabled && !managePermEnabled ? "确认离职并保存" : "保存设置" }}</text>
 					</view>
 					<cl-safe-area type="bottom"></cl-safe-area>
 				</view>
@@ -1076,15 +1087,23 @@
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('commission')">
 						<view class="bs-batch-action-icon"><cl-icon name="percent-line" :size="18" color="#2b59c3"></cl-icon></view>
 						<view class="bs-batch-action-copy">
-							<text class="bs-batch-action-title">批量设置分成</text>
+							<text class="bs-batch-action-title">设置分成</text>
 							<text class="bs-batch-action-desc">选择员工后统一调整常规分成比例</text>
+						</view>
+						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+					</view>
+					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('settlement')">
+						<view class="bs-batch-action-icon"><cl-icon name="bank-card-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-copy">
+							<text class="bs-batch-action-title">设置结算方式</text>
+							<text class="bs-batch-action-desc">线下结算或线上结算，支持单人及多人设置</text>
 						</view>
 						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
 					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('role_label')">
 						<view class="bs-batch-action-icon"><cl-icon name="price-tag-3-line" :size="18" color="#2b59c3"></cl-icon></view>
 						<view class="bs-batch-action-copy">
-							<text class="bs-batch-action-title">批量自定义标签</text>
+							<text class="bs-batch-action-title">自定义标签</text>
 							<text class="bs-batch-action-desc">统一设置姓名旁标签，不改变员工真实角色</text>
 						</view>
 						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
@@ -1100,14 +1119,61 @@
 						</view>
 						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
 					</view>
+					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('project')">
+						<view class="bs-batch-action-icon"><cl-icon name="apps-2-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-copy">
+							<text class="bs-batch-action-title">项目管理</text>
+							<text class="bs-batch-action-desc">统一配置所选员工可使用的项目</text>
+						</view>
+						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('wallet')">
 						<view class="bs-batch-action-icon"><cl-icon name="wallet-line" :size="18" color="#2b59c3"></cl-icon></view>
 						<view class="bs-batch-action-copy">
-							<text class="bs-batch-action-title">批量设置钱包</text>
+							<text class="bs-batch-action-title">设置钱包</text>
 							<text class="bs-batch-action-desc">统一调整员工钱包相关权限</text>
 						</view>
 						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
 					</view>
+				</view>
+				<cl-safe-area type="bottom"></cl-safe-area>
+			</view>
+		</cl-popup>
+
+		<cl-popup
+			v-model="employeeBatchSettlementPopupVisible"
+			direction="bottom"
+			size="auto"
+			:show-header="false"
+			:show-close="false"
+			:pt="{ className: 'bs-batch-rate-popup-wrap' }"
+		>
+			<view class="bs-batch-rate-popup bs-settlement-popup">
+				<view class="bs-batch-rate-header">
+					<view class="bs-batch-action-head-copy">
+						<text class="bs-batch-label-eyebrow">员工收益归属</text>
+						<text class="bs-batch-rate-title">设置结算方式</text>
+					</view>
+					<view class="bs-batch-rate-close" @tap="closeEmployeeBatchSettlementPopup"><cl-icon name="close-line" :size="18" color="#999999"></cl-icon></view>
+				</view>
+				<view class="bs-batch-label-selection">
+					<view class="bs-batch-label-selection-top"><text class="bs-batch-label-selection-title">应用员工</text><text class="bs-batch-label-selection-count">已选 {{ employeeBatchSelectedCount }} 人</text></view>
+					<text class="bs-batch-label-selection-names">{{ employeeBatchSelectedNames }}</text>
+				</view>
+				<view class="bs-settlement-options">
+					<view class="bs-settlement-option" :class="{ 'bs-settlement-option--active': employeeBatchSettlementMethod == 'offline' }" @tap="selectEmployeeBatchSettlement('offline')">
+						<view class="bs-settlement-option-head"><text class="bs-settlement-option-title">线下结算</text><cl-icon v-if="employeeBatchSettlementMethod == 'offline'" name="checkbox-circle-fill" :size="19" color="#2b59c3"></cl-icon></view>
+						<text class="bs-settlement-option-desc">员工可查看分成订单，但钱包禁止开启；订单收益划分至企业主。</text>
+					</view>
+					<view class="bs-settlement-option" :class="{ 'bs-settlement-option--active': employeeBatchSettlementMethod == 'online' }" @tap="selectEmployeeBatchSettlement('online')">
+						<view class="bs-settlement-option-head"><text class="bs-settlement-option-title">线上结算</text><cl-icon v-if="employeeBatchSettlementMethod == 'online'" name="checkbox-circle-fill" :size="19" color="#2b59c3"></cl-icon></view>
+						<text class="bs-settlement-option-desc">员工分成订单可见、可提现并归属员工；订单数据同步主站。</text>
+					</view>
+				</view>
+				<text class="bs-settlement-tip" :class="{ 'bs-settlement-tip--online': employeeBatchSettlementMethod == 'online' }">{{ employeeBatchSettlementMethod == 'online' ? '员工钱包允许开启，分成订单可提现，并将新订单数据推送主站' : '所选员工钱包将关闭且不可开启，订单收益划入企业主' }}</text>
+				<view class="bs-batch-rate-confirm" :class="{ 'bs-batch-rate-confirm--disabled': employeeBatchSaving }" @tap="submitEmployeeBatchSettlement">
+					<cl-loading v-if="employeeBatchSaving" :loading="true" :size="18" color="#ffffff"></cl-loading>
+					<text class="bs-batch-rate-confirm-text">{{ employeeBatchSaving ? "保存中..." : "确认设置" }}</text>
 				</view>
 				<cl-safe-area type="bottom"></cl-safe-area>
 			</view>
@@ -1349,7 +1415,7 @@
 		>
 			<view class="bs-revenue-rank-popup">
 				<view class="bs-revenue-rank-popup-head">
-					<text class="bs-revenue-rank-popup-title">收益排行</text>
+					<text class="bs-revenue-rank-popup-title">员工排序</text>
 					<view class="bs-revenue-rank-popup-close" @tap="closeRevenueRankPopup">
 						<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
 					</view>
@@ -1379,6 +1445,14 @@
 						:size="18"
 						color="#2b59c3"
 					></cl-icon>
+				</view>
+				<view class="bs-revenue-rank-popup-item" :class="{ 'bs-revenue-rank-popup-item--active': staffOrder == 'join_desc' }" @tap="selectStaffOrder('join_desc')">
+					<text class="bs-revenue-rank-popup-item-text">最新加入</text>
+					<cl-icon v-if="staffOrder == 'join_desc'" name="check-line" :size="18" color="#2b59c3"></cl-icon>
+				</view>
+				<view class="bs-revenue-rank-popup-item" :class="{ 'bs-revenue-rank-popup-item--active': staffOrder == 'join_asc' }" @tap="selectStaffOrder('join_asc')">
+					<text class="bs-revenue-rank-popup-item-text">最早加入</text>
+					<cl-icon v-if="staffOrder == 'join_asc'" name="check-line" :size="18" color="#2b59c3"></cl-icon>
 				</view>
 				<cl-safe-area type="bottom"></cl-safe-area>
 			</view>
@@ -1688,6 +1762,7 @@
 		saveStaffConfig,
 		saveStaffAdvancedConfig,
 		saveStaffProjectConfig,
+		saveStaffSettlementMethod,
 		unbindStaffGroupMembers,
 		type GetStaffListParams
 	} from "@/.cool/api/staff";
@@ -1719,7 +1794,8 @@
 
 	type StatItem = { label: string; value: string; rise: string };
 	type StaffFilterOption = { label: string; value: string };
-	type EmployeeBatchAction = "commission" | "role_label" | "quick_prompt";
+	type EmployeeBatchAction = "commission" | "role_label" | "quick_prompt" | "settlement" | "project";
+	type StaffSettlementMethod = "" | "offline" | "online";
 	type UnbindMemberCard = { id: number; name: string; meta: string };
 	type AdvancedCandidateRow = {
 		id: number;
@@ -1738,6 +1814,9 @@
 		enabled: boolean;
 		statusText: string;
 		collabId: string;
+		joinTime: string;
+		settlementMethod: StaffSettlementMethod;
+		settlementText: string;
 		canViewRevenue: boolean;
 		commissionRate: number;
 		pendingWithdrawalAmount: number;
@@ -1921,9 +2000,12 @@
 	const employeeBatchSelectedIds = ref<number[]>([]);
 	const employeeBatchAction = ref<EmployeeBatchAction>("commission");
 	const employeeBatchActionPopupVisible = ref(false);
+	const employeeBatchProjectStaffIds = ref<number[]>([]);
 	const employeeBatchRatePopupVisible = ref(false);
 	const employeeBatchRoleLabelPopupVisible = ref(false);
 	const employeeBatchQuickPromptPopupVisible = ref(false);
+	const employeeBatchSettlementPopupVisible = ref(false);
+	const employeeBatchSettlementMethod = ref<StaffSettlementMethod>("online");
 	const employeeBatchQuickPromptEnabled = ref(false);
 	const quickPromptPrerequisiteVisible = ref(false);
 	const employeeBatchRoleLabel = ref("");
@@ -2000,6 +2082,8 @@
 	const initialManagePermEnabled = ref(true);
 	const departureConfirmVisible = ref(false);
 	const incomePermEnabled = ref(true);
+	const currentSettlementMethod = ref<StaffSettlementMethod>("online");
+	const initialSettlementMethod = ref<StaffSettlementMethod>("");
 	const splitRate = ref(0);
 	const splitSliderValue = ref(0);
 	const projKeyword = ref("");
@@ -2137,6 +2221,8 @@
 	});
 
 	const employeeBatchTipText = computed(() => {
+		if (employeeBatchAction.value == "project") return "请选择要统一配置项目的员工（可单选或多选）";
+		if (employeeBatchAction.value == "settlement") return "请选择要设置结算方式的员工（可单选或多选）";
 		if (employeeBatchAction.value == "quick_prompt") {
 			return "请选择要设置快捷提词的员工";
 		}
@@ -2146,6 +2232,8 @@
 	});
 
 	const employeeBatchConfirmText = computed(() => {
+		if (employeeBatchAction.value == "project") return "项目管理";
+		if (employeeBatchAction.value == "settlement") return "设置结算方式";
 		if (employeeBatchAction.value == "quick_prompt") return "设置快捷提词";
 		return employeeBatchAction.value == "role_label" ? "自定义标签" : "设置分成比例";
 	});
@@ -2188,6 +2276,16 @@
 		}
 		if (ids.length > names.length) {
 			return `${names.join("、")} 等 ${ids.length} 人`;
+		}
+		return names.join("、");
+	});
+
+	const employeeBatchProjectStaffNames = computed(() => {
+		const names: string[] = [];
+		const ids = employeeBatchProjectStaffIds.value;
+		for (let i = 0; i < ids.length; i++) {
+			const card = findEmployeeCard(ids[i]);
+			if (card != null) names.push(card.name);
 		}
 		return names.join("、");
 	});
@@ -2245,7 +2343,9 @@
 		if (staffOrder.value == "desc") {
 			return "从高到低";
 		}
-		return "收益排行";
+		if (staffOrder.value == "join_desc") return "最新加入";
+		if (staffOrder.value == "join_asc") return "最早加入";
+		return "员工排序";
 	});
 
 	const virtualStaffSelectLabel = computed(() => {
@@ -2996,6 +3096,8 @@
 			currentEmployeePendingWithdrawalAmount.value
 		);
 		incomePermEnabled.value = (detail.can_view_revenue ?? 0) == 1;
+		currentSettlementMethod.value = normalizeSettlementMethod(detail.settlement_method ?? "") || "online";
+		initialSettlementMethod.value = currentSettlementMethod.value;
 		const stats = detail.stats ?? null;
 		const rateRaw = detail.commission_rate ?? (stats != null ? stats.commission_rate ?? null : null);
 		const rate = parseCommissionRate(rateRaw);
@@ -3141,6 +3243,8 @@
 			initialManagePermEnabled.value = false;
 			currentEmployeePendingWithdrawalAmount.value = 0;
 			incomePermEnabled.value = false;
+			currentSettlementMethod.value = "";
+			initialSettlementMethod.value = "";
 			syncSplitSlider(0, true);
 			initialSplitRate.value = 0;
 			return;
@@ -3153,6 +3257,8 @@
 		initialManagePermEnabled.value = item.enabled;
 		currentEmployeePendingWithdrawalAmount.value = item.pendingWithdrawalAmount;
 		incomePermEnabled.value = item.canViewRevenue;
+		currentSettlementMethod.value = item.settlementMethod;
+		initialSettlementMethod.value = item.settlementMethod;
 		syncSplitSlider(0, true);
 		initialSplitRate.value = 0;
 		loadStaffPermDetail(item.id);
@@ -3593,12 +3699,14 @@
 					if (res.confirm) {
 						projectPermChanged.value = false;
 						permPopupVisible.value = false;
+						employeeBatchProjectStaffIds.value = [];
 					}
 				}
 			});
 			return;
 		}
 		permPopupVisible.value = false;
+		employeeBatchProjectStaffIds.value = [];
 	}
 
 	function syncEmployeeCardPerm(
@@ -3687,6 +3795,13 @@
 			return;
 		}
 
+		if (employeeBatchProjectStaffIds.value.length > 0) {
+			const ids = employeeBatchProjectStaffIds.value.slice();
+			const disabledIds = collectDisabledProjectIds();
+			confirmBatchStaffProjectConfig(ids, disabledIds);
+			return;
+		}
+
 		const staffId = currentStaffId.value;
 		permSaving.value = true;
 		saveStaffProjectConfig({
@@ -3768,8 +3883,15 @@
 						card.pendingWithdrawalAmount = 0;
 					}
 				}
-				uni.showToast({ title: msg, icon: "success" });
-				closePermPopup(true);
+				if (currentSettlementMethod.value != "" && currentSettlementMethod.value != initialSettlementMethod.value) {
+					saveStaffSettlementMethod({ ids: [staffId], settlement_method: currentSettlementMethod.value as "offline" | "online" }).then((settlementRes) => {
+						const settlementEnvelope = settlementRes as Response | null;
+						if (settlementEnvelope != null && settlementEnvelope.code != null && !isApiSuccess(settlementEnvelope.code)) { uni.showToast({ title: getApiMessage(settlementEnvelope, "结算方式保存失败"), icon: "none" }); return; }
+						const card = findEmployeeCard(staffId); if (card != null) { card.settlementMethod = currentSettlementMethod.value; card.settlementText = currentSettlementMethod.value == "online" ? "线上结算" : "线下结算"; }
+						initialSettlementMethod.value = currentSettlementMethod.value;
+						uni.showToast({ title: msg, icon: "success" }); closePermPopup(true);
+					}).catch((err) => uni.showToast({ title: getApiMessage(err, "结算方式保存失败"), icon: "none" }));
+				} else { uni.showToast({ title: msg, icon: "success" }); closePermPopup(true); }
 			})
 			.catch((err) => {
 				const res = err as Response;
@@ -3777,6 +3899,55 @@
 			})
 			.finally(() => {
 				permSaving.value = false;
+			});
+	}
+
+	function confirmBatchStaffProjectConfig(ids: number[], disabledIds: number[]) {
+		const opened: string[] = [];
+		const closed: string[] = [];
+		const touched = staffDisabledTouchedIds.value;
+		const list = projectPermList.value;
+		for (let i = 0; i < list.length; i++) {
+			if (touched.indexOf(list[i].id) < 0) continue;
+			if (list[i].enabled) opened.push(list[i].name);
+			else closed.push(list[i].name);
+		}
+		let content = `将对 ${ids.length} 名员工统一应用当前项目配置。`;
+		if (opened.length > 0) content += `\n本次开启：${opened.join("、")}`;
+		if (closed.length > 0) content += `\n本次关闭：${closed.join("、")}`;
+		content += "\n确认后，所选员工将统一为当前配置；关闭的进行中项目将不可见。";
+		uni.showModal({
+			title: "确认批量配置？",
+			content,
+			confirmText: "确认执行",
+			cancelText: "返回修改",
+			success(res) {
+				if (!res.confirm) return;
+				permSaving.value = true;
+				saveBatchStaffProjectConfig(ids, disabledIds, 0, 0);
+			}
+		});
+	}
+
+	function saveBatchStaffProjectConfig(ids: number[], disabledIds: number[], index: number, successCount: number) {
+		if (index >= ids.length) {
+			permSaving.value = false;
+			staffDisabledPreloadPendingSave.value = false;
+			projectPermChanged.value = false;
+			employeeBatchProjectStaffIds.value = [];
+			closePermPopup(true);
+			uni.showToast({ title: `已完成 ${successCount} 名员工的项目配置`, icon: "success" });
+			refreshStaffList();
+			return;
+		}
+		saveStaffProjectConfig({ id: ids[index], disabled_project_ids: disabledIds })
+			.then((res) => {
+				const envelope = res as Response | null;
+				const ok = envelope == null || envelope.code == null || isApiSuccess(envelope.code);
+				saveBatchStaffProjectConfig(ids, disabledIds, index + 1, successCount + (ok ? 1 : 0));
+			})
+			.catch(() => {
+				saveBatchStaffProjectConfig(ids, disabledIds, index + 1, successCount);
 			});
 	}
 
@@ -3904,6 +4075,7 @@
 			departureConfirmVisible.value = true;
 			return;
 		}
+		if (splitRate.value > 0 && currentSettlementMethod.value == "") { uni.showToast({ title: "请先选择员工结算方式", icon: "none" }); return; }
 		continueSavePermConfig();
 	}
 
@@ -4123,6 +4295,19 @@
 		return result;
 	}
 
+	function normalizeSettlementMethod(value: any | null): StaffSettlementMethod {
+		const method = `${value ?? ""}`.trim().toLowerCase();
+		if (method == "offline" || method == "line_off" || method == "1") return "offline";
+		if (method == "online" || method == "line_on" || method == "2") return "online";
+		return "";
+	}
+
+	function formatStaffJoinTime(value: string | null | undefined): string {
+		const text = `${value ?? ""}`.trim();
+		if (text == "") return "--";
+		return text.length >= 16 ? text.slice(0, 16) : text;
+	}
+
 	function mapStaffToCard(item: StaffListItem, index: number, baseIndex: number = 0): EmployeeCard {
 		const name = item.nickname ?? "";
 		const sn = item.sn ?? "";
@@ -4135,6 +4320,7 @@
 		const groupMembers = mapGroupMembers(item);
 		const groupNames = item.group_nickname ?? item.group_name ?? item.team_name ?? "";
 		const collabId = sn != "" ? sn : `${item.user_id ?? ""}`;
+		const settlementMethod = normalizeSettlementMethod(item.settlement_method ?? "");
 		return {
 			id: item.id ?? index,
 			avatar: getAvatarText(name),
@@ -4144,6 +4330,9 @@
 			enabled,
 			statusText,
 			collabId,
+			joinTime: formatStaffJoinTime(item.join_time ?? item.create_time),
+			settlementMethod,
+			settlementText: settlementMethod == "online" ? "线上结算" : settlementMethod == "offline" ? "线下结算" : "待设置结算",
 			canViewRevenue: (item.can_view_revenue ?? 0) == 1,
 			commissionRate: parseCommissionRate(item.commission_rate ?? null),
 			pendingWithdrawalAmount: resolvePendingWithdrawalAmount(item),
@@ -4221,6 +4410,9 @@
 				enabled: true,
 				statusText: "在职",
 				collabId: row.collabId,
+				joinTime: `2026-08-${`${6 + i}`.padStart(2, "0")} 10:30`,
+				settlementMethod: i == 2 ? "" : (i == 0 ? "online" : "offline"),
+				settlementText: i == 2 ? "待设置结算" : (i == 0 ? "线上结算" : "线下结算"),
 				canViewRevenue: true,
 				commissionRate: row.commissionRate,
 				pendingWithdrawalAmount: i == 0 ? 65 : i == 1 ? 40 : 39,
@@ -4246,6 +4438,10 @@
 			cards.sort((a, b) => a.commissionRate - b.commissionRate);
 		} else if (staffOrder.value == "desc") {
 			cards.sort((a, b) => b.commissionRate - a.commissionRate);
+		} else if (staffOrder.value == "join_desc") {
+			cards.sort((a, b) => b.joinTime.localeCompare(a.joinTime));
+		} else if (staffOrder.value == "join_asc") {
+			cards.sort((a, b) => a.joinTime.localeCompare(b.joinTime));
 		}
 		return cards;
 	}
@@ -4367,7 +4563,7 @@
 				listParams.keyword = kw;
 			}
 			const order = staffOrder.value.trim();
-			if (order == "asc" || order == "desc") {
+			if (order == "asc" || order == "desc" || order == "join_desc" || order == "join_asc") {
 				listParams.order = order;
 			}
 			const role = staffRoleOptions[staffRoleIndex.value].value;
@@ -4395,11 +4591,11 @@
 					const filtered = filterStaffList(payload.list);
 					const baseIndex = more ? employeeCards.value.length : 0;
 					const cards = filtered.map((item, index) => mapStaffToCard(item, index, baseIndex));
-					if (more) {
-						employeeCards.value = employeeCards.value.concat(cards);
-					} else {
-						employeeCards.value = cards;
-					}
+				if (more) {
+					employeeCards.value = employeeCards.value.concat(cards);
+				} else {
+					employeeCards.value = cards;
+				}
 					staffPage.value = requestPage;
 					updateStaffHasMore(payload.list.length, payload.count, requestPage);
 				})
@@ -5460,6 +5656,14 @@
 			enterEmployeeBatchMode("quick_prompt");
 			return;
 		}
+		if (action == "settlement") {
+			enterEmployeeBatchMode("settlement");
+			return;
+		}
+		if (action == "project") {
+			enterEmployeeBatchMode("project");
+			return;
+		}
 		enterEmployeeBatchMode(action == "role_label" ? "role_label" : "commission");
 	}
 
@@ -5874,6 +6078,7 @@
 		closeEmployeeBatchRatePopup();
 		closeEmployeeBatchRoleLabelPopup();
 		closeEmployeeBatchQuickPromptPopup();
+		closeEmployeeBatchSettlementPopup();
 		quickPromptPrerequisiteVisible.value = false;
 		closeRevenueRankPopup();
 	}
@@ -5885,6 +6090,7 @@
 		}
 		closeRevenueRankPopup();
 		employeeBatchAction.value = action;
+		employeeCardsCollapsed.value = true;
 		employeeBatchMode.value = true;
 		employeeBatchSelectedIds.value = [];
 	}
@@ -5972,6 +6178,14 @@
 	}
 
 	function openEmployeeBatchEditor() {
+		if (employeeBatchAction.value == "project") {
+			openEmployeeBatchProjectEditor();
+			return;
+		}
+		if (employeeBatchAction.value == "settlement") {
+			openEmployeeBatchSettlementPopup();
+			return;
+		}
 		if (employeeBatchAction.value == "quick_prompt") {
 			openEmployeeBatchQuickPromptPopup();
 			return;
@@ -5981,6 +6195,81 @@
 			return;
 		}
 		openEmployeeBatchRatePopup();
+	}
+
+	function openEmployeeBatchProjectEditor() {
+		const ids = employeeBatchSelectedIds.value.slice();
+		if (ids.length == 0) {
+			uni.showToast({ title: "请选择员工", icon: "none" });
+			return;
+		}
+		const first = findEmployeeCard(ids[0]);
+		if (first == null) {
+			uni.showToast({ title: "员工信息无效", icon: "none" });
+			return;
+		}
+		employeeBatchProjectStaffIds.value = ids;
+		openPermPopup(first);
+		permTab.value = "project";
+		currentEmployeeName.value = `批量配置 · ${ids.length} 人`;
+		loadPermProjectTypes(true);
+	}
+
+	function openEmployeeBatchSettlementPopup() {
+		if (employeeBatchSelectedCount.value == 0) {
+			uni.showToast({ title: "请选择员工", icon: "none" });
+			return;
+		}
+		employeeBatchSettlementMethod.value = "online";
+		employeeBatchSettlementPopupVisible.value = true;
+	}
+
+	function closeEmployeeBatchSettlementPopup() {
+		if (employeeBatchSaving.value) return;
+		employeeBatchSettlementPopupVisible.value = false;
+	}
+
+	function selectEmployeeBatchSettlement(method: string) {
+		if (employeeBatchSaving.value) return;
+		employeeBatchSettlementMethod.value = method == "offline" ? "offline" : "online";
+	}
+
+	function submitEmployeeBatchSettlement() {
+		const ids = employeeBatchSelectedIds.value.slice();
+		const method = employeeBatchSettlementMethod.value;
+		if (ids.length == 0 || method == "" || employeeBatchSaving.value) return;
+		if (isLocalUiPreview()) {
+			for (let i = 0; i < ids.length; i++) {
+				const card = findEmployeeCard(ids[i]);
+				if (card == null) continue;
+				card.settlementMethod = method;
+				card.settlementText = method == "online" ? "线上结算" : "线下结算";
+			}
+			closeEmployeeBatchSettlementPopup();
+			cancelEmployeeBatchMode();
+			uni.showToast({ title: "结算方式已设置", icon: "success" });
+			return;
+		}
+		employeeBatchSaving.value = true;
+		saveStaffSettlementMethod({ ids, settlement_method: method })
+			.then((res) => {
+				const envelope = res as Response | null;
+				if (envelope != null && envelope.code != null && !isApiSuccess(envelope.code)) {
+					uni.showToast({ title: getApiMessage(envelope, "设置失败"), icon: "none" });
+					return;
+				}
+				for (let i = 0; i < ids.length; i++) {
+					const card = findEmployeeCard(ids[i]);
+					if (card == null) continue;
+					card.settlementMethod = method;
+					card.settlementText = method == "online" ? "线上结算" : "线下结算";
+				}
+				employeeBatchSettlementPopupVisible.value = false;
+				cancelEmployeeBatchMode();
+				uni.showToast({ title: "结算方式已设置", icon: "success" });
+			})
+			.catch((err) => uni.showToast({ title: getApiMessage(err, "设置失败"), icon: "none" }))
+			.finally(() => { employeeBatchSaving.value = false; });
 	}
 
 	function openEmployeeBatchRoleLabelPopup() {
@@ -6358,6 +6647,32 @@
 		applyResourceTab(tab);
 	}
 
+	const pendingBusinessHomeAction = ref("");
+
+	function applyPendingBusinessHomeAction() {
+		const action = pendingBusinessHomeAction.value;
+		if (action == "") return;
+		if (action == "ranking") {
+			pendingBusinessHomeAction.value = "";
+			openRevenueRankPopup();
+			return;
+		}
+		if (action == "settlement" && employeeCards.value.length > 0) {
+			pendingBusinessHomeAction.value = "";
+			enterEmployeeBatchMode("settlement");
+			uni.showToast({ title: "请选择需要设置结算方式的员工", icon: "none" });
+		}
+	}
+
+	function syncBusinessHomeAction() {
+		const action = uni.getStorageSync("businessHomeAction") as string;
+		if (action != "ranking" && action != "settlement") return;
+		uni.removeStorageSync("businessHomeAction");
+		applyResourceTab("employee");
+		pendingBusinessHomeAction.value = action;
+		applyPendingBusinessHomeAction();
+	}
+
 	function onStaffAdvancedUpdated() {
 		refreshStaffList(true);
 		if (permPopupVisible.value && currentStaffId.value > 0) {
@@ -6370,6 +6685,7 @@
 		uni.$on("business-resource-tab", onBusinessResourceTab);
 		uni.$on("staff-advanced-updated", onStaffAdvancedUpdated);
 		syncBusinessResourceTab();
+		syncBusinessHomeAction();
 		if (resourceTab.value == "employee") {
 			loadStaffList();
 		} else {
@@ -6381,6 +6697,7 @@
 	onShow(() => {
 		syncTabbarRoutePath();
 		updatePageHeight();
+		syncBusinessHomeAction();
 		if (resourceTab.value == "employee") {
 			refreshStaffList();
 		} else {
@@ -6415,6 +6732,11 @@
 			refreshCurrentTaskRecord();
 		}
 	});
+
+	watch(
+		() => employeeCards.value.length,
+		() => applyPendingBusinessHomeAction()
+	);
 </script>
 
 <style lang="scss">
@@ -10452,5 +10774,275 @@
 	background-color: #dc2626;
 	color: #ffffff;
 	box-shadow: 0 12rpx 28rpx rgba(220, 38, 38, 0.2);
+}
+
+.bs-emp-extra-meta {
+	margin-top: 8rpx;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10rpx;
+}
+
+.bs-emp-join-time {
+	font-size: 20rpx;
+	color: #8a94a6;
+}
+
+.bs-emp-settlement {
+	padding: 3rpx 10rpx;
+	border-radius: 999rpx;
+	font-size: 19rpx;
+	color: #2453aa;
+	background-color: #edf3ff;
+}
+
+.bs-emp-settlement--offline { color: #8a5a12; background-color: #fff7e6; }
+.bs-emp-settlement--unset { color: #c2410c; background-color: #fff1eb; }
+
+.bs-settlement-popup { padding-bottom: 12rpx; }
+.bs-settlement-options { display: flex; flex-direction: row; gap: 16rpx; margin: 22rpx 0 18rpx; }
+.bs-settlement-option { flex: 1; padding: 20rpx; border: 2rpx solid #e7eaf0; border-radius: 20rpx; background-color: #fafbfc; }
+.bs-settlement-option--active { border-color: #2b59c3; background-color: #f2f6ff; }
+.bs-settlement-option-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+.bs-settlement-option-title { font-size: 28rpx; font-weight: 700; color: #26324a; }
+.bs-settlement-option-desc { display: block; margin-top: 10rpx; font-size: 23rpx; line-height: 36rpx; color: #667085; }
+.bs-settlement-tip { display: block; padding: 18rpx 20rpx; border-radius: 16rpx; background-color: #fff8e8; color: #8a6421; font-size: 22rpx; line-height: 34rpx; }
+.bs-settlement-tip--online { background-color: #eaf8ef; color: #3f8559; }
+.bs-perm-settlement-block { padding: 22rpx 0; border-bottom: 1rpx solid #edf0f4; }
+.bs-perm-settlement-title,.bs-perm-settlement-subtitle,.bs-perm-settlement-name,.bs-perm-settlement-desc,.bs-perm-settlement-online-tip { display: block; }
+.bs-perm-settlement-title { font-size: 27rpx; font-weight: 700; color: #28344b; }.bs-perm-settlement-subtitle { margin-top: 6rpx; font-size: 20rpx; color: #8a94a6; }
+.bs-perm-settlement-options { margin-top: 18rpx; display: flex; gap: 12rpx; }.bs-perm-settlement-option { flex: 1; padding: 18rpx; display: flex; align-items: center; justify-content: space-between; border: 2rpx solid #e2e7ef; border-radius: 14rpx; background: #fafbfc; }.bs-perm-settlement-option--active { border-color: #2b59c3; background: #f1f5ff; }.bs-perm-settlement-name { font-size: 24rpx; font-weight: 700; color: #2d3950; }.bs-perm-settlement-desc { margin-top: 6rpx; font-size: 18rpx; color: #8792a4; }.bs-perm-settlement-radio { width: 20rpx; height: 20rpx; border: 2rpx solid #cdd5e2; border-radius: 50%; }.bs-perm-settlement-radio--active { border: 6rpx solid #2b59c3; box-sizing: border-box; }.bs-perm-settlement-online-tip { margin-top: 12rpx; padding: 12rpx 14rpx; border-radius: 10rpx; font-size: 18rpx; color: #3f8559; background: #eaf8ef; }
+.bs-perm-settlement-options,.bs-perm-settlement-option { flex-direction: row; }
+	.bs-batch-project-targets {
+		margin: 16rpx 24rpx 0;
+		padding: 20rpx 24rpx;
+		border: 1rpx solid #e8ecf4;
+		border-radius: 16rpx;
+		background: #f8faff;
+	}
+	.bs-batch-project-target-head { display: flex; align-items: center; justify-content: space-between; }
+	.bs-batch-project-target-title { font-size: 26rpx; font-weight: 600; color: #283650; }
+	.bs-batch-project-target-count { font-size: 24rpx; color: #2b59c3; }
+	.bs-batch-project-target-names { display: block; margin-top: 10rpx; font-size: 24rpx; line-height: 34rpx; color: #59667c; }
+	.bs-batch-project-target-tip { display: block; margin-top: 8rpx; font-size: 21rpx; line-height: 31rpx; color: #8a94a7; }
+</style>
+
+<style lang="scss" scoped>
+@use "../../../styles/owner-workbench" as owner;
+.bs-page, .bs-main-panel, .bs-main-scroll, .bs-emp-scroll, .bs-emp-filter-wrap { background: owner.$background; }
+.bs-nav-panel { padding: 0 16px 12px; background: owner.$background; border: 0; }
+.bs-head { height: 48px; padding: 0; box-sizing: border-box; align-items: center; }
+.bs-head .bs-title { @include owner.title; }
+.bs-subtabs.bs-subtabs--operations { @include owner.feature; margin: 0; padding: 4px; gap: 4px; }
+.bs-subtabs--operations .bs-subtab { padding: 8px 0; border-radius: 9px; }
+.bs-subtabs--operations .bs-subtab--active { background: rgba(255,255,255,.9); }
+.bs-subtabs--operations .bs-subtab-text { font-size: 13px; line-height: 20px; color: #75809b; }
+.bs-subtabs--operations .bs-subtab--active .bs-subtab-text { color: owner.$primary; }
+.bs-subtabs--operations .bs-subtab-line { display: none; }
+.bs-emp-filter-wrap { padding: 0 16px; }
+.bs-search-box { height: 38px; padding: 0 4px 0 10px; border-radius: 10px; margin-bottom: 10px; background: #fff; border: 1px solid owner.$border; }
+.bs-search-field { min-width: 0; margin-right: 6px; }
+.bs-search-input { height: 32px; min-width: 0; margin-left: 6px; font-size: 12px; }
+.bs-search-input-placeholder { font-size: 12px; color: #a2a9b5; }
+.bs-btn { min-height: 32px; height: auto; padding: 5px 12px; border-radius: 8px; }
+.bs-btn--primary { background: owner.$primary; border-color: owner.$primary; }
+.bs-btn--outline { @include owner.control; }
+.bs-btn-text, .bs-btn-text--plain { font-size: 12px; line-height: 20px; font-weight: 500; }
+.bs-acc-toolbar { margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+.bs-acc-toolbar-emp-left { gap: 6px; flex-wrap: wrap; }
+.bs-emp-card-toggle { padding: 6px; }
+.bs-emp-card-toggle-text { font-size: 12px; color: owner.$primary; }
+.bs-emp-scroll-inner { padding: 0 16px calc(76px + env(safe-area-inset-bottom)); }
+.bs-scroll-inner { padding: 0 16px calc(76px + env(safe-area-inset-bottom)); }
+.bs-emp-scroll-inner--batch, .bs-scroll-inner--batch { padding-bottom: calc(136px + env(safe-area-inset-bottom)); }
+.bs-emp-card, .bs-acc-card, .bs-record-card { @include owner.card; padding: 14px; margin-bottom: 12px; }
+.bs-emp-head { margin-bottom: 10px; padding-bottom: 10px; border-color: owner.$border; }
+.bs-emp-avatar, .bs-emp-avatar-img { width: 38px; height: 38px; flex-shrink: 0; }
+.bs-emp-avatar { margin-right: 10px; }
+.bs-emp-avatar-text { font-size: 16px; }
+.bs-emp-info { min-width: 0; }
+.bs-emp-name { font-size: 14px; line-height: 21px; overflow-wrap: anywhere; }
+.bs-emp-meta { margin-top: 4px; gap: 4px; }
+.bs-status-tag { padding: 1px 5px; margin-right: 0; border-radius: 4px; }
+.bs-status-text { font-size: 10px; line-height: 16px; }
+.bs-emp-id { font-size: 11px; line-height: 17px; color: owner.$muted; }
+.bs-stat-label, .bs-acc-label, .bs-record-field-label { font-size: 11px; line-height: 18px; color: owner.$muted; }
+.bs-stat-value { font-size: 17px; line-height: 24px; color: owner.$primary; }
+.bs-acc-value, .bs-record-field-value { font-size: 12px; line-height: 19px; overflow-wrap: anywhere; }
+.bs-emp-card--collapsed { padding: 12px 14px; }
+.bs-emp-card--collapsed .bs-emp-head { margin: 0; padding: 0; border: 0; }
+.bs-task-filter-grid { gap: 8px; margin-bottom: 10px; }
+.bs-task-filter-picker { @include owner.control; padding: 0 10px; }
+.bs-task-filter-inner { min-height: 34px; gap: 6px; }
+.bs-task-filter-value { font-size: 12px; line-height: 18px; }
+.bs-task-categories { gap: 8px; padding-bottom: 10px; }
+.bs-task-category { padding: 6px 12px; border-radius: 8px; background: #fff; border: 1px solid owner.$border; }
+.bs-task-category-text { font-size: 12px; line-height: 18px; }
+.bs-task-category--active { background: #eef2ff; border-color: #e0e7ff; }
+.bs-task-category--active .bs-task-category-text { color: owner.$primary; }
+.bs-record-tabs { padding: 3px; border-radius: 9px; background: #eceff5; gap: 4px; margin-bottom: 10px; }
+.bs-record-tab { min-height: 32px; padding: 5px 6px; border-radius: 7px; box-sizing: border-box; }
+.bs-record-tab-text { font-size: 12px; line-height: 20px; }
+.bs-record-tab--active { background: #fff; }
+.bs-record-tab--active .bs-record-tab-text { color: owner.$primary; }
+.bs-record-card-title { @include owner.section; }
+.bs-record-card-no, .bs-record-card-time, .bs-acc-time { font-size: 11px; line-height: 18px; color: owner.$muted; }
+.bs-emp-empty, .bs-acc-state { @include owner.card; min-height: 160px; padding: 24px 12px; }
+.bs-emp-empty-text, .bs-acc-state-text, .bs-emp-loadmore-hint { font-size: 12px; line-height: 18px; color: owner.$muted; }
+@media (max-width: 360px) { .bs-nav-panel, .bs-emp-filter-wrap { padding-left: 12px; padding-right: 12px; } .bs-emp-scroll-inner, .bs-scroll-inner { padding-left: 12px; padding-right: 12px; } .bs-btn { padding-left: 8px; padding-right: 8px; } }
+@media (min-width: 600px) { .bs-nav-panel, .bs-emp-filter-wrap, .bs-emp-scroll-inner, .bs-scroll-inner { width: calc(100% - 48px); max-width: 960px; margin-left: auto; margin-right: auto; padding-left: 0; padding-right: 0; box-sizing: border-box; } }
+
+.bs-record-tabs { height: 40px; margin: 0 16px 10px; border: 0; }
+.bs-transfer-shortcuts { margin: 0 16px 10px; }
+.bs-transfer-shortcut { @include owner.card; min-height: 44px; padding: 10px 12px; }
+@media (max-width: 360px) { .bs-record-tabs, .bs-transfer-shortcuts { margin-left: 12px; margin-right: 12px; } }
+@media (min-width: 600px) { .bs-record-tabs, .bs-transfer-shortcuts { width: calc(100% - 48px); max-width: 960px; margin-left: auto; margin-right: auto; } }
+</style>
+
+<style lang="scss">
+@use "../../../styles/owner-workbench" as owner;
+/* Scoped by the business sheet root because popup content is teleported. */
+.bs-perm-popup {
+ background: owner.$background;
+ .bs-perm-header { padding: 16px 54px 12px; background: #fff; }
+ .bs-perm-title { font-size: 17px; line-height: 24px; color: owner.$text; }
+ .bs-perm-close { width: 30px; height: 30px; top: 12px; right: 14px; background: #f1f3f8; }
+ .bs-perm-tabs { margin: 12px 14px; padding: 3px; border: 0; border-radius: 10px; background: #e8ecf8; gap: 4px; }
+ .bs-perm-tab { padding: 8px 0; border-radius: 8px; }
+ .bs-perm-tab--active { background: #fff; }
+ .bs-perm-tab-text { font-size: 13px; line-height: 20px; color: owner.$muted; }
+ .bs-perm-tab--active .bs-perm-tab-text { color: owner.$primary; }
+ .bs-perm-tab-line { display: none; }
+ .bs-perm-form { padding: 0 14px 16px; }
+ .bs-perm-switch-row { padding: 14px; border: 0; border-radius: 12px; background: #fff; margin-bottom: 10px; gap: 10px; }
+ .bs-perm-switch-copy { min-width: 0; }
+ .bs-perm-switch-title, .bs-perm-settlement-title, .bs-perm-slider-label { font-size: 14px; line-height: 21px; color: owner.$text; }
+ .bs-perm-switch-desc, .bs-perm-settlement-subtitle, .bs-perm-settlement-desc { font-size: 12px; line-height: 19px; color: owner.$muted; overflow-wrap: anywhere; }
+ .bs-perm-balance-inline { padding-top: 8px; margin-top: 8px; border-color: owner.$border; }
+ .bs-perm-balance-inline-label { font-size: 12px; color: owner.$muted; }
+ .bs-perm-balance-inline-value { font-size: 14px; color: owner.$primary; }
+ .bs-perm-settlement-block, .bs-perm-slider-block { padding: 14px; margin: 0 0 10px; border: 0; border-radius: 12px; background: #fff; }
+ .bs-perm-settlement-options { gap: 8px; margin-top: 10px; }
+ .bs-perm-settlement-option { min-width: 0; padding: 10px; border: 1px solid owner.$border; border-radius: 9px; background: #f8f9fb; gap: 6px; }
+ .bs-perm-settlement-option > view:first-child { min-width: 0; flex: 1; }
+ .bs-perm-settlement-option--active { border-color: owner.$primary; background: #eef2ff; }
+ .bs-perm-settlement-name { font-size: 13px; line-height: 20px; color: owner.$text; }
+ .bs-perm-settlement-radio { flex-shrink: 0; }
+ .bs-perm-settlement-radio--active { border-color: owner.$primary; background-color: owner.$primary; }
+ .bs-perm-settlement-online-tip { font-size: 11px; line-height: 18px; padding: 8px; border-radius: 8px; margin-top: 8px; }
+ .bs-perm-slider-value { font-size: 22px; color: owner.$primary; }
+ .bs-perm-footer { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); border-color: owner.$border; }
+ .bs-perm-save-btn { height: 44px; border-radius: 10px; background: owner.$primary; box-shadow: none; }
+ .bs-perm-save-text { font-size: 15px; line-height: 22px; }
+ .bs-perm-panel--project { padding: 0 14px 12px; }
+ .bs-perm-search { border-radius: 9px; }
+ .bs-perm-search-btn { background: owner.$primary; border-radius: 8px; }
+ .bs-perm-project-name { font-size: 13px; color: owner.$text; }
+ .bs-perm-employee-name { display: block; margin-top: 4px; font-size: 12px; line-height: 18px; color: owner.$muted; text-align: center; overflow-wrap: anywhere; }
+ .bs-advanced-manage-section--compact { padding: 0 14px; border: 0; border-radius: 12px; background: #fff; box-shadow: none; overflow: hidden; }
+ .bs-perm-switch-row--advanced { padding: 14px 0; margin: 0; align-items: center; border-radius: 0; }
+ .bs-advanced-manage-section--compact .bs-advanced-manage-on { margin: 0; }
+ .bs-inline-field { margin: 0; padding: 14px 0; gap: 12px; border-top: 1px solid owner.$border; align-items: flex-start; flex-direction: column; }
+ .bs-inline-field--relation { border: 0; border-top: 1px solid owner.$border; border-radius: 0; background: transparent; }
+ .bs-inline-field-copy { padding: 0; width: 100%; }
+ .bs-inline-field-label { font-size: 14px; line-height: 21px; font-weight: 600; color: owner.$text; }
+ .bs-inline-field-desc { margin-top: 4px; font-size: 12px; line-height: 19px; color: owner.$muted; }
+ .bs-inline-role-options { width: 100%; padding: 3px; gap: 4px; box-sizing: border-box; border: 0; border-radius: 10px; background: #f2f3f8; }
+ .bs-inline-role-option { flex: 1; min-width: 0; height: 38px; padding: 0 12px; font-size: 14px; border-radius: 8px; color: owner.$muted; }
+ .bs-inline-role-option--active { background: #fff; color: owner.$primary; box-shadow: 0 2px 6px rgba(30, 40, 70, .06); }
+ .bs-inline-select { width: 100%; min-width: 0; min-height: 42px; height: auto; padding: 10px 12px; gap: 8px; box-sizing: border-box; border: 1px solid owner.$border; background: #f8f9fb; border-radius: 8px; font-size: 13px; line-height: 20px; color: owner.$text; }
+ .bs-inline-select > text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+ .bs-inline-rate { margin: 0; padding: 14px 0; border-color: owner.$border; }
+ .bs-inline-rate-value { font-size: 20px; color: owner.$primary; }
+ .bs-inline-scale text { font-size: 11px; color: owner.$muted; }
+ .bs-inline-note { font-size: 12px; line-height: 19px; color: owner.$muted; }
+ .bs-inline-calculation { margin-top: 10px; padding: 12px; border: 0; border-radius: 8px; background: #f6f7fb; }
+ .bs-inline-calculation-title { font-size: 12px; line-height: 19px; color: owner.$text; }
+ .bs-inline-calculation-result { font-size: 12px; line-height: 20px; color: owner.$primary; }
+ .bs-inline-calculation-desc { font-size: 11px; line-height: 18px; color: owner.$muted; }
+ .bs-inline-permission { margin: 0; padding: 14px 0; gap: 12px; border: 0; border-top: 1px solid owner.$border; border-radius: 0; background: transparent; }
+ .bs-inline-permission .bs-inline-field-copy { width: auto; }
+ .bs-advanced-rule-text { margin: 0; padding: 12px 0 14px; border: 0; border-top: 1px solid owner.$border; border-radius: 0; background: transparent; font-size: 11px; line-height: 18px; color: owner.$muted; }
+
+}
+
+.bs-perm-popup.bs-perm-popup--batch-project {
+ .bs-perm-header { padding-top: 11px; padding-bottom: 9px; }
+ .bs-perm-title { font-size: 16px; line-height: 22px; }
+ .bs-perm-employee-name { margin-top: 1px; font-size: 11px; line-height: 16px; }
+ .bs-perm-panel--project { padding: 10px 14px 8px; }
+ .bs-batch-project-targets { display: flex; flex-direction: row; align-items: flex-start; gap: 7px; margin: 0 0 10px; padding: 8px 10px; border: 0; border-radius: 8px; background: #eef3ff; }
+ .bs-batch-project-target-tip { flex: 1; min-width: 0; margin: 0; font-size: 11px; line-height: 17px; color: #596a90; }
+ .bs-perm-search { padding-right: 0; }
+ .bs-perm-search-field { height: 38px; margin-right: 0; padding: 0 10px; border-radius: 9px; background: #fff; }
+ .bs-perm-search-input { height: 36px; font-size: 12px; }
+ .bs-perm-search-placeholder { font-size: 12px; }
+ .bs-perm-platform-panel { height: 38px; margin: 6px 0 4px; padding-right: 0; border-bottom: 1px solid owner.$border; }
+ .bs-perm-platform-item { margin-right: 22px; padding-bottom: 8px; }
+ .bs-perm-platform-text { font-size: 12px; line-height: 20px; }
+ .bs-perm-bulk-row { min-height: 42px; margin: 0; padding: 0; border-bottom: 1px solid owner.$border; }
+ .bs-perm-bulk-title { font-size: 13px; line-height: 20px; }
+ .bs-perm-bulk-desc { font-size: 10px; line-height: 16px; color: owner.$muted; }
+ .bs-perm-project-list { padding-right: 0; }
+ .bs-perm-project-item { min-height: 52px; margin: 0; padding: 7px 0; border-bottom: 1px solid owner.$border; box-sizing: border-box; }
+ .bs-perm-project-logo, .bs-perm-project-icon { width: 34px; height: 34px; margin-right: 10px; border-radius: 8px; }
+ .bs-perm-project-name { flex: 1; font-size: 13px; line-height: 20px; }
+ .bs-perm-footer { padding-top: 9px; padding-bottom: calc(9px + env(safe-area-inset-bottom)); }
+ .bs-perm-save-btn { height: 42px; }
+}
+.bs-batch-action-popup, .bs-revenue-rank-popup { background: owner.$background; padding: 16px 14px calc(16px + env(safe-area-inset-bottom)); }
+.bs-batch-action-popup .bs-batch-action-title, .bs-revenue-rank-popup .bs-revenue-rank-popup-title { font-size: 16px; line-height: 24px; color: owner.$text; }
+.bs-batch-action-popup .bs-batch-action-list { border-radius: 12px; margin-top: 12px; }
+.bs-batch-action-popup .bs-batch-action-item { min-height: 64px; padding: 12px; border-color: owner.$border; }
+.bs-batch-action-popup .bs-batch-action-icon { width: 32px; height: 32px; border-radius: 8px; margin-right: 10px; background: #eef2ff; }
+.bs-batch-action-popup .bs-batch-action-title { font-size: 14px; }
+.bs-batch-action-popup .bs-batch-action-desc { font-size: 12px; line-height: 18px; color: owner.$muted; }
+.bs-revenue-rank-popup .bs-revenue-rank-popup-item { padding: 12px; border-radius: 9px; margin-top: 8px; background: #fff; }
+.bs-revenue-rank-popup .bs-revenue-rank-popup-item--active { background: #eef2ff; }
+.bs-revenue-rank-popup .bs-revenue-rank-popup-item-text { font-size: 14px; line-height: 22px; color: owner.$text; }
+.bs-revenue-rank-popup .bs-revenue-rank-popup-item--active .bs-revenue-rank-popup-item-text { color: owner.$primary; }
+</style>
+
+<style lang="scss" scoped>
+@use "../../../styles/owner-workbench" as owner;
+.bs-employee-panel {
+ .bs-search-box { height: 42px; margin-bottom: 8px; }
+ .bs-search-input { font-size: 13px; }
+ .bs-acc-toolbar--emp { margin-bottom: 10px; align-items: center; gap: 6px; }
+ .bs-acc-toolbar-emp-left { flex: 1; min-width: 0; }
+ .bs-acc-toolbar--emp .bs-btn--outline { height: 32px; padding: 0 10px; background: #ffffff; border: 1px solid #e3e7ef; border-radius: 8px; box-shadow: none; }
+ .bs-acc-toolbar--emp .bs-btn--outline:active { background: #f5f7ff; border-color: #d7def7; }
+ .bs-btn-text--plain { font-size: 12px; line-height: 18px; font-weight: 500; color: #4b5568; }
+ .bs-emp-card-toggle { flex-shrink: 0; padding-right: 0; }
+ .bs-emp-card-toggle-text { font-size: 11px; color: #7c8598; }
+ .bs-emp-card { padding: 16px; margin-bottom: 12px; border: 1px solid #eef0f5; border-radius: 16px; box-shadow: none; }
+ .bs-emp-head { align-items: flex-start; margin: 0; padding: 0; border: 0; }
+ .bs-emp-avatar, .bs-emp-avatar-img { width: 40px; height: 40px; border-radius: 13px; }
+ .bs-emp-avatar { margin: 2px 10px 0 0; overflow: hidden; }
+ .bs-emp-name { display: block; font-size: 15px; line-height: 22px; color: owner.$text; }
+ .bs-emp-meta { gap: 4px; margin-top: 6px; }
+ .bs-status-tag, .bs-role-tag, .bs-emp-settlement { padding: 1px 5px; margin: 0; border-radius: 4px; }
+ .bs-status-text, .bs-role-tag-text, .bs-emp-settlement { font-size: 10px; line-height: 16px; }
+ .bs-status-tag--on { background: #edf7f2; }
+ .bs-status-tag--on .bs-status-text { color: #398466; }
+ .bs-role-tag { max-width: 100%; }
+ .bs-role-tag-text { overflow-wrap: anywhere; }
+ .bs-emp-settlement { background: #f5f6f9; color: #7c8598; }
+ .bs-emp-settlement--unset { background: #fff6eb; color: #a87535; }
+ .bs-emp-group { display: block; margin-top: 5px; font-size: 11px; line-height: 17px; color: owner.$muted; overflow-wrap: anywhere; }
+ .bs-emp-actions { margin-left: 8px; flex-shrink: 0; padding-top: 2px; }
+ .bs-manage-btn { min-width: 48px; height: 30px; padding: 0 9px; border: 1px solid #e8ecfa; border-radius: 8px; background: #f4f6ff; box-shadow: none; box-sizing: border-box; }
+ .bs-manage-text { font-size: 12px; line-height: 18px; color: owner.$primary; }
+ .bs-emp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; padding: 12px 0 0; gap: 14px 10px; border-top: 1px solid #f0f2f6; }
+ .bs-stat { width: auto; min-width: 0; margin: 0; padding: 0; }
+ .bs-stat-label { font-size: 11px; line-height: 18px; color: #8991a2; }
+ .bs-stat-value { margin-top: 3px; font-size: 18px; line-height: 25px; font-weight: 600; letter-spacing: -.3px; color: #414d6b; overflow-wrap: anywhere; }
+ .bs-stat-rise { margin-top: 2px; font-size: 10px; line-height: 16px; color: #9aa1af; overflow-wrap: anywhere; }
+ .bs-emp-footnote { display: flex; flex-direction: column; gap: 2px; margin-top: 13px; padding-top: 10px; border-top: 1px solid #f0f2f6; }
+ .bs-emp-id, .bs-emp-join-time { font-size: 10px; line-height: 16px; color: #99a0ae; overflow-wrap: anywhere; }
+ .bs-emp-card--collapsed .bs-emp-footnote { margin-top: 10px; padding-top: 8px; }
+ .bs-acc-card--batch-active { border-color: owner.$primary; background: #f8faff; }
 }
 </style>

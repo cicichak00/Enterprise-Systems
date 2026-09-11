@@ -23,6 +23,12 @@
 					</view>
 				</view>
 
+				<project-whitelist
+					v-if="isBrandApplication"
+					:task-id="taskId"
+					:project-id="projectId"
+				></project-whitelist>
+
 				<view class="td-body" v-if="false">
 					<view class="td-tabs">
 						<view
@@ -201,7 +207,8 @@
 </template>
 
 <script lang="ts" setup>
-	import { ref } from "vue";
+	import { computed, ref } from "vue";
+	import ProjectWhitelist from "@/components/task/project-whitelist.uvue";
 	import { getTaskDetail } from "@/.cool/api/task";
 	import { getApiMessage, isApiSuccess, router } from "@/.cool";
 	import type { Response } from "@/.cool";
@@ -218,6 +225,7 @@
 	const taskId = ref(0);
 	const projectId = ref(0);
 	const categoryId = ref(0);
+	const categoryText = ref("");
 	const taskTitle = ref("任务详情");
 	const logoUrl = ref("");
 	const logoText = ref("任");
@@ -243,6 +251,7 @@
 	const courseHtml = ref("");
 	const courseLink = ref("");
 	const is_batch_back = ref(0);
+	const isBrandApplication = computed(() => categoryText.value.indexOf("品牌应用") >= 0);
 
 	function getLogoText(title: string): string {
 		const text = title.trim();
@@ -786,6 +795,12 @@
 		if (detailCategoryId > 0) {
 			categoryId.value = detailCategoryId;
 		}
+		categoryText.value = pickNonEmpty(
+			readDetailField(data, "category_text"),
+			readDetailField(data, "project_type_text"),
+			readDetailField(data, "type_text"),
+			categoryText.value
+		);
 		is_batch_back.value = readDetailNumber(data, "is_batch_back");
 		updateTime.value = formatUpdateDate(
 			pickNonEmpty(readDetailField(data, "time"), readDetailField(data, "update_time"))
@@ -919,6 +934,7 @@
 		const titleVal = options["title"] as string | null;
 		const projectIdVal = options["project_id"] as string | null;
 		const categoryIdVal = options["category_id"] as string | null;
+		const categoryTextVal = options["category_text"] as string | null;
 		const id = idVal != null ? parseInt(`${idVal}`) : 0;
 		if (titleVal != null && `${titleVal}`.trim() != "") {
 			taskTitle.value = `${titleVal}`.trim();
@@ -931,6 +947,9 @@
 		if (categoryIdVal != null) {
 			const cid = parseInt(`${categoryIdVal}`);
 			categoryId.value = isNaN(cid) ? 0 : cid;
+		}
+		if (categoryTextVal != null) {
+			categoryText.value = `${categoryTextVal}`.trim();
 		}
 		if (id <= 0) {
 			uni.showToast({ title: "缺少任务 ID", icon: "none" });

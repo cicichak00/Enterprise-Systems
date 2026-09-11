@@ -13,6 +13,10 @@ export type MineRevenueCard = {
 	/** 企业累计收益总值，已包含离职员工余额回收金额。 */
 	revenue?: string;
 	pending_settlement?: string;
+	online_revenue?: string | number;
+	offline_revenue?: string | number;
+	online_income?: string | number;
+	offline_income?: string | number;
 	staff_normal?: number;
 	staff_count?: number;
 	keyword_count?: number;

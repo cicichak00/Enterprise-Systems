@@ -17,6 +17,10 @@ export type OrderListParams = {
 	/** period=custom 时必填 */
 	start_date?: string;
 	end_date?: string;
+	/** 收益日历仅统计审核通过且已结算订单 */
+	audit_status?: string;
+	settlement_status?: string;
+	time_field?: string;
 };
 
 /** GET /api/order 返回的 data.summary */
@@ -69,6 +73,7 @@ export type OrderListItem = {
 	remark?: string;
 	is_virtual?: number;
 	payment_time?: string;
+	settlement_time?: string;
 	import_time?: string;
 	audit_time?: string;
 	payment_status_text?: string;

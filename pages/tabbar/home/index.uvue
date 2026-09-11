@@ -1,78 +1,62 @@
 <template>
 	<cl-page :pt="{ className: 'ov-page' }">
 		<view class="ov-page">
-			<view class="ov-header">
-				<cl-safe-area type="top"></cl-safe-area>
-
-				<view class="ov-hero">
-					<view class="ov-hero-copy">
-						<text class="ov-hero-kicker">企业主工作台</text>
-						<text class="ov-hero-title">{{ enterpriseName }}</text>
-						<text v-if="enterpriseIntro != ''" class="ov-hero-sub">{{ enterpriseIntro }}</text>
-					</view>
-					<view class="ov-hero-notice-wrap" @tap="toNotice">
-						<view class="ov-hero-notice">
-							<cl-icon name="notification-4-line" :size="20" color="#333333"></cl-icon>
-						</view>
-						<view class="ov-hero-badge" v-if="messageUnreadCount > 0">
-							<text class="ov-hero-badge-text">{{ messageUnreadBadgeText }}</text>
-						</view>
-					</view>
-				</view>
-			</view>
+            <view class="wb-header">
+                <cl-safe-area type="top"></cl-safe-area>
+                <view class="wb-nav"><text class="wb-nav-title">工作台</text></view>
+                <view class="wb-profile">
+                    <image v-if="enterpriseLogo" class="wb-avatar" :src="enterpriseLogo" mode="aspectFill"></image>
+                    <view v-else class="wb-avatar wb-avatar-placeholder"><text>{{ enterpriseName.slice(0, 1) }}</text></view>
+                    <view class="wb-profile-copy">
+                        <view class="wb-name-row"><text class="wb-role">企业主</text><text class="wb-name">{{ enterpriseName }}</text></view>
+                        <text class="wb-intro">{{ enterpriseIntro || '企业工作台' }}</text>
+                    </view>
+                    <view class="wb-profile-actions">
+                    <view class="wb-edit-action" role="button" aria-label="编辑企业信息" @tap="editProfile"><text>编辑</text></view>
+                    <view class="wb-invite" role="button" aria-label="邀请员工" @tap="openWorkbenchInvite">
+                        <cl-icon name="qr-scan-2-line" :size="19" color="#5375ed"></cl-icon>
+                    </view>
+                    </view>
+                </view>
 
             <view class="ov-card">
                 <view class="ov-card-head">
-					<text class="ov-card-title">数据总览</text>
+					<view class="ov-card-title-row">
+						<text class="ov-card-title">数据总览</text>
+						<text class="wb-summary-caption">{{ currentPeriodLabel }}</text>
+					</view>
+					<view class="ov-calendar-link" @tap="toIncomeCalendar">
+						<text class="ov-calendar-link-text">收益日历</text>
+						<cl-icon name="arrow-right-s-line" :size="14" color="#2b59c3"></cl-icon>
+					</view>
                 </view>
-                <view class="ov-card-divider"></view>
+                <view class="ov-card-divider"></view><text v-if="overviewError" class="wb-error" @tap="loadOrderList">{{ overviewError }} · 点击重试</text>
 
                 <view class="ov-card-content">
-					<view class="ov-metric-layout">
-						<view class="ov-metric-row ov-metric-row--primary">
-							<view class="ov-metric-cell ov-metric-cell--full ov-metric-cell--hero">
-								<text class="ov-metric-primary-label">企业主总收益（元）</text>
-								<view class="ov-metric-money">
-									<text class="ov-metric-unit">¥</text>
-									<text class="ov-metric-primary-value">{{ headlineMetrics[1].value }}</text>
-								</view>
-							</view>
+					<view class="ov-summary-grid">
+						<view class="ov-summary-item ov-summary-item--full">
+							<text class="ov-summary-label">企业总收益</text>
+							<text class="ov-summary-value">¥{{ headlineMetrics[1].value }}</text>
 						</view>
-						<view class="ov-metric-row">
-							<view class="ov-metric-cell ov-metric-cell--stack">
-								<text class="ov-metric-label">推广总收益（元）</text>
-								<view class="ov-metric-money">
-									<text class="ov-metric-unit">¥</text>
-									<text class="ov-metric-value">{{ headlineMetrics[0].value }}</text>
-								</view>
-							</view>
-							<view class="ov-metric-cell ov-metric-cell--stack">
-								<text class="ov-metric-label">员工总收益（元）</text>
-								<view class="ov-metric-money">
-									<text class="ov-metric-unit">¥</text>
-									<text class="ov-metric-value">{{ topMetrics[3].value }}</text>
-								</view>
-							</view>
+						<view class="ov-summary-item">
+							<text class="ov-summary-label">推广总收益</text>
+							<text class="ov-summary-value">¥{{ headlineMetrics[0].value }}</text>
 						</view>
-						<view class="ov-metric-row" @tap="onMetricTap(topMetrics[0])">
-							<view class="ov-metric-cell ov-metric-cell--full">
-								<view class="ov-metric-label-with-arrow">
-									<text class="ov-metric-label">总员工</text>
-									<text class="ov-metric-caption">在职/全部</text>
-									<cl-icon name="arrow-right-s-line" :size="12" color="#a6adbb"></cl-icon>
-								</view>
-								<text class="ov-metric-value">{{ topMetrics[0].value }}</text>
-							</view>
+						<view class="ov-summary-item">
+							<text class="ov-summary-label">员工总收益</text>
+							<text class="ov-summary-value">¥{{ topMetrics[3].value }}</text>
 						</view>
-						<view class="ov-metric-row ov-metric-row--last">
-							<view class="ov-metric-cell ov-metric-cell--stack">
-								<text class="ov-metric-label">推广任务总量</text>
-								<text class="ov-metric-value">{{ topMetrics[1].value }}</text>
-							</view>
-							<view class="ov-metric-cell ov-metric-cell--stack">
-								<text class="ov-metric-label">回填总量</text>
-								<text class="ov-metric-value">{{ topMetrics[2].value }}</text>
-							</view>
+						<view class="ov-summary-item ov-summary-item--full" @tap="onMetricTap(topMetrics[0])">
+							<text class="ov-summary-label">在职 / 总员工</text>
+							<text class="ov-summary-value">{{ topMetrics[0].value }}</text>
+						</view>
+						<view class="ov-summary-item">
+							<text class="ov-summary-label">任务总量</text>
+							<text class="ov-summary-value">{{ topMetrics[1].value }}</text>
+						</view>
+						<view class="ov-summary-item">
+							<text class="ov-summary-label">回填总量</text>
+							<text class="ov-summary-value">{{ topMetrics[2].value }}</text>
 						</view>
 					</view>
 
@@ -113,8 +97,53 @@
                         </view>
                     </view>
                 </view>
+			</view>
+            <view class="wb-activity" role="button" aria-label="经营动态，查看消息中心" @tap="toNotice">
+                <view class="wb-activity-head">
+                    <text class="wb-activity-label">经营动态</text>
+                    <view class="wb-activity-more"><text>消息中心</text><cl-icon name="arrow-right-s-line" :size="14" color="#8d95a7"></cl-icon></view>
+                </view>
+                <view class="wb-message-row">
+                    <view class="wb-message-icon"><cl-icon name="message-3-line" :size="18" color="#5375ed"></cl-icon></view>
+                    <view class="wb-activity-copy"><text class="wb-activity-title">{{ activityTitle }}</text><text v-if="messageUnreadCount > 0" class="wb-muted">{{ messageUnreadCount }} 条未读</text></view>
+                </view>
             </view>
 			<view class="ov-body">
+				<view class="ov-section-head">
+					<text class="ov-section-title">订单收益</text>
+					<view class="ov-section-actions"><text class="wb-link" @tap="refreshWorkbench">{{ workbenchLoading ? "刷新中" : "刷新" }}</text>
+						<text v-if="orderList.length > 0" class="ov-section-meta">{{ orderListMeta }}</text>
+						<view
+							class="ov-export-btn"
+							:class="{ 'ov-export-btn--disabled': displayOrderList.length == 0 }"
+							role="button"
+							aria-label="导出已加载的筛选结果"
+                            title="导出已加载的筛选结果"
+							@tap="exportRevenueList"
+						>
+							<text class="wb-link">导出</text>
+						</view>
+					</view>
+					<view class="ov-section-link-row" @tap="toBusiness" v-if="false">
+						<text class="ov-section-link">看全部</text>
+						<cl-icon name="arrow-right-s-line" :size="12" color="#999999"></cl-icon>
+					</view>
+				</view>
+
+                <view class="wb-month">
+                    <view class="wb-month-head">
+                        <view><text class="wb-month-title">{{ currentPeriodLabel }}经营快照</text><text class="wb-month-tip">随下方时间同步更新</text></view>
+                        <view class="wb-order-total"><text class="wb-order-total-value">{{ monthCount }}</text><text class="wb-order-total-unit">笔订单</text></view>
+                    </view>
+                    <view class="wb-revenue-total"><text class="wb-revenue-label">企业总收益</text><text class="wb-revenue-value"><text class="wb-revenue-currency">¥</text>{{ periodTotalRevenue }}</text></view></view>
+                    <view class="wb-revenue-track"><view class="wb-revenue-enterprise" :style="{ width: enterpriseRevenueShare }"></view><view class="wb-revenue-staff" :style="{ width: staffRevenueShare }"></view></view>
+                    <view class="wb-month-grid">
+                        <view><view class="wb-revenue-name"><text class="wb-revenue-dot wb-revenue-dot--enterprise"></text><text>推广收益</text></view><text class="wb-number"><text class="wb-currency">¥</text>{{ monthPromoRevenue }}</text></view>
+                        <view><view class="wb-revenue-name"><text class="wb-revenue-dot wb-revenue-dot--staff"></text><text>员工收益</text></view><text class="wb-number"><text class="wb-currency">¥</text>{{ monthStaffRevenue }}</text></view>
+                    </view>
+                    <text v-if="monthError" class="wb-month-error">{{ monthError }}</text>
+                </view>
+
 				<view class="ov-overview-filter">
 					<view class="ov-period-bar">
 						<view class="ov-period-row">
@@ -133,8 +162,20 @@
 							:class="{ 'ov-period-cal--active': isCustomRange }"
 							@tap="onCalendarTap"
 						>
-							<cl-icon name="calendar-line" :size="16" :color="isCustomRange ? '#ffffff' : '#666666'"></cl-icon>
+							<cl-icon name="calendar-line" :size="16" :color="isCustomRange ? '#ffffff' : '#666666'"></cl-icon><text class="wb-date-label">日期</text>
 						</view>
+                        <picker
+                            class="ov-sort-picker wb-inline-sort"
+                            mode="selector"
+                            :range="orderSortOptions"
+                            :value="orderSortIndex"
+                            @change="onOrderSortChange"
+                        >
+                            <view class="ov-sort-trigger">
+                                <text class="ov-sort-text">{{ orderSortIndex == 0 ? "排序" : orderSortOptions[orderSortIndex] }}</text>
+                                <cl-icon name="arrow-down-s-line" :size="14" color="#596174"></cl-icon>
+                            </view>
+                        </picker>
 					</view>
 					<view v-if="isCustomRange" class="ov-range-bar">
 						<view class="ov-range-main">
@@ -147,18 +188,7 @@
                 <view class="ov-filter-panel">
                     <view class="ov-sort-row">
 						<text class="ov-filter-label">明细筛选</text>
-                        <picker
-                            class="ov-sort-picker"
-                            mode="selector"
-                            :range="orderSortOptions"
-                            :value="orderSortIndex"
-                            @change="onOrderSortChange"
-                        >
-                            <view class="ov-sort-trigger">
-                                <text class="ov-sort-text">{{ orderSortOptions[orderSortIndex] }}</text>
-                                <cl-icon name="arrow-down-s-line" :size="14" color="#596174"></cl-icon>
-                            </view>
-                        </picker>
+
                         <picker
                             class="ov-sort-picker"
                             mode="selector"
@@ -171,23 +201,29 @@
                                 <cl-icon name="arrow-down-s-line" :size="14" color="#596174"></cl-icon>
                             </view>
                         </picker>
+						<picker
+							class="ov-sort-picker"
+							mode="selector"
+							:range="employeeFilterOptions"
+							:value="employeeFilterIndex"
+							@change="onEmployeeFilterChange"
+						>
+							<view class="ov-sort-trigger">
+								<text class="ov-sort-text">{{ employeeFilterOptions[employeeFilterIndex] || "全部员工" }}</text>
+								<cl-icon name="arrow-down-s-line" :size="14" color="#596174"></cl-icon>
+							</view>
+						</picker>
                     </view>
                 </view>
-				<view class="ov-section-head">
-					<text class="ov-section-title">订单收益</text>
-					<text v-if="orderList.length > 0" class="ov-section-meta">{{ orderListMeta }}</text>
-					<view class="ov-section-link-row" @tap="toBusiness" v-if="false">
-						<text class="ov-section-link">看全部</text>
-						<cl-icon name="arrow-right-s-line" :size="12" color="#999999"></cl-icon>
-					</view>
-				</view>
+
+                <view v-if="orderError" class="wb-error" @tap="loadOrderList">{{ orderError }} · 点击重试</view>
 
 				<view v-if="listLoading && orderList.length == 0" class="ov-list-state">
 					<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
 					<text class="ov-list-state-text">加载中...</text>
 				</view>
 				<view v-else-if="displayOrderList.length == 0" class="ov-list-state">
-					<text class="ov-list-state-text">暂无收益数据</text>
+					<text class="ov-list-state-text">{{ orderError ? "加载失败" : "暂无订单" }}</text><text v-if="hasMore && !orderError" class="wb-link" @tap="loadMoreOrderList">{{ listLoadingMore ? "加载中…" : "加载更多" }}</text>
 				</view>
 				<view v-else>
 				<view class="ov-emp-card" v-for="item in displayOrderList" :key="item.id">
@@ -197,7 +233,7 @@
 						</view>
 						<view class="ov-emp-info">
                             <view class="ov-emp-name-row">
-							    <text class="ov-emp-name">{{ item.user_nickname }}</text>
+							    <text class="ov-emp-name">{{ item.user_nickname || "未命名员工" }}</text>
                                 <text
                                     v-if="resolveEmploymentStatus(item) != ''"
                                     class="ov-emp-badge ov-emp-badge--status"
@@ -214,11 +250,13 @@
                             </view>
 							<text class="ov-emp-id">ID: {{ item.user_sn || item.user_id }}</text>
 						</view>
-                        <view class="ov-emp-main" v-if="item.is_virtual == 1">
+						<view class="ov-emp-main" v-if="item.is_virtual == 1">
+							<text class="ov-emp-settlement-status" :class="{ 'ov-emp-settlement-status--done': resolveSettlementStatus(item) == '已结算' }">{{ resolveSettlementStatus(item) }}</text>
 							<text class="ov-emp-amount">{{ item.user_profit }}</text>
 							<text class="ov-emp-amount-label">员工收益</text>
 						</view>
 						<view class="ov-emp-main" v-else>
+							<text class="ov-emp-settlement-status" :class="{ 'ov-emp-settlement-status--done': resolveSettlementStatus(item) == '已结算' }">{{ resolveSettlementStatus(item) }}</text>
 							<text class="ov-emp-amount">{{ item.enterprise_profit }}</text>
 							<text class="ov-emp-amount-label">企业收益</text>
 						</view>
@@ -259,20 +297,24 @@
 						</view> -->
 					</view>
 				</view>
-				<view v-if="orderList.length > 0" class="ov-list-footer">
+				<view v-if="orderList.length > 0" class="ov-list-footer" @tap="loadMoreOrderList">
 					<cl-loadmore
 						:loading="listLoadingMore"
 						:finish="!hasMore"
 						finish-text="没有更多了"
 						loading-text="加载中..."
 					></cl-loadmore>
-					<text v-if="hasMore && !listLoadingMore" class="ov-list-footer-text">上拉加载更多</text>
+					<text v-if="hasMore && !listLoadingMore" class="ov-list-footer-text">加载更多</text>
 				</view>
 				</view>
 			</view>
 		</view>
 
-		<custom-tabbar></custom-tabbar>
+        <cl-popup v-model="inviteVisible" direction="center" :show-close="true">
+            <view class="wb-invite-popup"><text class="wb-name">{{ enterpriseName }}</text><text class="wb-muted">扫码加入企业</text><cl-qrcode v-if="inviteVisible && inviteContent" :text="inviteContent" mode="rect" :pd-radius="0" :width="220" :height="220"></cl-qrcode><text v-else class="wb-muted">{{ enterpriseInfoLoading ? '邀请码加载中' : '邀请码暂不可用' }}</text><text v-if="!inviteContent && !enterpriseInfoLoading" class="wb-link" @tap="loadEnterpriseInfo">重试</text><text v-if="inviteContent" class="wb-copy-button" role="button" @tap="copyWorkbenchInvite">复制链接</text></view>
+        </cl-popup>
+
+		<custom-tabbar :show-spacer="true"></custom-tabbar>
 
 		<cl-popup
 			v-model="rangePopupVisible"
@@ -378,6 +420,8 @@
 <script lang="ts" setup>
 	import { computed, nextTick, onMounted, ref } from "vue";
 	import { getAppSystem } from "@/.cool/api/app";
+	import { getMessageList } from "@/.cool/api/message";
+	import { resolveInviteQrContent } from "@/.cool/utils/invite-qrcode";
 	import { getEnterpriseInfo } from "@/.cool/api/enterprise";
 	import { fetchMessageUnreadCount, formatMessageUnreadBadgeText } from "@/.cool/utils/message";
 	import { getOrderList } from "@/.cool/api/order";
@@ -394,6 +438,59 @@
 
 	const { user } = useStore();
 
+    const enterpriseLogo = ref("");
+    const inviteContent = ref("");
+    const inviteVisible = ref(false);
+    const activityTitle = ref("暂无消息");
+    const monthCount = ref("—");
+    const monthPromoRevenue = ref("—");
+    const monthRevenue = ref("—");
+    const monthStaffRevenue = ref("—");
+    const monthError = ref("");
+    const monthLoading = ref(false);
+        const workbenchLoading = computed(() => listLoading.value || monthLoading.value || overviewLoading.value);
+    function editProfile() { router.push({ path: "/pages/user/settings" }); }
+    function copyWorkbenchInvite() {
+        if (!inviteContent.value) return;
+        uni.setClipboardData({ data: inviteContent.value, fail: () => uni.showToast({ title: "复制失败，请重试", icon: "none" }) });
+    }
+    function openWorkbenchInvite() { inviteVisible.value = true; if (!inviteContent.value) loadEnterpriseInfo(); }
+    const overviewError = ref("");
+    const overviewLoading = ref(false);
+    const periodTotalRevenue = computed((): string => monthRevenue.value);
+    const enterpriseRevenueShare = computed((): string => {
+        const total = parseFloat(periodTotalRevenue.value);
+        const enterprise = parseFloat(monthPromoRevenue.value);
+        if (isNaN(total) || total <= 0 || isNaN(enterprise)) return "50%";
+        return `${Math.round(enterprise / total * 100)}%`;
+    });
+    const staffRevenueShare = computed((): string => {
+        const total = parseFloat(periodTotalRevenue.value);
+        const staff = parseFloat(monthStaffRevenue.value);
+        if (isNaN(total) || total <= 0 || isNaN(staff)) return "50%";
+        return `${Math.round(staff / total * 100)}%`;
+    });
+    function resetOrderFilters() { staffFilterIndex.value = 0; employeeFilterIndex.value = 0; orderSortIndex.value = 0; }
+    function showThisMonth() {
+        selectPeriod(2);
+    }
+    async function loadWorkbenchExtras() {
+        if (monthLoading.value) return;
+        monthLoading.value = true;
+        await Promise.all([
+            getMessageList({ page: 1, limit: 1 }).then((res: any) => {
+                if (res?.code != null && !isApiSuccess(res.code)) throw new Error("消息加载失败");
+                const row = (res?.data ?? res)?.list?.[0];
+                activityTitle.value = row ? (row.title || row.content || "你有一条最新消息").replace(/<[^>]*>/g, "") : "暂无消息";
+            }).catch(() => { activityTitle.value = "消息加载失败，点击进入消息中心"; })
+        ]);
+        monthLoading.value = false;
+    }
+    function refreshWorkbench() {
+        if (workbenchLoading.value) return;
+        loadOrderList(); loadWorkbenchExtras(); loadMessageUnreadCount(); loadEnterpriseInfo();
+    }
+
 	const DEFAULT_ENTERPRISE_NAME = "企业号";
 	const DEFAULT_ENTERPRISE_INTRO = "";
 	const enterpriseName = ref(DEFAULT_ENTERPRISE_NAME);
@@ -401,7 +498,6 @@
 	const enterpriseInfoLoading = ref(false);
 	const messageUnreadCount = ref(0);
 	const messageUnreadLoading = ref(false);
-
 	const messageUnreadBadgeText = computed((): string => {
 		return formatMessageUnreadBadgeText(messageUnreadCount.value);
 	});
@@ -416,7 +512,7 @@
 	const draftQuickKey = ref<QuickRangeKey | "">("");
 	const draftStartSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
 	const draftEndSelectRef = ref<ClCalendarSelectComponentPublicInstance | null>(null);
-	const periodTabs = ["今日", "昨日", "近7天", "近30天", "累计"];
+	const periodTabs = ["今天", "7天", "本月", "累计"];
 	const listLoading = ref(false);
 	const currentPeriodLabel = computed((): string => {
 		if (isCustomRange.value) {
@@ -586,7 +682,7 @@
 		if (isCustomRange.value) {
 			return "custom";
 		}
-		const keys = ["today", "yesterday", "last_7_days", "last_30_days", "total"];
+		const keys = ["today", "last_7_days", "custom", "total"];
 		const idx = activePeriod.value;
 		if (idx >= 0 && idx < keys.length) {
 			return keys[idx];
@@ -738,7 +834,7 @@
 		if (summary == null) {
 			headlineMetrics.value = [
 				{ label: "推广总收益（元）", value: "0.00" },
-				{ label: "企业主总收益（元）", value: "0.00" }
+				{ label: "企业总收益（元）", value: "0.00" }
 			];
 			topMetrics.value = [
 				{ label: "总员工", value: "0/0", resourceTab: "employee" },
@@ -751,7 +847,7 @@
 		}
 		headlineMetrics.value = [
 			{ label: "推广总收益（元）", value: formatMoney(summary["promo_revenue"]) },
-			{ label: "企业主总收益（元）", value: formatMoney(summary["enterprise_revenue"]) }
+			{ label: "企业总收益（元）", value: formatMoney(summary["enterprise_revenue"]) }
 		];
 		topMetrics.value = [
 			{ label: "总员工", value: formatStaffRatio(summary), resourceTab: "employee" },
@@ -761,63 +857,52 @@
 		];
 		roleStats.value = buildRoleStats(summary);
 	}
-	function fetchOrderList(reset: boolean) {
-		if (reset) {
-			if (listLoading.value) {
-				return;
-			}
-			listLoading.value = true;
-			orderList.value = [];
-			orderPage.value = 1;
-			hasMore.value = true;
-		} else {
-			if (listLoadingMore.value || !hasMore.value || listLoading.value) {
-				return;
-			}
-			listLoadingMore.value = true;
-		}
-		const reqPage = reset ? 1 : orderPage.value;
-		getOrderList({
-			page: reqPage,
-			limit: ORDER_LIMIT,
-			period: getPeriodKey(),
-			start_date: isCustomRange.value ? rangeStart.value : "",
-			end_date: isCustomRange.value ? rangeEnd.value : ""
-		})
-			.then((res) => {
-				if (res == null) {
-					return;
-				}
-				const envelope = res as UTSJSONObject;
-				const code = envelope["code"];
-				if (code != null && !isApiSuccess(code)) {
-					uni.showToast({ title: getApiMessage(res, "加载失败"), icon: "none" });
-					return;
-				}
-				const data = (envelope["data"] ?? envelope) as UTSJSONObject;
-				if (reset) {
-					applySummary(data["summary"] as UTSJSONObject | null);
-				}
-				const listRaw = data["list"] as OrderListItem[] | null;
-				const rows = listRaw != null ? listRaw : ([] as OrderListItem[]);
-				if (reset) {
-					orderList.value = rows;
-				} else {
-					orderList.value = orderList.value.concat(rows);
-				}
-				hasMore.value = rows.length >= ORDER_LIMIT;
-				if (hasMore.value) {
-					orderPage.value = reqPage + 1;
-				}
-			})
-			.catch((err) => {
-				uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" });
-			})
-			.finally(() => {
-				listLoading.value = false;
-				listLoadingMore.value = false;
-			});
-	}
+    let orderRequestVersion = 0;
+    const orderError = ref("");
+    function fetchOrderList(reset: boolean) {
+        if (!reset && (listLoadingMore.value || !hasMore.value || listLoading.value)) return;
+        const version = ++orderRequestVersion;
+        if (reset) {
+            listLoading.value = true; listLoadingMore.value = false;
+            orderList.value = []; employeeFilterIndex.value = 0; orderPage.value = 1;
+            hasMore.value = true;
+        } else { listLoadingMore.value = true; }
+        orderError.value = "";
+        const reqPage = reset ? 1 : orderPage.value;
+        const useRange = isCustomRange.value || activePeriod.value == 2;
+        getOrderList({ page: reqPage, limit: ORDER_LIMIT, period: getPeriodKey(),
+            start_date: useRange ? rangeStart.value : "",
+            end_date: useRange ? rangeEnd.value : ""
+        }).then((res: any) => {
+            if (version != orderRequestVersion) return;
+            if (!res || (res.code != null && !isApiSuccess(res.code))) throw new Error(getApiMessage(res, "订单加载失败"));
+            const data = res.data ?? res;
+            const rows: OrderListItem[] = Array.isArray(data.list) ? data.list : [];
+            orderList.value = reset ? rows : orderList.value.concat(rows);
+            const total = data.count ?? data.total;
+            if (reset) {
+                const summary = data.summary ?? null;
+                applySummary(summary);
+                overviewError.value = "";
+                monthCount.value = total != null ? formatCount(total) : formatCount(summary?.order_count);
+                monthPromoRevenue.value = formatMoney(summary?.promo_revenue);
+                monthRevenue.value = formatMoney(summary?.enterprise_revenue);
+                monthStaffRevenue.value = formatMoney(summary?.staff_revenue);
+                monthError.value = "";
+            }
+            hasMore.value = rows.length > 0 && (total != null ? orderList.value.length < Number(total) : rows.length >= ORDER_LIMIT);
+            orderPage.value = reqPage + 1;
+        }).catch((err) => {
+            if (version == orderRequestVersion) {
+                orderError.value = getApiMessage(err, "订单加载失败");
+                monthError.value = "当前时段数据加载失败，请点击刷新重试";
+                overviewError.value = "当前时段数据加载失败";
+            }
+        }).finally(() => {
+            if (version != orderRequestVersion) return;
+            listLoading.value = false; listLoadingMore.value = false;
+        });
+    }
 	function loadOrderList() {
 		fetchOrderList(true);
 	}
@@ -827,13 +912,16 @@
 	function selectPeriod(index: number) {
 		isCustomRange.value = false;
 		activePeriod.value = index;
+		if (index == 2) {
+			const range = resolveQuickRange("this_month");
+			rangeStart.value = range.start;
+			rangeEnd.value = range.end;
+		}
 		loadOrderList();
 	}
 
 	function onCalendarTap() {
-		isCustomRange.value = true;
-		activePeriod.value = -1;
-		openRangePopup();
+		openRangePopup(isCustomRange.value);
 	}
 
 	function compareDate(start: string, end: string): number {
@@ -932,6 +1020,11 @@
 		toBusinessTab("employee");
 	}
 
+	function toIncomeCalendar() {
+		router.push({ path: "/pages/revenue/calendar" });
+	}
+
+
 	function onMetricTap(item: TopMetric) {
 		if (item.resourceTab == "employee") {
 			toBusinessTab("employee");
@@ -955,7 +1048,7 @@
 
 	const headlineMetrics = ref<HeadlineMetric[]>([
 		{ label: "推广总收益（元）", value: "0.00" },
-		{ label: "企业主总收益（元）", value: "0.00" }
+		{ label: "企业总收益（元）", value: "0.00" }
 	]);
 	const topMetrics = ref<TopMetric[]>([
 		{ label: "总员工", value: "0/0", resourceTab: "employee" },
@@ -971,9 +1064,26 @@
 	const listLoadingMore = ref(false);
 
 	const orderSortOptions = ["订单排序", "由近到远", "由远到近", "收益从高到低", "收益从低到高"];
-	const staffFilterOptions = ["全部员工", "普通员工", "员工组长", "员工组员"];
+	const staffFilterOptions = ["员工类型", "普通员工", "员工组长", "员工组员"];
 	const orderSortIndex = ref(0);
 	const staffFilterIndex = ref(0);
+	const employeeFilterIndex = ref(0);
+	const employeeFilterEntries = computed((): { label: string; key: string }[] => {
+		const entries: { label: string; key: string }[] = [{ label: "全部员工", key: "" }];
+		const keys: string[] = [];
+		for (let i = 0; i < orderList.value.length; i++) {
+			const item = orderList.value[i];
+			const key = resolveOrderEmployeeKey(item);
+			if (key == "" || keys.indexOf(key) >= 0) continue;
+			keys.push(key);
+			const name = fieldText(item.user_nickname);
+			entries.push({ label: name != "" ? name : `员工${key}`, key });
+		}
+		return entries;
+	});
+	const employeeFilterOptions = computed((): string[] => {
+		return employeeFilterEntries.value.map((item) => item.label);
+	});
 	const activeRoleKey = computed((): string => {
 		if (staffFilterIndex.value == 1) return "normal";
 		if (staffFilterIndex.value == 2) return "leader";
@@ -981,7 +1091,7 @@
 		return "";
 	});
 	const orderListMeta = computed((): string => {
-		const label = staffFilterOptions[staffFilterIndex.value] ?? "全部员工";
+		const label = employeeFilterOptions.value[employeeFilterIndex.value] ?? "全部员工";
 		return `${label} · ${displayOrderList.value.length} 条`;
 	});
 
@@ -997,6 +1107,10 @@
 
 	function onStaffFilterChange(event: UniPickerChangeEvent) {
 		staffFilterIndex.value = resolvePickerIndex(event);
+	}
+
+	function onEmployeeFilterChange(event: UniPickerChangeEvent) {
+		employeeFilterIndex.value = resolvePickerIndex(event);
 	}
 
 	function onRoleStatTap(roleKey: string) {
@@ -1066,6 +1180,17 @@
 		return isNaN(time) ? 0 : time;
 	}
 
+	function resolveOrderEmployeeKey(item: OrderListItem): string {
+		return fieldText(item.user_id ?? item.user_sn ?? item.user_nickname);
+	}
+
+	function resolveSettlementStatus(item: OrderListItem): string {
+		const direct = fieldText(item["settlement_status_text"] ?? item.payment_status_text);
+		if (direct != "") return direct;
+		const raw = item["settlement_status"] ?? item["payment_status"] ?? item.status;
+		return `${raw}` == "1" ? "已结算" : "未结算";
+	}
+
 	function resolveOrderRevenue(item: OrderListItem): number {
 		const raw =
 			item.is_virtual == 1
@@ -1073,6 +1198,79 @@
 				: fieldText(item.enterprise_profit ?? item.user_profit);
 		const value = parseFloat(raw.replace("¥", ""));
 		return isNaN(value) ? 0 : value;
+	}
+
+	function escapeCsvCell(value: any | null): string {
+		const raw = fieldText(value);
+        const text = (/^[=+@\-\t\r]/.test(raw) ? "'" + raw : raw).replace(/"/g, '""');
+		return `"${text}"`;
+	}
+
+	function buildRevenueCsv(rows: OrderListItem[]): string {
+		const header = [
+			"序号",
+			"员工昵称",
+			"员工ID",
+			"员工类型",
+			"在职状态",
+			"项目",
+			"关键词",
+			"推广收益",
+			"员工收益",
+			"企业收益",
+			"分佣比例",
+			"结算日期"
+		];
+		const lines: string[] = [header.map((item) => escapeCsvCell(item)).join(",")];
+		for (let i = 0; i < rows.length; i++) {
+			const item = rows[i];
+			const values = [
+				`${i + 1}`,
+				item.user_nickname,
+				item.user_sn ?? item.user_id,
+				resolveStaffRoleLabel(item),
+				resolveEmploymentStatus(item),
+				item.project_title,
+				item.keyword,
+				item.share_profit,
+				item.user_profit,
+				item.enterprise_profit,
+				item.user_rate,
+				item.audit_time ?? item.settlement_time ?? item.payment_time
+			];
+			lines.push(values.map((value) => escapeCsvCell(value)).join(","));
+		}
+		return `\ufeff${lines.join("\r\n")}`;
+	}
+
+	function exportRevenueList() {
+        if (listLoading.value) return;
+		const rows = displayOrderList.value;
+		if (rows.length == 0) {
+			uni.showToast({ title: "暂无可导出的收益数据", icon: "none" });
+			return;
+		}
+
+		// #ifdef H5
+		const csv = buildRevenueCsv(rows);
+		const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		const safeEnterpriseName = enterpriseName.value.replace(/[\\/:*?"<>|\s]+/g, "-");
+		const safePeriod = currentPeriodLabel.value.replace(/[\\/:*?"<>|\s]+/g, "-");
+		anchor.href = url;
+		anchor.download = `${safeEnterpriseName || "企业号"}-订单收益-${safePeriod}.csv`;
+		anchor.style.display = "none";
+		document.body.appendChild(anchor);
+		anchor.click();
+		document.body.removeChild(anchor);
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
+		uni.showToast({ title: `已导出 ${rows.length} 条`, icon: "none" });
+		// #endif
+
+		// #ifndef H5
+		uni.showToast({ title: "请在网页端导出", icon: "none" });
+		// #endif
 	}
 
 	const displayOrderList = computed((): OrderListItem[] => {
@@ -1084,10 +1282,14 @@
 					: staffFilterIndex.value == 3
 						? "member"
 						: "";
+		const employeeEntry = employeeFilterEntries.value[employeeFilterIndex.value];
+		const targetEmployee = employeeEntry != null ? employeeEntry.key : "";
 		const rows: OrderListItem[] = [];
 		for (let i = 0; i < orderList.value.length; i++) {
 			const item = orderList.value[i];
-			if (targetRole == "" || resolveStaffRoleKey(item) == targetRole) {
+			const roleMatched = targetRole == "" || resolveStaffRoleKey(item) == targetRole;
+			const employeeMatched = targetEmployee == "" || resolveOrderEmployeeKey(item) == targetEmployee;
+			if (roleMatched && employeeMatched) {
 				rows.push(item);
 			}
 		}
@@ -1120,6 +1322,9 @@
 		const intro = `${info.intro ?? ""}`.trim();
 		enterpriseName.value = name != "" ? name : DEFAULT_ENTERPRISE_NAME;
 		enterpriseIntro.value = intro;
+        enterpriseLogo.value = `${info.logo ?? ""}`;
+        inviteContent.value = resolveInviteQrContent(info as UTSJSONObject);
+
 	}
 
 	function loadEnterpriseInfo() {
@@ -1179,12 +1384,16 @@
 		setTimeout(() => {
 			capsuleLayoutKey.value += 1;
 		}, 50);
+		const monthRange = resolveQuickRange("this_month");
+		rangeStart.value = monthRange.start;
+		rangeEnd.value = monthRange.end;
 		loadOrderList();
 	});
 	onShow(() => {
 		guardHomeOverviewAccess();
 		syncTabbarRoutePath();
 		loadEnterpriseInfo();
+        loadWorkbenchExtras();
 		loadMessageUnreadCount();
 		loadOrderList();
 	});
@@ -1207,16 +1416,44 @@
 		flex-shrink: 0;
 		overflow: visible;
 		background-color: #ffffff;
-		border-bottom: 1rpx solid #eeeeee;
+		border-bottom: min(0.1333vw, 0.60px) solid #eeeeee;
 
 		:deep(.cl-safe-area) {
 			background-color: transparent;
 		}
 	}
 
+	.ov-settlement-popup { padding: min(3.4667vw, 15.60px) min(3.7333vw, 16.80px) calc(min(3.2000vw, 14.40px) + env(safe-area-inset-bottom)); border-radius: min(3.4667vw, 15.60px) min(3.4667vw, 15.60px) 0 0; background: #ffffff; }
+	.ov-settlement-popup-head { display: flex; align-items: center; justify-content: space-between; }
+	.ov-settlement-popup-title,.ov-settlement-popup-subtitle,.ov-settlement-popup-name,.ov-settlement-popup-rate { display: block; }
+	.ov-settlement-popup-title { font-size: clamp(11px, 4.2667vw, 19.20px); font-weight: 700; color: #202a3f; }
+	.ov-settlement-popup-subtitle { margin-top: min(1.0667vw, 4.80px); font-size: clamp(11px, 2.9333vw, 13.20px); line-height: min(4.5333vw, 20.40px); color: #7e899d; }
+	.ov-settlement-popup-count { font-size: clamp(11px, 3.0667vw, 13.80px); font-weight: 700; color: #35425c; }
+	.ov-settlement-popup-toolbar { height: min(8.8000vw, 39.60px); margin-top: min(2.9333vw, 13.20px); padding: 0 min(2.4000vw, 10.80px); display: flex; align-items: center; justify-content: space-between; border-radius: min(1.6000vw, 7.20px); background: #f3f5f8; box-sizing: border-box; }
+	.ov-settlement-popup-batch { font-size: clamp(11px, 2.9333vw, 13.20px); color: #8791a3; }
+	.ov-settlement-popup-batch-options { display: flex; align-items: center; gap: min(1.6000vw, 7.20px); }
+	.ov-settlement-popup-batch-option { height: min(6.1333vw, 27.60px); padding: 0 min(1.6000vw, 7.20px); display: flex; align-items: center; gap: min(0.9333vw, 4.20px); border: min(0.1333vw, 0.60px) solid transparent; border-radius: min(1.3333vw, 6.00px); font-size: clamp(11px, 2.6667vw, 12.00px); font-weight: 600; color: #35518a; }
+	.ov-settlement-popup-batch-option--active { border-color: #2b59c3; color: #2b59c3; background: #eaf1ff; }
+	.ov-settlement-popup-table-head { height: min(7.4667vw, 33.60px); padding: 0 min(2.4000vw, 10.80px); display: flex; align-items: center; justify-content: space-between; border-bottom: min(0.1333vw, 0.60px) solid #edf0f5; font-size: clamp(11px, 2.6667vw, 12.00px); color: #8791a3; }
+	.ov-settlement-popup-list { max-height: min(57.3333vw, 258.00px); box-sizing: border-box; }
+	.ov-settlement-popup-row { min-height: min(12.2667vw, 55.20px); padding: min(1.8667vw, 8.40px) min(2.4000vw, 10.80px); display: flex; align-items: center; justify-content: space-between; border-bottom: min(0.1333vw, 0.60px) solid #edf0f5; box-sizing: border-box; }
+	.ov-settlement-popup-user { flex: 1; min-width: 0; }
+	.ov-settlement-popup-name { font-size: clamp(11px, 3.4667vw, 15.60px); font-weight: 700; color: #263249; }
+	.ov-settlement-popup-rate { margin-top: min(0.6667vw, 3.00px); font-size: clamp(11px, 2.6667vw, 12.00px); color: #7f8aa0; }
+	.ov-settlement-popup-methods { width: min(30.1333vw, 135.60px); display: flex; align-items: center; justify-content: space-between; }
+	.ov-settlement-popup-method { width: min(13.8667vw, 62.40px); display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(1.0667vw, 4.80px); font-size: clamp(11px, 2.6667vw, 12.00px); color: #4c5870; }
+	.ov-settlement-popup-radio { width: min(3.2000vw, 14.40px); height: min(3.2000vw, 14.40px); display: flex; align-items: center; justify-content: center; border: min(0.2667vw, 1.20px) solid #cdd5e2; border-radius: 50%; background: #ffffff; }
+	.ov-settlement-popup-radio--active { border-color: #2b59c3; }
+	.ov-settlement-popup-radio view { width: min(1.6000vw, 7.20px); height: min(1.6000vw, 7.20px); border-radius: 50%; background: #2b59c3; }
+	.ov-settlement-popup-progress { height: min(7.7333vw, 34.80px); display: flex; align-items: center; justify-content: space-between; font-size: clamp(11px, 2.6667vw, 12.00px); color: #68758b; }
+	.ov-settlement-popup-progress text:last-child { color: #c36b18; }
+	.ov-settlement-popup-save { height: min(10.9333vw, 49.20px); display: flex; align-items: center; justify-content: center; border-radius: min(1.7333vw, 7.80px); font-size: clamp(11px, 3.6000vw, 16.20px); font-weight: 700; color: #ffffff; background: #2b59c3; }
+	.ov-settlement-popup-save--disabled { background: #c5cedd; }
+	.ov-settlement-popup-head,.ov-settlement-popup-toolbar,.ov-settlement-popup-batch-options,.ov-settlement-popup-batch-option,.ov-settlement-popup-table-head,.ov-settlement-popup-row,.ov-settlement-popup-methods,.ov-settlement-popup-method,.ov-settlement-popup-radio,.ov-settlement-popup-progress,.ov-settlement-popup-save { flex-direction: row; }
+
 	.ov-hero {
 		box-sizing: content-box;
-		padding: 16rpx 30rpx 84rpx;
+		padding: min(2.1333vw, 9.60px) min(4.0000vw, 18.00px) min(11.2000vw, 50.40px);
 		display: flex;
 		flex-direction: row;
 		align-items: flex-start;
@@ -1228,51 +1465,51 @@
 		.ov-hero-copy {
 			flex: 1;
 			min-width: 0;
-			padding-right: 16rpx;
+			padding-right: min(2.1333vw, 9.60px);
 			display: flex;
 			flex-direction: column;
 		}
 
 		.ov-hero-kicker {
-			margin-bottom: 4rpx;
-			font-size: 22rpx;
+			margin-bottom: min(0.5333vw, 2.40px);
+			font-size: clamp(11px, 2.9333vw, 13.20px);
 			font-weight: 600;
 			color: #2b59c3;
-			line-height: 32rpx;
+			line-height: min(4.2667vw, 19.20px);
 		}
 
 		.ov-hero-title {
-			font-size: 40rpx;
+			font-size: clamp(11px, 5.3333vw, 24.00px);
 			font-weight: 700;
 			color: #333333;
-			line-height: 56rpx;
+			line-height: min(7.4667vw, 33.60px);
 			width: 100%;
 			word-break: break-all;
 		}
 
 		.ov-hero-sub {
-			margin-top: 8rpx;
-			font-size: 24rpx;
+			margin-top: min(1.0667vw, 4.80px);
+			font-size: clamp(11px, 3.2000vw, 14.40px);
 			color: #999999;
-			line-height: 34rpx;
+			line-height: min(4.5333vw, 20.40px);
 			width: 100%;
 			word-break: break-all;
 		}
 
 		.ov-hero-notice-wrap {
 			position: relative;
-			width: 72rpx;
-			height: 72rpx;
+			width: min(9.6000vw, 43.20px);
+			height: min(9.6000vw, 43.20px);
 			flex-shrink: 0;
 			overflow: visible;
 		}
 
 		.ov-hero-notice {
-			width: 72rpx;
-			height: 72rpx;
-			border-radius: 36rpx;
+			width: min(9.6000vw, 43.20px);
+			height: min(9.6000vw, 43.20px);
+			border-radius: min(4.8000vw, 21.60px);
 			background-color: #f5f6fa;
-			border: 1rpx solid #eeeeee;
+			border: min(0.1333vw, 0.60px) solid #eeeeee;
 			display: flex;
 			flex-direction: row;
 			align-items: center;
@@ -1281,14 +1518,14 @@
 
 		.ov-hero-badge {
 			position: absolute;
-			top: -6rpx;
-			right: -6rpx;
-			min-width: 32rpx;
-			height: 32rpx;
-			padding: 0 8rpx;
-			border-radius: 16rpx;
+			top: calc(-1 * min(0.8000vw, 3.60px));
+			right: calc(-1 * min(0.8000vw, 3.60px));
+			min-width: min(4.2667vw, 19.20px);
+			height: min(4.2667vw, 19.20px);
+			padding: 0 min(1.0667vw, 4.80px);
+			border-radius: min(2.1333vw, 9.60px);
 			background-color: #ff4d4f;
-			border-width: 2rpx;
+			border-width: min(0.2667vw, 1.20px);
 			border-style: solid;
 			border-color: #ffffff;
 			display: flex;
@@ -1298,55 +1535,55 @@
 		}
 
 		.ov-hero-badge-text {
-			font-size: 20rpx;
+			font-size: clamp(11px, 2.6667vw, 12.00px);
 			font-weight: 600;
 			color: #ffffff;
-			line-height: 28rpx;
+			line-height: min(3.7333vw, 16.80px);
 		}
 	}
 
 	.ov-body {
-		padding: 18rpx 30rpx 16rpx;
+		padding: min(2.4000vw, 10.80px) min(4.0000vw, 18.00px) min(2.1333vw, 9.60px);
 		background-color: #f7f8fa;
 		position: relative;
 	}
 	.ov-list-state {
-		padding: 32rpx 0;
+		padding: min(4.2667vw, 19.20px) 0;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 	}
 	.ov-list-state-text {
-		margin-top: 16rpx;
-		font-size: 26rpx;
+		margin-top: min(2.1333vw, 9.60px);
+		font-size: clamp(11px, 3.4667vw, 15.60px);
 		color: #999999;
-		line-height: 36rpx;
+		line-height: min(4.8000vw, 21.60px);
 	}
 	.ov-list-footer {
-		padding: 24rpx 0 32rpx;
+		padding: min(3.2000vw, 14.40px) 0 min(4.2667vw, 19.20px);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 	}
 	.ov-list-footer-text {
-		margin-top: 12rpx;
-		font-size: 24rpx;
+		margin-top: min(1.6000vw, 7.20px);
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		color: #999999;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-card {
 		padding: 0;
-		border-radius: 20rpx;
+		border-radius: min(2.6667vw, 12.00px);
 		background-color: #ffffff;
-		border: 1rpx solid #edf0f5;
-		box-shadow: 0 8rpx 24rpx rgba(30, 47, 84, 0.08);
+		border: min(0.1333vw, 0.60px) solid #edf0f5;
+		box-shadow: 0 min(1.0667vw, 4.80px) min(3.2000vw, 14.40px) rgba(30, 47, 84, 0.08);
 		position: relative;
-		top: -48rpx;
+		top: calc(-1 * min(6.4000vw, 28.80px));
 		z-index: 2;
-		margin: 0 30rpx -36rpx;
+		margin: 0 min(4.0000vw, 18.00px) calc(-1 * min(4.8000vw, 21.60px));
 		box-sizing: border-box;
 		overflow: hidden;
 
@@ -1355,34 +1592,34 @@
 			flex-direction: row;
 			align-items: center;
 			justify-content: space-between;
-			padding: 20rpx 24rpx 16rpx;
+			padding: min(2.6667vw, 12.00px) min(3.2000vw, 14.40px) min(2.1333vw, 9.60px);
 		}
 
 		.ov-card-divider {
-			height: 1rpx;
+			height: min(0.1333vw, 0.60px);
 			background-color: #f0f0f0;
 		}
 
 		.ov-card-content {
-			padding: 14rpx 20rpx 16rpx;
+			padding: min(1.8667vw, 8.40px) min(2.6667vw, 12.00px) min(2.1333vw, 9.60px);
 		}
 
 		.ov-card-title {
-			font-size: 30rpx;
+			font-size: clamp(11px, 4.0000vw, 18.00px);
 			font-weight: 700;
 			color: #202336;
-			line-height: 44rpx;
+			line-height: min(5.8667vw, 26.40px);
 		}
 
 	}
 
 	.ov-overview-filter {
-		padding: 20rpx 24rpx;
-		border-radius: 20rpx;
+		padding: min(2.6667vw, 12.00px) min(3.2000vw, 14.40px);
+		border-radius: min(2.6667vw, 12.00px);
 		background-color: #ffffff;
-		border: 1rpx solid #edf0f5;
-		box-shadow: 0 4rpx 16rpx rgba(30, 47, 84, 0.05);
-		margin-bottom: 16rpx;
+		border: min(0.1333vw, 0.60px) solid #edf0f5;
+		box-shadow: 0 min(0.5333vw, 2.40px) min(2.1333vw, 9.60px) rgba(30, 47, 84, 0.05);
+		margin-bottom: min(2.1333vw, 9.60px);
 	}
 
 	.ov-metric-layout {
@@ -1393,7 +1630,7 @@
 	.ov-metric-row {
 		display: flex;
 		flex-direction: row;
-		border-bottom: 1rpx solid #eef0f5;
+		border-bottom: min(0.1333vw, 0.60px) solid #eef0f5;
 	}
 
 	.ov-metric-row--last {
@@ -1403,13 +1640,13 @@
 	.ov-metric-cell {
 		width: 50%;
 		min-width: 0;
-		padding: 13rpx 14rpx;
+		padding: min(1.7333vw, 7.80px) min(1.8667vw, 8.40px);
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: row;
 		align-items: center;
 		justify-content: space-between;
-		border-right: 1rpx solid #eef0f5;
+		border-right: min(0.1333vw, 0.60px) solid #eef0f5;
 
 		&:last-child {
 			border-right-width: 0;
@@ -1422,15 +1659,15 @@
 	}
 
 	.ov-metric-cell--hero {
-		padding: 16rpx 14rpx 18rpx;
+		padding: min(2.1333vw, 9.60px) min(1.8667vw, 8.40px) min(2.4000vw, 10.80px);
 		flex-direction: column;
 		align-items: flex-start;
 		justify-content: flex-start;
 	}
 
 	.ov-metric-cell--stack {
-		min-height: 88rpx;
-		padding: 12rpx 14rpx;
+		min-height: min(11.7333vw, 52.80px);
+		padding: min(1.6000vw, 7.20px) min(1.8667vw, 8.40px);
 		flex-direction: column;
 		align-items: flex-start;
 		justify-content: center;
@@ -1439,30 +1676,30 @@
 	.ov-metric-cell--hero .ov-metric-money,
 	.ov-metric-cell--stack .ov-metric-money,
 	.ov-metric-cell--stack > .ov-metric-value {
-		margin-top: 4rpx;
+		margin-top: min(0.5333vw, 2.40px);
 	}
 
 	.ov-metric-primary-label {
-		font-size: 24rpx;
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		font-weight: 500;
 		color: #7f8798;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-metric-primary-value {
-		font-size: 48rpx;
+		font-size: clamp(11px, 6.4000vw, 28.80px);
 		font-weight: 800;
 		color: #2b59c3;
-		line-height: 56rpx;
+		line-height: min(7.4667vw, 33.60px);
 		font-variant-numeric: tabular-nums;
-		letter-spacing: -1rpx;
+		letter-spacing: calc(-1 * min(0.1333vw, 0.60px));
 	}
 
 	.ov-metric-label {
-		font-size: 23rpx;
+		font-size: clamp(11px, 3.0667vw, 13.80px);
 		font-weight: 400;
 		color: #858c9e;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-metric-label-with-arrow {
@@ -1472,12 +1709,12 @@
 	}
 
 	.ov-metric-caption {
-		margin-left: 10rpx;
-		margin-right: 2rpx;
-		font-size: 19rpx;
+		margin-left: min(1.3333vw, 6.00px);
+		margin-right: min(0.2667vw, 1.20px);
+		font-size: clamp(11px, 2.5333vw, 11.40px);
 		font-weight: 400;
 		color: #b0b5c0;
-		line-height: 28rpx;
+		line-height: min(3.7333vw, 16.80px);
 	}
 
 	.ov-metric-money {
@@ -1487,31 +1724,31 @@
 	}
 
 	.ov-metric-unit {
-		margin-right: 4rpx;
-		font-size: 23rpx;
+		margin-right: min(0.5333vw, 2.40px);
+		font-size: clamp(11px, 3.0667vw, 13.80px);
 		font-weight: 700;
 		color: #2b59c3;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-metric-cell--hero .ov-metric-unit {
-		font-size: 27rpx;
-		line-height: 38rpx;
+		font-size: clamp(11px, 3.6000vw, 16.20px);
+		line-height: min(5.0667vw, 22.80px);
 	}
 
 	.ov-metric-value {
 		margin-left: 0;
-		font-size: 29rpx;
+		font-size: clamp(11px, 3.8667vw, 17.40px);
 		font-weight: 700;
 		color: #252a3d;
-		line-height: 40rpx;
+		line-height: min(5.3333vw, 24.00px);
 		font-variant-numeric: tabular-nums;
 	}
 
 	.ov-detail-head {
-		margin-top: 12rpx;
-		min-height: 60rpx;
-		padding: 0 4rpx;
+		margin-top: min(1.6000vw, 7.20px);
+		min-height: min(8.0000vw, 36.00px);
+		padding: 0 min(0.5333vw, 2.40px);
 		display: flex;
 		flex-direction: row;
 		align-items: center;
@@ -1526,23 +1763,23 @@
 	}
 
 	.ov-detail-title {
-		font-size: 26rpx;
+		font-size: clamp(11px, 3.4667vw, 15.60px);
 		font-weight: 700;
 		color: #2b3042;
-		line-height: 36rpx;
+		line-height: min(4.8000vw, 21.60px);
 	}
 
 	.ov-detail-hint {
-		margin-top: 2rpx;
-		font-size: 21rpx;
+		margin-top: min(0.2667vw, 1.20px);
+		font-size: clamp(11px, 2.8000vw, 12.60px);
 		color: #a1a7b5;
-		line-height: 30rpx;
+		line-height: min(4.0000vw, 18.00px);
 	}
 
 	.ov-detail-toggle {
-		margin-left: 20rpx;
-		padding: 10rpx 14rpx;
-		border-radius: 999rpx;
+		margin-left: min(2.6667vw, 12.00px);
+		padding: min(1.3333vw, 6.00px) min(1.8667vw, 8.40px);
+		border-radius: min(133.2000vw, 599.40px);
 		background-color: #f5f6fa;
 		display: flex;
 		flex-direction: row;
@@ -1551,26 +1788,26 @@
 	}
 
 	.ov-detail-toggle-text {
-		margin-right: 4rpx;
-		font-size: 22rpx;
+		margin-right: min(0.5333vw, 2.40px);
+		font-size: clamp(11px, 2.9333vw, 13.20px);
 		font-weight: 600;
 		color: #596174;
-		line-height: 30rpx;
+		line-height: min(4.0000vw, 18.00px);
 	}
 
 	.ov-stat-table {
-		margin-top: 16rpx;
-		border: 1rpx solid #e9ebf1;
-		border-radius: 14rpx;
+		margin-top: min(2.1333vw, 9.60px);
+		border: min(0.1333vw, 0.60px) solid #e9ebf1;
+		border-radius: min(1.8667vw, 8.40px);
 		overflow: hidden;
 	}
 
 	.ov-stat-row {
-		min-height: 64rpx;
+		min-height: min(8.5333vw, 38.40px);
 		display: flex;
 		flex-direction: row;
 		align-items: stretch;
-		border-top: 1rpx solid #eceef3;
+		border-top: min(0.1333vw, 0.60px) solid #eceef3;
 
 		&:first-child {
 			border-top-width: 0;
@@ -1588,15 +1825,15 @@
 	.ov-stat-cell {
 		flex: 1;
 		min-width: 0;
-		padding: 12rpx 4rpx;
-		border-left: 1rpx solid #eceef3;
+		padding: min(1.6000vw, 7.20px) min(0.5333vw, 2.40px);
+		border-left: min(0.1333vw, 0.60px) solid #eceef3;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		text-align: center;
-		font-size: 20rpx;
+		font-size: clamp(11px, 2.6667vw, 12.00px);
 		color: #51586b;
-		line-height: 28rpx;
+		line-height: min(3.7333vw, 16.80px);
 		box-sizing: border-box;
 
 		&:first-child {
@@ -1616,11 +1853,11 @@
 	}
 
 	.ov-filter-panel {
-		margin-bottom: 20rpx;
-		padding: 18rpx 20rpx;
-		border-radius: 16rpx;
+		margin-bottom: min(2.6667vw, 12.00px);
+		padding: min(2.4000vw, 10.80px) min(2.6667vw, 12.00px);
+		border-radius: min(2.1333vw, 9.60px);
 		background-color: #ffffff;
-		border: 1rpx solid #edf0f5;
+		border: min(0.1333vw, 0.60px) solid #edf0f5;
 	}
 
 	.ov-period-bar {
@@ -1632,20 +1869,20 @@
 
 	.ov-period-row {
 		flex: 1;
-        height: 68rpx;
+        height: min(9.0667vw, 40.80px);
 		display: flex;
 		flex-direction: row;
 		align-items: center;
-		padding: 6rpx;
+		padding: min(0.8000vw, 3.60px);
         box-sizing: border-box;
-		border-radius: 12rpx;
+		border-radius: min(1.6000vw, 7.20px);
 		background-color: #eef1f5;
 	}
 
 	.ov-period-item {
 		flex: 1;
-		padding: 12rpx 0;
-		border-radius: 9rpx;
+		padding: min(1.6000vw, 7.20px) 0;
+		border-radius: min(1.2000vw, 5.40px);
 		display: flex;
 		flex-direction: row;
 		align-items: center;
@@ -1658,7 +1895,7 @@
 	}
 
 	.ov-period-text {
-		font-size: 24rpx;
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		color: #666666;
 		white-space: nowrap;
 	}
@@ -1670,12 +1907,12 @@
 
 	.ov-period-cal {
 		flex-shrink: 0;
-		width: 64rpx;
-		height: 64rpx;
-		margin-left: 16rpx;
-		border-radius: 12rpx;
+		width: min(8.5333vw, 38.40px);
+		height: min(8.5333vw, 38.40px);
+		margin-left: min(2.1333vw, 9.60px);
+		border-radius: min(1.6000vw, 7.20px);
 		background-color: #ffffff;
-		border: 1rpx solid #eeeeee;
+		border: min(0.1333vw, 0.60px) solid #eeeeee;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1687,10 +1924,10 @@
 	}
 
 	.ov-range-bar {
-		margin-top: 18rpx;
+		margin-top: min(2.4000vw, 10.80px);
 		margin-bottom: 0;
-		padding: 16rpx 18rpx;
-		border-radius: 12rpx;
+		padding: min(2.1333vw, 9.60px) min(2.4000vw, 10.80px);
+		border-radius: min(1.6000vw, 7.20px);
 		background-color: #eef3fc;
 		display: flex;
 		flex-direction: row;
@@ -1702,28 +1939,28 @@
 			display: flex;
 			flex-direction: row;
 			align-items: center;
-			margin-right: 16rpx;
+			margin-right: min(2.1333vw, 9.60px);
 		}
 
 		.ov-range-label {
-			margin-left: 8rpx;
-			font-size: 24rpx;
+			margin-left: min(1.0667vw, 4.80px);
+			font-size: clamp(11px, 3.2000vw, 14.40px);
 			color: #2b59c3;
-			line-height: 34rpx;
+			line-height: min(4.5333vw, 20.40px);
 		}
 
 		.ov-range-value {
-			margin-left: 12rpx;
-			font-size: 26rpx;
+			margin-left: min(1.6000vw, 7.20px);
+			font-size: clamp(11px, 3.4667vw, 15.60px);
 			font-weight: 600;
 			color: #333333;
-			line-height: 36rpx;
+			line-height: min(4.8000vw, 21.60px);
 		}
 
 		.ov-range-edit {
-			font-size: 24rpx;
+			font-size: clamp(11px, 3.2000vw, 14.40px);
 			color: #2b59c3;
-			line-height: 34rpx;
+			line-height: min(4.5333vw, 20.40px);
 		}
 	}
 
@@ -1733,12 +1970,12 @@
 		flex-direction: row;
 		align-items: center;
 		justify-content: flex-end;
-		gap: 14rpx;
+		gap: min(1.8667vw, 8.40px);
 	}
 
 	.ov-filter-label {
 		margin-right: auto;
-		font-size: 24rpx;
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		font-weight: 600;
 		color: #596174;
 	}
@@ -1748,11 +1985,11 @@
 	}
 
 	.ov-sort-trigger {
-		height: 58rpx;
-		padding: 0 18rpx;
-		border-radius: 14rpx;
+		height: min(7.7333vw, 34.80px);
+		padding: 0 min(2.4000vw, 10.80px);
+		border-radius: min(1.8667vw, 8.40px);
 		background-color: #f5f6fa;
-		border: 1rpx solid #e7e9f0;
+		border: min(0.1333vw, 0.60px) solid #e7e9f0;
 		display: flex;
 		flex-direction: row;
 		align-items: center;
@@ -1760,11 +1997,11 @@
 	}
 
 	.ov-sort-text {
-		margin-right: 8rpx;
-		font-size: 23rpx;
+		margin-right: min(1.0667vw, 4.80px);
+		font-size: clamp(11px, 3.0667vw, 13.80px);
 		font-weight: 600;
 		color: #4f5668;
-		line-height: 32rpx;
+		line-height: min(4.2667vw, 19.20px);
 	}
 
 	.ov-metric-label-row {
@@ -1774,7 +2011,7 @@
 	}
 
 	.ov-section-head {
-		margin: 8rpx 0 16rpx;
+		margin: min(1.0667vw, 4.80px) 0 min(2.1333vw, 9.60px);
 		display: flex;
 		flex-direction: row;
 		align-items: center;
@@ -1782,15 +2019,45 @@
 	}
 
 	.ov-section-title {
-		font-size: 30rpx;
+		font-size: clamp(11px, 4.0000vw, 18.00px);
 		font-weight: 700;
 		color: #333333;
-		line-height: 44rpx;
+		line-height: min(5.8667vw, 26.40px);
 	}
 
 	.ov-section-meta {
-		font-size: 22rpx;
+		font-size: clamp(11px, 2.9333vw, 13.20px);
 		color: #999999;
+	}
+
+	.ov-section-actions {
+		min-width: 0;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+		gap: min(1.8667vw, 8.40px);
+	}
+
+	.ov-export-btn {
+		flex-shrink: 0;
+		width: min(7.7333vw, 34.80px);
+		height: min(7.7333vw, 34.80px);
+		border-radius: min(1.8667vw, 8.40px);
+		border: min(0.1333vw, 0.60px) solid #dce4f6;
+		background-color: #eef3fc;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		&:active {
+			background-color: #e3ebfb;
+		}
+
+		&--disabled {
+			border-color: #e7e9ed;
+			background-color: #f2f3f5;
+		}
 	}
 
 	.ov-section-link-row {
@@ -1800,43 +2067,43 @@
 	}
 
 	.ov-section-link {
-		font-size: 24rpx;
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		color: #999999;
 	}
 
 	.ov-emp-card {
-		padding: 22rpx 0;
-		border-radius: 16rpx;
+		padding: min(2.9333vw, 13.20px) 0;
+		border-radius: min(2.1333vw, 9.60px);
 		background-color: #ffffff;
-		border: 1rpx solid #edf0f5;
+		border: min(0.1333vw, 0.60px) solid #edf0f5;
 		box-shadow: none;
-		margin-bottom: 16rpx;
+		margin-bottom: min(2.1333vw, 9.60px);
 
 		.ov-emp-top {
 			display: flex;
 			flex-direction: row;
 			align-items: center;
-			padding: 0 24rpx 24rpx;
+			padding: 0 min(3.2000vw, 14.40px) min(3.2000vw, 14.40px);
 		}
 
 		.ov-emp-divider {
-			height: 1rpx;
+			height: min(0.1333vw, 0.60px);
 			background-color: #f0f0f0;
 		}
 
 		.ov-emp-avatar {
-			width: 72rpx;
-			height: 72rpx;
-			border-radius: 36rpx;
+			width: min(9.6000vw, 43.20px);
+			height: min(9.6000vw, 43.20px);
+			border-radius: min(4.8000vw, 21.60px);
 			background-color: #eef3fc;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			margin-right: 16rpx;
+			margin-right: min(2.1333vw, 9.60px);
 		}
 
 		.ov-emp-avatar-text {
-			font-size: 28rpx;
+			font-size: clamp(11px, 3.7333vw, 16.80px);
 			color: #2b59c3;
 			font-weight: 600;
 		}
@@ -1848,7 +2115,7 @@
 		}
 
 		.ov-emp-name {
-			font-size: 30rpx;
+			font-size: clamp(11px, 4.0000vw, 18.00px);
 			font-weight: 600;
 			color: #333333;
 		}
@@ -1861,12 +2128,12 @@
 		}
 
 		.ov-emp-badge {
-			margin-left: 8rpx;
-			padding: 3rpx 9rpx;
-			border-radius: 6rpx;
-			font-size: 19rpx;
+			margin-left: min(1.0667vw, 4.80px);
+			padding: min(0.4000vw, 1.80px) min(1.2000vw, 5.40px);
+			border-radius: min(0.8000vw, 3.60px);
+			font-size: clamp(11px, 2.5333vw, 11.40px);
 			font-weight: 600;
-			line-height: 26rpx;
+			line-height: min(3.4667vw, 15.60px);
 
 			&--status {
 				color: #1b9850;
@@ -1885,8 +2152,8 @@
 		}
 
 		.ov-emp-id {
-			margin-top: 4rpx;
-			font-size: 22rpx;
+			margin-top: min(0.5333vw, 2.40px);
+			font-size: clamp(11px, 2.9333vw, 13.20px);
 			color: #999999;
 		}
 
@@ -1897,14 +2164,14 @@
 		}
 
 		.ov-emp-amount {
-			font-size: 36rpx;
+			font-size: clamp(11px, 4.8000vw, 21.60px);
 			font-weight: 700;
 			color: #2b59c3;
 		}
 
 		.ov-emp-amount-label {
-			margin-top: 4rpx;
-			font-size: 22rpx;
+			margin-top: min(0.5333vw, 2.40px);
+			font-size: clamp(11px, 2.9333vw, 13.20px);
 			color: #999999;
 		}
 
@@ -1912,12 +2179,12 @@
 			display: flex;
 			flex-direction: row;
 			flex-wrap: wrap;
-			padding: 24rpx 24rpx 0;
+			padding: min(3.2000vw, 14.40px) min(3.2000vw, 14.40px) 0;
 		}
 
 		.ov-emp-cell {
 			width: 50%;
-			padding: 12rpx 0;
+			padding: min(1.6000vw, 7.20px) 0;
 			display: flex;
 			flex-direction: row;
 			align-items: center;
@@ -1929,30 +2196,30 @@
 
 			&--keyword {
 				align-items: flex-start;
-				padding-right: 12rpx;
+				padding-right: min(1.6000vw, 7.20px);
 			}
 
 			&--date {
 				align-items: flex-start;
-				padding-left: 12rpx;
+				padding-left: min(1.6000vw, 7.20px);
 			}
 		}
 
 		.ov-emp-cell-label {
 			flex-shrink: 0;
-			margin-right: 8rpx;
-			font-size: 22rpx;
+			margin-right: min(1.0667vw, 4.80px);
+			font-size: clamp(11px, 2.9333vw, 13.20px);
 			color: #999999;
-			line-height: 34rpx;
+			line-height: min(4.5333vw, 20.40px);
 		}
 
 		.ov-emp-cell-value {
 			flex: 1;
 			min-width: 0;
-			font-size: 26rpx;
+			font-size: clamp(11px, 3.4667vw, 15.60px);
 			color: #333333;
 			font-weight: 600;
-			line-height: 34rpx;
+			line-height: min(4.5333vw, 20.40px);
 
 			&--blue {
 				color: #2b59c3;
@@ -1965,29 +2232,326 @@
 	}
 </style>
 
+<style lang="scss" scoped>
+	.ov-page {
+		background-color: #f4f5f7;
+	}
+
+	.ov-header {
+		background: linear-gradient(135deg, #1a1738 0%, #25214b 100%);
+		border-bottom-width: 0;
+	}
+
+	.ov-hero {
+		padding: min(1.6000vw, 7.20px) min(4.0000vw, 18.00px) min(9.6000vw, 43.20px);
+		align-items: center;
+
+		.ov-hero-title {
+			font-size: clamp(11px, 5.0667vw, 22.80px);
+			line-height: min(6.9333vw, 31.20px);
+			color: #ffffff;
+		}
+
+		.ov-hero-notice-wrap,
+		.ov-hero-notice {
+			width: min(8.5333vw, 38.40px);
+			height: min(8.5333vw, 38.40px);
+		}
+
+		.ov-hero-notice {
+			border-radius: min(4.2667vw, 19.20px);
+			background-color: rgba(255, 255, 255, 0.14);
+			border-color: rgba(255, 255, 255, 0.08);
+		}
+	}
+
+	.ov-card {
+		top: calc(-1 * min(5.8667vw, 26.40px));
+		margin: 0 min(4.0000vw, 18.00px) calc(-1 * min(3.7333vw, 16.80px));
+		border-width: 0;
+		border-radius: min(2.9333vw, 13.20px);
+		box-shadow: 0 min(1.0667vw, 4.80px) min(3.7333vw, 16.80px) rgba(31, 35, 48, 0.08);
+
+		.ov-card-head {
+			padding: min(2.9333vw, 13.20px) min(3.2000vw, 14.40px) min(2.4000vw, 10.80px);
+		}
+
+		.ov-card-content {
+			padding: min(1.6000vw, 7.20px) min(3.2000vw, 14.40px) 0;
+		}
+	}
+
+	.ov-card-title-row,
+	.ov-calendar-link,
+	.ov-card-shortcuts,
+	.ov-card-shortcut {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+	}
+
+	.ov-card-title-row {
+		gap: min(1.0667vw, 4.80px);
+	}
+
+	.ov-calendar-link-text {
+		font-size: clamp(11px, 3.2000vw, 14.40px);
+		font-weight: 600;
+		color: #2b59c3;
+	}
+
+	.ov-summary-grid {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding: min(0.2667vw, 1.20px) 0 min(1.6000vw, 7.20px);
+	}
+
+	.ov-summary-item {
+		width: 50%;
+		min-height: min(6.1333vw, 27.60px);
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		box-sizing: border-box;
+
+		&--full {
+			width: 100%;
+		}
+	}
+
+	.ov-summary-label {
+		font-size: clamp(11px, 3.0667vw, 13.80px);
+		color: #858b98;
+		line-height: min(4.5333vw, 20.40px);
+	}
+
+	.ov-summary-value {
+		font-size: clamp(11px, 3.2000vw, 14.40px);
+		font-weight: 500;
+		color: #252936;
+		line-height: min(4.5333vw, 20.40px);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.ov-detail-head {
+		margin: 0 calc(-1 * min(3.2000vw, 14.40px));
+		padding: 0 min(3.2000vw, 14.40px);
+		min-height: min(9.6000vw, 43.20px);
+		border-top: min(0.1333vw, 0.60px) solid #eceef2;
+	}
+
+	.ov-detail-hint {
+		display: none;
+	}
+
+	.ov-detail-toggle {
+		padding: min(1.0667vw, 4.80px) 0;
+		background-color: transparent;
+	}
+
+	.ov-card-shortcuts {
+		margin: 0 calc(-1 * min(3.2000vw, 14.40px));
+		padding: 0 min(3.2000vw, 14.40px);
+		min-height: min(8.8000vw, 39.60px);
+		justify-content: flex-end;
+		gap: min(3.7333vw, 16.80px);
+		border-top: min(0.1333vw, 0.60px) solid #f0f1f4;
+	}
+
+	.ov-card-shortcut {
+		gap: min(0.8000vw, 3.60px);
+	}
+
+	.ov-card-shortcut-text {
+		font-size: clamp(11px, 3.0667vw, 13.80px);
+		font-weight: 600;
+		color: #2b59c3;
+	}
+
+	.ov-body {
+		padding: 0 min(4.0000vw, 18.00px) min(2.6667vw, 12.00px);
+		background-color: #f4f5f7;
+	}
+
+	.ov-overview-filter {
+		margin-bottom: 0;
+		padding: min(2.6667vw, 12.00px) min(2.6667vw, 12.00px) min(1.3333vw, 6.00px);
+		border-width: 0;
+		border-radius: min(2.6667vw, 12.00px) min(2.6667vw, 12.00px) 0 0;
+		box-shadow: none;
+	}
+
+	.ov-filter-panel {
+		margin-bottom: min(3.7333vw, 16.80px);
+		padding: min(1.3333vw, 6.00px) min(2.6667vw, 12.00px) min(2.6667vw, 12.00px);
+		border-width: 0;
+		border-radius: 0 0 min(2.6667vw, 12.00px) min(2.6667vw, 12.00px);
+	}
+
+	.ov-period-row {
+		height: min(7.4667vw, 33.60px);
+		background-color: #f0f1f3;
+	}
+
+	.ov-period-item {
+		padding: min(1.0667vw, 4.80px) 0;
+
+		&--active {
+			background-color: #ffffff;
+			box-shadow: 0 min(0.2667vw, 1.20px) min(0.8000vw, 3.60px) rgba(22, 27, 40, 0.08);
+		}
+	}
+
+	.ov-period-item--active .ov-period-text {
+		color: #333743;
+	}
+
+	.ov-period-cal {
+		width: min(7.7333vw, 34.80px);
+		height: min(7.4667vw, 33.60px);
+		margin-left: min(1.3333vw, 6.00px);
+		border-width: 0;
+		background-color: #f0f1f3;
+	}
+
+	.ov-filter-label {
+		display: none;
+	}
+
+	.ov-sort-row {
+		gap: min(1.3333vw, 6.00px);
+	}
+
+	.ov-sort-picker {
+		flex: 1;
+	}
+
+	.ov-sort-trigger {
+		height: min(7.7333vw, 34.80px);
+		padding: 0 min(1.3333vw, 6.00px);
+		border-width: 0;
+		border-radius: min(1.6000vw, 7.20px);
+		background-color: #f0f1f3;
+	}
+
+	.ov-sort-text {
+		max-width: min(17.3333vw, 78.00px);
+		margin-right: min(0.5333vw, 2.40px);
+		font-size: clamp(11px, 2.9333vw, 13.20px);
+		font-weight: 500;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	.ov-section-head {
+		margin: 0 0 min(1.8667vw, 8.40px);
+	}
+
+	.ov-section-meta {
+		display: none;
+	}
+
+	.ov-export-btn {
+		width: min(6.9333vw, 31.20px);
+		height: min(6.9333vw, 31.20px);
+		border-width: 0;
+		background-color: transparent;
+
+		&--disabled {
+			background-color: transparent;
+		}
+	}
+
+	.ov-emp-card {
+		padding: min(2.4000vw, 10.80px) 0 min(1.8667vw, 8.40px);
+		border-width: 0;
+		border-radius: min(2.6667vw, 12.00px);
+
+		.ov-emp-top {
+			padding: 0 min(3.2000vw, 14.40px) min(2.1333vw, 9.60px);
+		}
+
+		.ov-emp-avatar {
+			width: min(10.1333vw, 45.60px);
+			height: min(10.1333vw, 45.60px);
+			border-radius: min(5.0667vw, 22.80px);
+			background-color: #2d62d0;
+		}
+
+		.ov-emp-avatar-text {
+			color: #ffffff;
+		}
+
+		.ov-emp-name {
+			font-size: clamp(11px, 3.8667vw, 17.40px);
+		}
+
+		.ov-emp-main {
+			position: relative;
+			padding-top: min(2.1333vw, 9.60px);
+		}
+
+		.ov-emp-settlement-status {
+			position: absolute;
+			top: calc(-1 * min(2.4000vw, 10.80px));
+			right: calc(-1 * min(3.2000vw, 14.40px));
+			padding: min(0.2667vw, 1.20px) min(1.3333vw, 6.00px);
+			border-radius: 0 min(2.1333vw, 9.60px) 0 min(1.0667vw, 4.80px);
+			font-size: clamp(11px, 2.4000vw, 11.00px);
+			font-weight: 600;
+			color: #f28a23;
+			background-color: #fff3e6;
+			line-height: min(3.4667vw, 15.60px);
+
+			&--done {
+				color: #16a05d;
+				background-color: #eaf8f0;
+			}
+		}
+
+		.ov-emp-amount {
+			font-size: clamp(11px, 4.5333vw, 20.40px);
+		}
+
+		.ov-emp-grid {
+			padding: min(1.6000vw, 7.20px) min(3.2000vw, 14.40px) 0;
+		}
+
+		.ov-emp-cell {
+			padding: min(0.8000vw, 3.60px) 0;
+		}
+
+		.ov-emp-cell-value {
+			font-size: clamp(11px, 3.2000vw, 14.40px);
+		}
+	}
+</style>
+
 <style lang="scss">
 .ov-range-popup-wrap {
-	border-top-left-radius: 24rpx;
-	border-top-right-radius: 24rpx;
+	border-top-left-radius: min(3.2000vw, 14.40px);
+	border-top-right-radius: min(3.2000vw, 14.40px);
 	overflow: hidden;
 }
 
 .ov-range-popup-inner {
-	border-top-left-radius: 24rpx;
-	border-top-right-radius: 24rpx;
+	border-top-left-radius: min(3.2000vw, 14.40px);
+	border-top-right-radius: min(3.2000vw, 14.40px);
 	overflow: hidden;
 	background-color: #ffffff;
 }
 
 .ov-range-popup {
-	padding: 0 30rpx 40rpx;
+	padding: 0 min(4.0000vw, 18.00px) min(5.3333vw, 24.00px);
 	background-color: #ffffff;
-	border-top-left-radius: 24rpx;
-	border-top-right-radius: 24rpx;
+	border-top-left-radius: min(3.2000vw, 14.40px);
+	border-top-right-radius: min(3.2000vw, 14.40px);
 	overflow: hidden;
 
 	.ov-range-popup-head {
-		height: 96rpx;
+		height: min(12.8000vw, 57.60px);
 		display: flex;
 		flex-direction: row;
 		align-items: center;
@@ -1995,41 +2559,41 @@
 	}
 
 	.ov-range-popup-cancel {
-		font-size: 28rpx;
+		font-size: clamp(11px, 3.7333vw, 16.80px);
 		color: #999999;
-		line-height: 40rpx;
+		line-height: min(5.3333vw, 24.00px);
 	}
 
 	.ov-range-popup-title {
-		font-size: 32rpx;
+		font-size: clamp(11px, 4.2667vw, 19.20px);
 		font-weight: 600;
 		color: #333333;
-		line-height: 44rpx;
+		line-height: min(5.8667vw, 26.40px);
 	}
 
 	.ov-range-popup-apply {
-		font-size: 28rpx;
+		font-size: clamp(11px, 3.7333vw, 16.80px);
 		font-weight: 600;
 		color: #2b59c3;
-		line-height: 40rpx;
+		line-height: min(5.3333vw, 24.00px);
 	}
 
 	.ov-range-popup-section {
-		margin-top: 12rpx;
-		font-size: 24rpx;
+		margin-top: min(1.6000vw, 7.20px);
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		color: #999999;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-range-popup-quick {
-		margin-top: 16rpx;
+		margin-top: min(2.1333vw, 9.60px);
 	}
 
 	.ov-range-popup-quick-row {
 		display: flex;
 		flex-direction: row;
 		align-items: center;
-		margin-bottom: 16rpx;
+		margin-bottom: min(2.1333vw, 9.60px);
 
 		&:last-child {
 			margin-bottom: 0;
@@ -2038,10 +2602,10 @@
 
 	.ov-range-popup-quick-item {
 		flex-shrink: 0;
-		width: calc((100% - 32rpx) / 3);
-		margin-right: 16rpx;
-		padding: 20rpx 0;
-		border-radius: 16rpx;
+		width: calc((100% - min(4.2667vw, 19.20px)) / 3);
+		margin-right: min(2.1333vw, 9.60px);
+		padding: min(2.6667vw, 12.00px) 0;
+		border-radius: min(2.1333vw, 9.60px);
 		background-color: #f3f4f6;
 		display: flex;
 		align-items: center;
@@ -2057,9 +2621,9 @@
 	}
 
 	.ov-range-popup-quick-text {
-		font-size: 26rpx;
+		font-size: clamp(11px, 3.4667vw, 15.60px);
 		color: #333333;
-		line-height: 36rpx;
+		line-height: min(4.8000vw, 21.60px);
 	}
 
 	.ov-range-popup-quick-item--active .ov-range-popup-quick-text {
@@ -2068,9 +2632,9 @@
 	}
 
 	.ov-range-popup-custom {
-		margin-top: 16rpx;
-		padding: 24rpx 20rpx;
-		border-radius: 16rpx;
+		margin-top: min(2.1333vw, 9.60px);
+		padding: min(3.2000vw, 14.40px) min(2.6667vw, 12.00px);
+		border-radius: min(2.1333vw, 9.60px);
 		background-color: #f3f4f6;
 		display: flex;
 		flex-direction: row;
@@ -2083,37 +2647,37 @@
 		flex-direction: row;
 		align-items: center;
 		min-width: 0;
-		padding: 4rpx 0;
+		padding: min(0.5333vw, 2.40px) 0;
 	}
 
 	.ov-range-popup-date-label {
 		flex-shrink: 0;
-		margin-right: 12rpx;
-		font-size: 24rpx;
+		margin-right: min(1.6000vw, 7.20px);
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		color: #999999;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-range-popup-date-value {
 		flex: 1;
-		font-size: 28rpx;
+		font-size: clamp(11px, 3.7333vw, 16.80px);
 		font-weight: 600;
 		color: #333333;
-		line-height: 40rpx;
+		line-height: min(5.3333vw, 24.00px);
 	}
 
 	.ov-range-popup-arrow {
 		flex-shrink: 0;
-		margin: 0 12rpx;
-		font-size: 28rpx;
+		margin: 0 min(1.6000vw, 7.20px);
+		font-size: clamp(11px, 3.7333vw, 16.80px);
 		color: #cccccc;
-		line-height: 40rpx;
+		line-height: min(5.3333vw, 24.00px);
 	}
 
 	.ov-range-popup-summary {
-		margin-top: 20rpx;
-		padding: 18rpx 20rpx;
-		border-radius: 12rpx;
+		margin-top: min(2.6667vw, 12.00px);
+		padding: min(2.4000vw, 10.80px) min(2.6667vw, 12.00px);
+		border-radius: min(1.6000vw, 7.20px);
 		background-color: #e8edf5;
 		display: flex;
 		flex-direction: row;
@@ -2121,17 +2685,17 @@
 	}
 
 	.ov-range-popup-summary-text {
-		margin-left: 8rpx;
-		font-size: 24rpx;
+		margin-left: min(1.0667vw, 4.80px);
+		font-size: clamp(11px, 3.2000vw, 14.40px);
 		font-weight: 500;
 		color: #1a2744;
-		line-height: 34rpx;
+		line-height: min(4.5333vw, 20.40px);
 	}
 
 	.ov-range-popup-btn {
-		margin-top: 28rpx;
-		height: 88rpx;
-		border-radius: 44rpx;
+		margin-top: min(3.7333vw, 16.80px);
+		height: min(11.7333vw, 52.80px);
+		border-radius: min(5.8667vw, 26.40px);
 		background-color: #2b59c3;
 		display: flex;
 		align-items: center;
@@ -2139,10 +2703,197 @@
 	}
 
 	.ov-range-popup-btn-text {
-		font-size: 30rpx;
+		font-size: clamp(11px, 4.0000vw, 18.00px);
 		font-weight: 600;
 		color: #ffffff;
-		line-height: 42rpx;
+		line-height: min(5.6000vw, 25.20px);
 	}
+}
+</style>
+
+<style lang="scss" scoped>
+.wb-header { background: #fff; padding: 0 16px 16px; box-sizing: border-box; }
+.wb-nav { display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; height: 48px; }
+.wb-nav-title { font-size: 19px; font-weight: 700; color: #252b3b; }
+.wb-notice { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: 0; flex-shrink: 0; }
+.wb-unread { position: absolute; top: 1px; right: 1px; min-width: 14px; padding: 0 3px; border: 2px solid #fff; border-radius: 12px; background: #ed6863; color: #fff; font-size: 10px; line-height: 14px; text-align: center; }
+.wb-profile { display: flex; flex-direction: row; align-items: center; gap: 12px; padding-top: 10px; }
+.wb-avatar { width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; }
+.wb-avatar-placeholder { background: #edf1ff; color: #5375ed; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.wb-profile-copy { flex: 1; min-width: 0; }
+.wb-name-row { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.wb-role { flex-shrink: 0; background: #fff0e9; color: #d77c58; padding: 2px 4px; border-radius: 3px; font-size: 10px; line-height: 14px; }
+.wb-name { font-size: 15px; line-height: 22px; font-weight: 600; color: #303649; }
+.wb-name-row .wb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-intro { display: block; font-size: 12px; line-height: 18px; color: #89909e; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-edit, .wb-link { font-size: 12px; line-height: 20px; color: #5375ed; }
+.wb-edit { display: block; margin-top: 2px; }
+.wb-invite { width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: #f1f4ff; display: flex; align-items: center; justify-content: center; }
+.ov-card, .wb-activity, .ov-body { width: auto; margin: 12px 16px 0; border: 0; border-radius: 12px; box-sizing: border-box; box-shadow: none; }
+.ov-card { top: 0; }
+.ov-card .ov-card-head { padding: 12px 14px; min-height: 44px; box-sizing: border-box; }
+.ov-card .ov-card-content { padding: 8px 14px 0; }
+.ov-card-title, .ov-section-title { font-size: 15px; line-height: 22px; font-weight: 700; }
+.ov-card-title-row { gap: 6px; }
+.ov-card-title-row:before, .ov-section-title:before { content: ''; display: inline-block; width: 3px; height: 13px; border-radius: 3px; background: #6481ff; margin-right: 3px; }
+.wb-summary-caption { font-size: 10px; line-height: 16px; color: #969dac; background: #f4f6f9; border-radius: 3px; padding: 0 4px; }
+.ov-calendar-link-text { font-size: 12px; font-weight: 500; }
+.ov-summary-grid { padding: 0 0 8px; }
+.ov-summary-item { width: 33.333%; min-width: 0; min-height: 56px; padding: 7px 8px 7px 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; box-sizing: border-box; }
+.ov-summary-label { font-size: 11px; line-height: 17px; color: #89909e; }
+.ov-summary-value { font-size: 16px; line-height: 21px; font-weight: 700; color: #5375ed; overflow-wrap: anywhere; }
+.ov-detail-head { margin: 0 -14px; padding: 0 14px; min-height: 40px; }
+.ov-detail-title { font-size: 13px; line-height: 20px; }
+.ov-detail-toggle-text { font-size: 12px; }
+.ov-stat-table { margin: 0 0 12px; }
+.wb-activity { padding: 12px 14px; background: #f0f3ff; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.wb-activity-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.wb-activity-label { display: block; width: auto; flex-shrink: 0; white-space: nowrap; font-size: 13px; line-height: 20px; font-weight: 600; color: #424d68; }
+.wb-activity-more { display: flex; flex-direction: row; align-items: center; gap: 2px; font-size: 11px; line-height: 18px; color: #8b94a8; }
+.wb-message-row { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+.wb-message-icon { width: 34px; height: 34px; border-radius: 10px; background: #e4eaff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.wb-activity-copy { flex: 1; min-width: 0; }
+.wb-activity-title { display: block; font-size: 13px; line-height: 20px; color: #535d73; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-muted { font-size: 11px; line-height: 17px; color: #929aaa; }
+.ov-body { padding: 12px 14px 4px; background: #fff; margin-bottom: 16px; }
+.ov-section-head { min-height: 28px; margin: 0; }
+.ov-section-actions { gap: 12px; }
+.ov-export-btn { width: auto; min-width: 28px; height: 28px; background: transparent; border: 0; }
+.ov-export-btn--disabled .wb-link { color: #b3bac6; }
+.wb-month { margin: 10px 0 12px; padding: 12px; border-radius: 10px; background: #f7f8fc; }
+.wb-month-head { display: flex; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; line-height: 18px; color: #535d73; }
+.wb-month-grid { display: flex; flex-direction: row; gap: 8px; margin-top: 12px; }
+.wb-month-grid > view { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wb-number { font-size: 17px; line-height: 23px; font-weight: 700; color: #5375ed; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ov-overview-filter { padding: 0; margin: 0; }
+.ov-period-row { height: 34px; padding: 3px; border-radius: 8px; }
+.ov-period-item { padding: 5px 0; border-radius: 6px; }
+.ov-period-text { font-size: 12px; line-height: 18px; }
+.ov-period-cal { width: 34px; height: 34px; margin-left: 8px; border-radius: 8px; }
+.ov-period-cal--active { background: #5375ed; }
+.ov-filter-panel { padding: 8px 0 10px; margin: 0; }
+.ov-sort-row { gap: 8px; }
+.ov-sort-trigger { height: 32px; padding: 0 6px; border-radius: 8px; }
+.ov-sort-text { font-size: 11px; line-height: 18px; max-width: 100%; }
+.wb-list-caption { display: flex; flex-direction: row; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; line-height: 18px; color: #838c9c; padding: 0 0 8px; }
+.wb-scope { display: block; color: #939baa; font-size: 10px; line-height: 16px; padding-bottom: 8px; }
+.wb-error { display: block; padding: 10px 12px; color: #bd653f; background: #fff6ed; font-size: 12px; line-height: 18px; border-radius: 8px; }
+.ov-emp-card { padding: 12px 0; margin: 0; border-top: 1px solid #edf0f5; border-radius: 0; }
+.ov-emp-card .ov-emp-top { padding: 0 0 10px; }
+.ov-emp-card .ov-emp-avatar { width: 36px; height: 36px; margin-right: 8px; }
+.ov-emp-card .ov-emp-info { min-width: 0; padding-right: 8px; }
+.ov-emp-card .ov-emp-name { max-width: 140px; font-size: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ov-emp-card .ov-emp-main { flex-shrink: 0; padding: 0; }
+.ov-emp-card .ov-emp-settlement-status { position: static; border-radius: 4px; font-size: 10px; line-height: 16px; padding: 0 4px; }
+.ov-emp-card .ov-emp-amount { font-size: 20px; line-height: 26px; }
+.ov-emp-card .ov-emp-grid { padding: 8px 0 0; }
+.ov-emp-card .ov-emp-cell { align-items: flex-start; padding: 4px 0; }
+.ov-emp-card .ov-emp-cell-label { font-size: 11px; line-height: 18px; }
+.ov-emp-card .ov-emp-cell-value { font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+.ov-list-state { min-height: 120px; gap: 12px; padding: 20px 0; }
+.ov-list-footer { padding: 8px 0 12px; }
+.wb-invite-popup { width: 288px; max-width: 90vw; box-sizing: border-box; padding: 28px 20px 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; background: #fff; }
+.wb-copy-button { width: 100%; padding: 12px 0; background: #5375ed; color: #fff; text-align: center; font-size: 14px; line-height: 20px; border-radius: 10px; }
+@media (max-width: 360px) {
+    .ov-card, .wb-activity, .ov-body { margin-left: 12px; margin-right: 12px; }
+    .wb-header { padding-left: 12px; padding-right: 12px; }
+    .wb-profile { gap: 8px; }
+    .wb-avatar { width: 40px; height: 40px; }
+    .wb-invite { width: 36px; height: 36px; }
+    .ov-emp-card .ov-emp-cell { flex-direction: column; gap: 2px; }
+    .ov-emp-card .ov-emp-name { max-width: 100px; }
+    .wb-number { font-size: 15px; }
+}
+@media (min-width: 600px) {
+    .wb-header { padding-left: 24px; padding-right: 24px; }
+    .ov-card, .wb-activity, .ov-body { width: calc(100% - 48px); max-width: 960px; margin-left: auto; margin-right: auto; }
+    .wb-nav, .wb-profile { width: 100%; max-width: 960px; margin-left: auto; margin-right: auto; }
+    .ov-card .ov-card-head { padding: 14px 18px; }
+    .ov-card .ov-card-content { padding: 8px 18px 0; }
+    .ov-detail-head { margin: 0 -18px; padding: 0 18px; }
+    .wb-activity, .ov-body { padding-left: 18px; padding-right: 18px; }
+    .ov-summary-value { font-size: 20px; }
+    .ov-emp-card .ov-emp-name { max-width: 320px; }
+}
+
+.wb-activity-more > text { font-size: 11px; line-height: 18px; color: #8b94a8; }
+.wb-month-head > text { font-size: 12px; line-height: 18px; }
+.wb-month-head > .wb-muted { font-size: 11px; }
+.wb-list-caption > text { font-size: 11px; line-height: 18px; }
+.wb-unread { box-sizing: border-box; right: 2px; }
+
+.wb-month { padding: 14px; margin: 10px 0 14px; overflow: hidden; border: 1px solid #e4e9ff; background: linear-gradient(135deg, #f7f9ff 0%, #f2f5ff 100%); }
+.wb-month-head { align-items: flex-start; flex-wrap: nowrap; }
+.wb-month-head > view:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wb-month-title { font-size: 13px; line-height: 20px; font-weight: 600; color: #303b57; }
+.wb-month-tip { font-size: 10px; line-height: 16px; color: #8a94aa; }
+.wb-order-total { display: flex; flex-direction: row; align-items: baseline; gap: 3px; flex-shrink: 0; }
+.wb-order-total-value { font-size: 26px; line-height: 30px; font-weight: 700; color: #315fd4; font-variant-numeric: tabular-nums; }
+.wb-order-total-unit { font-size: 11px; color: #69748b; }
+.wb-revenue-total { display: flex; flex-direction: row; align-items: baseline; justify-content: space-between; margin-top: 14px; }
+.wb-revenue-label { font-size: 11px; line-height: 18px; color: #69748b; }
+.wb-revenue-value { font-size: 22px; line-height: 28px; font-weight: 700; color: #202a40; font-variant-numeric: tabular-nums; }
+.wb-revenue-currency { margin-right: 2px; font-size: 13px; color: #5375ed; }
+.wb-revenue-track { display: flex; flex-direction: row; width: 100%; height: 6px; margin-top: 10px; overflow: hidden; border-radius: 6px; background: #e4e8f2; }
+.wb-revenue-enterprise { min-width: 3px; height: 6px; background: #5375ed; }
+.wb-revenue-staff { min-width: 3px; height: 6px; background: #8b72e8; }
+.wb-month-more { display: flex; flex-direction: row; align-items: center; gap: 2px; }
+.wb-month-more > text { font-size: 11px; color: #929aaa; }
+.wb-month-grid { gap: 0; margin-top: 10px; }
+.wb-month-grid > view { padding: 0 10px; border-left: 1px solid #dfe5f4; box-sizing: border-box; gap: 4px; }
+.wb-month-grid > view:first-child { padding-left: 0; border-left: 0; }
+.wb-month-grid > view:last-child { padding-right: 0; }
+.wb-revenue-name { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 11px; line-height: 18px; color: #69748b; }
+.wb-revenue-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.wb-revenue-dot--enterprise { background: #5375ed; }
+.wb-revenue-dot--staff { background: #8b72e8; }
+.wb-number { font-size: 16px; line-height: 22px; color: #35415b; }
+.wb-currency { font-size: 11px; padding-right: 2px; }
+.wb-month-error { display: block; margin-top: 10px; font-size: 11px; line-height: 17px; color: #bd653f; }
+.ov-overview-filter { background: #fff; }
+.ov-period-row { height: 36px; background: #f2f4f8; }
+.ov-period-item { padding: 6px 0; }
+.ov-period-item--active .ov-period-text { color: #315acb; }
+.ov-period-cal { width: 60px; height: 36px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 4px; background: #f2f4f8; }
+.wb-date-label { font-size: 11px; color: #687182; }
+.ov-period-cal--active { background: #5375ed; }
+.ov-period-cal--active .wb-date-label { color: #fff; }
+.ov-filter-panel { padding: 8px 0 12px; }
+.ov-sort-row { display: flex; flex-direction: row; gap: 8px; }
+.ov-sort-picker { flex: 1; min-width: 0; }
+.ov-sort-trigger { height: 34px; background: #f8f9fb; border: 1px solid #edf0f5; padding: 0 6px; }
+.ov-sort-text { flex: 1; min-width: 0; text-align: center; }
+@media (max-width: 360px) {
+    .wb-month { padding: 12px; }
+    .wb-month-grid > view { padding: 0 6px; }
+    .wb-number { font-size: 16px; }
+    .ov-sort-row { gap: 6px; }
+}
+
+.wb-header { background: #f4f5f7; padding-bottom: 0; }
+.wb-profile { padding: 16px 12px; border-radius: 14px; background: linear-gradient(115deg, #e8edff 0%, #f0edfc 100%); border: 1px solid #e2e7f7; gap: 10px; }
+.wb-profile-actions { display: flex; flex-direction: row; align-items: center; gap: 6px; flex-shrink: 0; }
+.wb-edit-action, .wb-profile .wb-invite { width: 34px; height: 34px; margin: 0; border: 1px solid rgba(255,255,255,.9); border-radius: 9px; background: rgba(255,255,255,.75); display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.wb-edit-action > text { font-size: 11px; line-height: 18px; color: #5375ed; }
+.wb-profile .wb-avatar { width: 40px; height: 40px; }
+.wb-name-row { flex-wrap: wrap; gap: 3px 5px; }
+.wb-name-row .wb-name { max-width: 100%; font-size: 14px; }
+.wb-name-row .wb-role { font-size: 9px; line-height: 13px; }
+.wb-intro { font-size: 11px; line-height: 17px; margin-top: 4px; color: #7d869c; }
+.ov-period-bar { gap: 6px; }
+.ov-period-row { min-width: 0; flex: 1; }
+.ov-period-cal { width: 32px; height: 36px; margin-left: 0; flex-shrink: 0; }
+.wb-date-label { display: none; }
+.wb-inline-sort { flex: 0 0 72px; min-width: 0; }
+.wb-inline-sort .ov-sort-trigger { height: 36px; box-sizing: border-box; }
+.wb-inline-sort .ov-sort-text { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.ov-filter-panel .ov-sort-picker { flex: 1; }
+@media (max-width: 360px) {
+    .wb-profile { padding: 14px 10px; gap: 8px; }
+    .wb-profile .wb-avatar { width: 34px; height: 34px; }
+    .wb-profile-actions { gap: 4px; }
+    .wb-edit-action, .wb-profile .wb-invite { width: 30px; height: 32px; }
+    .wb-inline-sort { flex-basis: 66px; }
+    .ov-period-text { font-size: 11px; }
 }
 </style>

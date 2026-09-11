@@ -84,7 +84,8 @@ export function saveEnterpriseInviteConfig(params: SaveEnterpriseInviteConfigPar
 		method: "POST",
 		data: {
 			name: params.name,
-			preset_can_view_revenue: params.preset_can_view_revenue
+			preset_can_view_revenue: params.preset_can_view_revenue,
+			preset_commission_rate: params.preset_commission_rate
 		}
 	});
 }

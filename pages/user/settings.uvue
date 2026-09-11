@@ -1,199 +1,54 @@
 <template>
-	<cl-page :pt="{ className: 'st-page' }">
-		<view class="st-page">
-			<view v-if="pageLoading" class="st-loading-mask st-loading-mask--full">
-				<cl-loading :loading="true" :size="32" color="#2b59c3"></cl-loading>
-				<text class="st-loading-text">加载中...</text>
-			</view>
-			<view v-if="saving" class="st-loading-mask st-loading-mask--save">
-				<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
-				<text class="st-loading-text">保存中...</text>
-			</view>
-
-			<view class="st-header">
-				<view class="st-hero">
-					<view class="st-hero-tag">
-						<view class="st-hero-dot"></view>
-						<text class="st-hero-tag-text">白标 · 员工端品牌可自定义</text>
-					</view>
-					<text class="st-hero-title">{{ heroBrandName }} · 设置</text>
-					<text class="st-hero-sub">品牌名称 · logo · 企业资质</text>
-				</view>
-			</view>
-
-			<view class="st-body">
-					<text class="st-section-label">员工看到的样子 · 实时预览</text>
-					<view class="st-preview-card">
-						<view class="st-preview-phone">
-							<view class="st-preview-phone-inner">
-								<view class="st-preview-phone-bar">
-									<view class="st-preview-logo">
-										<image
-											v-if="logoDisplaySrc != ''"
-											class="st-preview-logo-img"
-											:src="logoDisplaySrc"
-											mode="aspectFill"
-										/>
-										<text v-else class="st-preview-logo-text">{{ logoText }}</text>
-									</view>
-									<text class="st-preview-app-name">{{ miniAppName }}</text>
-								</view>
-								<view class="st-preview-grid">
-									<view
-										class="st-preview-grid-item"
-										v-for="(item, index) in previewGrid"
-										:key="index"
-										:class="{ 'st-preview-grid-item--active': index == 0 }"
-									>
-										<text
-											class="st-preview-grid-text"
-											:class="{ 'st-preview-grid-text--active': index == 0 }"
-										>{{ item }}</text>
-									</view>
-								</view>
-							</view>
-						</view>
-						<view class="st-preview-copy">
-							<text class="st-preview-desc">
-								员工扫您的二维码进入小程序，看到的就是
-								<text class="st-preview-desc-strong">这个样子</text>
-							</text>
-							<text class="st-preview-tip">小程序内全程不出现「企业号」字样，纯白标。修改下方设置，预览同步更新。</text>
-						</view>
-					</view>
-
-					<text class="st-section-label">品牌定制</text>
-					<view class="st-card st-card--list">
-						<view class="st-brand-row">
-							<text class="st-brand-label">小程序名称</text>
-							<view class="st-brand-value">
-								<input
-									class="st-brand-input"
-									v-model="miniAppName"
-									maxlength="16"
-									placeholder="请输入"
-									placeholder-class="st-brand-input-placeholder"
-								/>
-								<text class="st-brand-count">{{ miniAppName.length }}/16</text>
-							</view>
-							<view class="st-row-divider"></view>
-						</view>
-
-						<view class="st-brand-row">
-							<text class="st-brand-label">品牌 Logo</text>
-							<view class="st-brand-logo">
-								<view class="st-logo-box">
-									<image
-										v-if="logoDisplaySrc != ''"
-										class="st-logo-image"
-										:src="logoDisplaySrc"
-										mode="aspectFill"
-									/>
-									<text v-else class="st-logo-text">{{ logoText }}</text>
-								</view>
-								<view class="st-change-btn" @tap="onChangeLogo">
-									<text class="st-change-btn-text">更换</text>
-								</view>
-							</view>
-							<view class="st-row-divider"></view>
-						</view>
-
-						<view class="st-brand-row st-brand-row--last">
-							<text class="st-brand-label">简介</text>
-							<input
-								class="st-brand-input st-brand-input--intro"
-								v-model="introText"
-								placeholder="请输入简介"
-								placeholder-class="st-brand-input-placeholder"
-							/>
-						</view>
-					</view>
-
-					<view class="st-section-head" v-if="false">
-						<text class="st-section-label st-section-label--inline">企业资质</text>
-						<view v-if="showVerifiedTag" class="st-verified-tag">
-							<text class="st-verified-tag-text">{{ certStatusText }}</text>
-						</view>
-					</view>
-					<view class="st-card st-card--list" v-if="false">
-						<view
-							class="st-info-item"
-							v-for="(item, index) in qualificationItems"
-							:key="index"
-						>
-							<text class="st-info-label">{{ item.label }}</text>
-							<view class="st-info-value-row">
-								<text class="st-info-value">{{ item.value }}</text>
-								<cl-icon
-									v-if="item.locked"
-									name="lock-line"
-									:size="14"
-									color="#cccccc"
-								></cl-icon>
-							</view>
-							<view v-if="index < qualificationItems.length - 1" class="st-row-divider"></view>
-						</view>
-					</view>
-
-					<text class="st-section-label">合规与协议</text>
-					<view class="st-card st-card--list">
-					<view
-						class="st-agreement-item"
-						v-for="(item, index) in agreementItems"
-						:key="'protocol-' + (item.id ?? item.protocol_id ?? index)"
-						@tap="onAgreementTap(item)"
-					>
-						<view class="st-agreement-copy">
-							<text class="st-agreement-title">{{ item.protocol_title || '' }}</text>
-						</view>
-							<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
-							<view v-if="index < agreementItems.length - 1" class="st-row-divider"></view>
-						</view>
-					</view>
-
-					<view
-						class="st-save-btn"
-						:class="{ 'st-save-btn--disabled': pageLoading || saving }"
-						@tap="onSave"
-					>
-						<text class="st-save-btn-text">{{ saving ? "保存中..." : "保存设置" }}</text>
-					</view>
-
-				<cl-safe-area type="bottom"></cl-safe-area>
-			</view>
-		</view>
-	</cl-page>
+    <cl-page :pt="{ className: 'st-page' }">
+        <view class="st-page">
+            <cl-safe-area type="top"></cl-safe-area>
+            <view class="st-nav"><text>企业信息</text></view>
+            <view class="st-content">
+                <view class="st-note">
+                    <text class="st-note-title">员工端展示说明</text>
+                    <text class="st-note-copy">员工扫码进入小程序后，将看到你设置的名称、Logo 和介绍。</text>
+                    <text class="st-note-copy">小程序内不展示「企业号」字样，使用自定义品牌。保存后员工端同步更新。</text>
+                </view>
+                <view class="st-form">
+                    <view class="st-field">
+                        <view class="st-label-row"><text class="st-label">企业号名称</text><text class="st-count">{{ miniAppName.length }}/16</text></view>
+                        <input class="st-input" v-model="miniAppName" :disabled="pageLoading || saving" maxlength="16" placeholder="填写企业号名称" placeholder-class="st-placeholder" aria-label="企业号名称" />
+                    </view>
+                    <view class="st-logo-row">
+                        <text class="st-label">企业 Logo</text>
+                        <view class="st-logo-actions">
+                            <view class="st-logo-box"><image v-if="logoDisplaySrc" class="st-logo-image" :src="logoDisplaySrc" mode="aspectFill" /><text v-else class="st-logo-text">{{ logoText }}</text></view>
+                            <view class="st-change-btn" role="button" aria-label="更换企业Logo" @tap="onChangeLogo"><text>{{ uploading ? '上传中' : '更换' }}</text></view>
+                        </view>
+                    </view>
+                    <view class="st-field st-field--last">
+                        <view class="st-label-row"><text class="st-label">介绍</text><text class="st-count">{{ introText.length }}/140</text></view>
+                        <textarea class="st-intro" v-model="introText" :disabled="pageLoading || saving" maxlength="140" :auto-height="false" placeholder="填写企业介绍" placeholder-class="st-placeholder" aria-label="企业介绍" />
+                    </view>
+                </view>
+                <view class="st-save-btn" :class="{ 'st-save-btn--disabled': pageLoading || saving || uploading }" role="button" @tap="onSave"><text>{{ saving ? '保存中' : '保存' }}</text></view>
+                <cl-safe-area type="bottom"></cl-safe-area>
+            </view>
+            <view v-if="pageLoading || saving" class="st-loading-mask"><cl-loading :loading="true" :size="28" color="#5375ed"></cl-loading><text>{{ saving ? '保存中' : '加载中' }}</text></view>
+        </view>
+    </cl-page>
 </template>
-
 <script lang="ts" setup>
 	import { ref, watch } from "vue";
 	import { getEnterpriseInfo, saveEnterpriseSettings } from "@/.cool/api/enterprise";
-	import { router } from "@/.cool";
 	import { normalizePickDisplayPath, toDisplayImageSrc, uploadImage } from "@/.cool/api/upload";
-	import type { EnterpriseInfo, EnterpriseProtocolItem, Response } from "@/.cool";
-
-	type QualificationItem = {
-		label: string;
-		value: string;
-		locked: boolean;
-	};
-
-	const qualificationItems = ref<QualificationItem[]>([]);
-	const agreementItems = ref<EnterpriseProtocolItem[]>([]);
+	import type { EnterpriseInfo, Response } from "@/.cool";
 
 	const miniAppName = ref<string>("");
 	const introText = ref<string>("");
 	const logoUrl = ref<string>("");
 	const logoDisplaySrc = ref<string>("");
 	const logoText = ref<string>("企");
-	const heroBrandName = ref<string>("企业");
-	const showVerifiedTag = ref(false);
-	const certStatusText = ref<string>("已认证");
 	const pageLoading = ref(false);
 	const saving = ref(false);
+    const uploading = ref(false);
 	const infoRequesting = ref(false);
 
-	const previewGrid = ["首页", "任务", "收益", "我的"];
 
 	function isApiSuccess(code: number | string | null | undefined): boolean {
 		return code == 1 || code == "1" || code == 200 || code == "200";
@@ -229,34 +84,6 @@
 		});
 	}
 
-	function buildQualificationItems(cert: UTSJSONObject | null): QualificationItem[] {
-		if (cert == null) {
-			return [];
-		}
-		const items: QualificationItem[] = [];
-		const entityName = cert["entity_name"] as string | null;
-		if (entityName != null && `${entityName}`.trim() != "") {
-			items.push({ label: "企业名称", value: `${entityName}`, locked: true });
-		}
-		const creditCode = cert["credit_code"] as string | null;
-		if (creditCode != null && `${creditCode}`.trim() != "") {
-			items.push({ label: "营业执照", value: `${creditCode}`, locked: true });
-		}
-		const legalRep = cert["legal_rep_name"] as string | null;
-		if (legalRep != null && `${legalRep}`.trim() != "") {
-			items.push({ label: "法人", value: `${legalRep}`, locked: false });
-		}
-		const phone = cert["contact_phone"] as string | null;
-		if (phone != null && `${phone}`.trim() != "") {
-			items.push({ label: "联系电话", value: `${phone}`, locked: false });
-		}
-		const code = cert["enterprise_code"] as string | null;
-		if (code != null && `${code}`.trim() != "") {
-			items.push({ label: "邀请码", value: `${code}`, locked: true });
-		}
-		return items;
-	}
-
 	function parseEnterpriseInfo(res: any | null): EnterpriseInfo | null {
 		if (res == null) {
 			return null;
@@ -278,24 +105,6 @@
 		logoText.value = getLogoText(name);
 		refreshLogoDisplay(logo);
 
-		const cert = info.cert ?? null;
-		const certObj = cert != null ? (cert as UTSJSONObject) : null;
-		showVerifiedTag.value = cert != null && (cert.is_certified ?? false) == true;
-		certStatusText.value =
-			cert != null && cert.status_text != null && `${cert.status_text}` != ""
-				? `${cert.status_text}`
-				: "已认证";
-		const entityName = cert != null ? cert.entity_name ?? "" : "";
-		heroBrandName.value = entityName != "" ? entityName : name != "" ? name : "企业";
-		qualificationItems.value = buildQualificationItems(certObj);
-		const protocols = info.protocols;
-		if (Array.isArray(protocols)) {
-			agreementItems.value = protocols as EnterpriseProtocolItem[];
-		} else if (protocols != null && protocols.list != null) {
-			agreementItems.value = protocols.list;
-		} else {
-			agreementItems.value = [];
-		}
 	}
 
 	function loadEnterpriseInfo(fullScreen: boolean = true) {
@@ -331,7 +140,7 @@
 	}
 
 	function onChangeLogo() {
-		if (pageLoading.value || saving.value) {
+		if (pageLoading.value || saving.value || uploading.value) {
 			return;
 		}
 		uni.chooseImage({
@@ -344,7 +153,8 @@
 					return;
 				}
 				const tempPath = paths[0];
-				uni.showLoading({ title: "上传中..." });
+				uploading.value = true;
+                uni.showLoading({ title: "上传中..." });
 				normalizePickDisplayPath(tempPath)
 					.then((displayPath) => {
 						logoDisplaySrc.value = displayPath;
@@ -358,36 +168,29 @@
 							err != null && (err as UTSJSONObject)["message"] != null
 								? `${(err as UTSJSONObject)["message"]}`
 								: "上传失败";
-						uni.showToast({ title: msg, icon: "none" });
+						refreshLogoDisplay(logoUrl.value);
+                        uni.showToast({ title: msg, icon: "none" });
 					})
 					.finally(() => {
-						uni.hideLoading();
+						uploading.value = false;
+                        uni.hideLoading();
 					});
 			}
 		});
 	}
 
-	function onAgreementTap(item: EnterpriseProtocolItem) {
-		router.push({
-			path: "/pages/protocol/detail",
-			query: {
-				id: item.id,
-			}
-		});
-	}
-
 	function onSave() {
-		if (pageLoading.value || saving.value) {
+		if (pageLoading.value || saving.value || uploading.value) {
 			return;
 		}
 		const name = miniAppName.value.trim();
 		if (name == "") {
-			uni.showToast({ title: "请填写小程序名称", icon: "none" });
+			uni.showToast({ title: "请填写企业号名称", icon: "none" });
 			return;
 		}
 		const intro = introText.value.trim();
 		if (intro == "") {
-			uni.showToast({ title: "请填写简介", icon: "none" });
+			uni.showToast({ title: "请填写介绍", icon: "none" });
 			return;
 		}
 
@@ -425,494 +228,36 @@
 </script>
 
 <style lang="scss" scoped>
-	.st-page {
-		position: relative;
-		min-height: 100vh;
-		background-color: #f7f8fa;
-	}
-
-	.st-loading-mask {
-		position: fixed;
-		left: 0;
-		right: 0;
-		top: 0;
-		bottom: 0;
-		z-index: 999;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.st-loading-mask--full {
-		background-color: #f7f8fa;
-	}
-
-	.st-loading-mask--save {
-		background-color: rgba(247, 248, 250, 0.45);
-	}
-
-	.st-loading-text {
-		margin-top: 20rpx;
-		font-size: 28rpx;
-		color: #999999;
-		line-height: 40rpx;
-	}
-
-	.st-header {
-		background-image:
-			radial-gradient(circle at 90% 8%, rgba(110, 100, 190, 0.34) 0%, rgba(86, 78, 155, 0.14) 30%, rgba(26, 31, 58, 0) 56%),
-			linear-gradient(180deg, #1a1f3a 0%, #0d0f18 100%);
-
-		:deep(.cl-safe-area) {
-			background-color: transparent;
-		}
-	}
-
-	.st-nav {
-		height: 88rpx;
-		padding: 0 16rpx;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: space-between;
-
-		.st-nav-btn {
-			width: 72rpx;
-			height: 72rpx;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-		}
-
-		.st-nav-title {
-			font-size: 32rpx;
-			font-weight: 600;
-			color: #ffffff;
-		}
-	}
-
-	.st-hero {
-		padding: 36rpx 30rpx 36rpx;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.st-hero-tag {
-		align-self: flex-start;
-		padding: 6rpx 16rpx 6rpx 12rpx;
-		border-radius: 20rpx;
-		border-width: 1rpx;
-		border-style: solid;
-		border-color: rgba(255, 255, 255, 0.35);
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-	}
-
-	.st-hero-dot {
-		width: 10rpx;
-		height: 10rpx;
-		border-radius: 5rpx;
-		background-color: #22c55e;
-		margin-right: 8rpx;
-		flex-shrink: 0;
-	}
-
-	.st-hero-tag-text {
-		font-size: 20rpx;
-		color: #ffffff;
-		line-height: 28rpx;
-	}
-
-	.st-hero-title {
-		margin-top: 20rpx;
-		font-size: 44rpx;
-		font-weight: 700;
-		color: #ffffff;
-		line-height: 60rpx;
-	}
-
-	.st-hero-sub {
-		margin-top: 8rpx;
-		font-size: 24rpx;
-		color: rgba(255, 255, 255, 0.55);
-		line-height: 34rpx;
-	}
-
-	.st-body {
-		padding: 24rpx 30rpx 40rpx;
-	}
-
-	.st-section-label {
-		font-size: 28rpx;
-		font-weight: 600;
-		color: #333333;
-		line-height: 40rpx;
-		margin-bottom: 16rpx;
-	}
-
-	.st-section-label--inline {
-		margin-bottom: 0;
-	}
-
-	.st-section-head {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		margin-bottom: 16rpx;
-	}
-
-	.st-verified-tag {
-		margin-left: 12rpx;
-		padding: 4rpx 12rpx;
-		border-radius: 8rpx;
-		background-color: #ecfdf5;
-	}
-
-	.st-verified-tag-text {
-		font-size: 20rpx;
-		color: #16a34a;
-		line-height: 28rpx;
-	}
-
-	.st-preview-card {
-		display: flex;
-		flex-direction: row;
-		align-items: flex-start;
-		padding: 24rpx;
-		border-radius: 24rpx;
-		background-color: #ffffff;
-		border-width: 1rpx;
-		border-style: solid;
-		border-color: #eeeeee;
-		margin-bottom: 32rpx;
-	}
-
-	.st-preview-phone {
-		width: 160rpx;
-		height: 220rpx;
-		border-radius: 20rpx;
-		border-width: 2rpx;
-		border-style: solid;
-		border-color: #e5e7eb;
-		background-color: #f9fafb;
-		padding: 12rpx;
-		flex-shrink: 0;
-	}
-
-	.st-preview-phone-inner {
-		width: 100%;
-		height: 100%;
-		border-radius: 12rpx;
-		background-color: #ffffff;
-		overflow: hidden;
-	}
-
-	.st-preview-phone-bar {
-		padding: 16rpx 12rpx;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-	}
-
-	.st-preview-logo {
-		width: 32rpx;
-		height: 32rpx;
-		border-radius: 8rpx;
-		background-color: #2b59c3;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-
-	.st-preview-logo-img {
-		width: 32rpx;
-		height: 32rpx;
-		border-radius: 8rpx;
-	}
-
-	.st-preview-logo-text {
-		font-size: 18rpx;
-		font-weight: 700;
-		color: #ffffff;
-		line-height: 24rpx;
-	}
-
-	.st-preview-app-name {
-		margin-left: 8rpx;
-		font-size: 16rpx;
-		font-weight: 600;
-		color: #333333;
-		line-height: 22rpx;
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.st-preview-grid {
-		padding: 0 12rpx 12rpx;
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: space-between;
-	}
-
-	.st-preview-grid-item {
-		width: 58rpx;
-		height: 36rpx;
-		border-radius: 8rpx;
-		margin-bottom: 8rpx;
-		background-color: #f3f4f6;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.st-preview-grid-item--active {
-		background-color: #2b59c3;
-	}
-
-	.st-preview-grid-text {
-		font-size: 14rpx;
-		line-height: 20rpx;
-		color: #9ca3af;
-	}
-
-	.st-preview-grid-text--active {
-		color: #ffffff;
-	}
-
-	.st-preview-copy {
-		flex: 1;
-		min-width: 0;
-		margin-left: 20rpx;
-	}
-
-	.st-preview-desc {
-		font-size: 26rpx;
-		color: #333333;
-		line-height: 38rpx;
-	}
-
-	.st-preview-desc-strong {
-		color: #2b59c3;
-		font-weight: 600;
-	}
-
-	.st-preview-tip {
-		margin-top: 12rpx;
-		font-size: 22rpx;
-		color: #999999;
-		line-height: 32rpx;
-	}
-
-	.st-card {
-		padding: 28rpx;
-		border-radius: 24rpx;
-		background-color: #ffffff;
-		border-width: 1rpx;
-		border-style: solid;
-		border-color: #eeeeee;
-		margin-bottom: 32rpx;
-	}
-
-	.st-card--list {
-		padding: 0 28rpx;
-	}
-
-	.st-brand-row {
-		position: relative;
-		min-height: 96rpx;
-		padding: 28rpx 0;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.st-brand-row--last {
-		padding-bottom: 28rpx;
-	}
-
-	.st-brand-label {
-		width: 168rpx;
-		font-size: 28rpx;
-		color: #666666;
-		line-height: 40rpx;
-		flex-shrink: 0;
-	}
-
-	.st-brand-value {
-		flex: 1;
-		min-width: 0;
-		margin-left: 24rpx;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: flex-end;
-	}
-
-	.st-brand-input {
-		flex: 1;
-		min-width: 0;
-		height: 40rpx;
-		font-size: 28rpx;
-		color: #333333;
-		text-align: right;
-	}
-
-	.st-brand-input--intro {
-		margin-left: 24rpx;
-	}
-
-	.st-brand-input-placeholder {
-		color: #cccccc;
-		font-size: 28rpx;
-	}
-
-	.st-brand-count {
-		margin-left: 12rpx;
-		font-size: 24rpx;
-		color: #cccccc;
-		line-height: 34rpx;
-		flex-shrink: 0;
-	}
-
-	.st-brand-logo {
-		flex: 1;
-		min-width: 0;
-		margin-left: 24rpx;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: flex-end;
-	}
-
-	.st-logo-box {
-		width: 72rpx;
-		height: 72rpx;
-		border-radius: 16rpx;
-		background-color: #2b59c3;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-
-	.st-logo-image {
-		width: 72rpx;
-		height: 72rpx;
-		border-radius: 16rpx;
-	}
-
-	.st-logo-text {
-		font-size: 32rpx;
-		font-weight: 700;
-		color: #ffffff;
-		line-height: 44rpx;
-	}
-
-	.st-change-btn {
-		margin-left: 16rpx;
-		padding: 8rpx 20rpx;
-		border-radius: 8rpx;
-		border-width: 1rpx;
-		border-style: solid;
-		border-color: #e5e7eb;
-		background-color: #ffffff;
-		flex-shrink: 0;
-	}
-
-	.st-change-btn-text {
-		font-size: 24rpx;
-		color: #666666;
-		line-height: 34rpx;
-	}
-
-	.st-row-divider {
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: 1rpx;
-		background-color: #f0f0f0;
-	}
-
-	.st-info-item {
-		position: relative;
-		padding: 28rpx 0;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.st-info-label {
-		font-size: 28rpx;
-		color: #666666;
-		line-height: 40rpx;
-		flex-shrink: 0;
-	}
-
-	.st-info-value-row {
-		flex: 1;
-		min-width: 0;
-		margin-left: 24rpx;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: flex-end;
-	}
-
-	.st-info-value {
-		font-size: 28rpx;
-		color: #333333;
-		line-height: 40rpx;
-		text-align: right;
-	}
-
-	.st-agreement-item {
-		position: relative;
-		padding: 28rpx 0;
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-	}
-
-	.st-agreement-copy {
-		flex: 1;
-		min-width: 0;
-		margin-right: 12rpx;
-	}
-
-	.st-agreement-title {
-		font-size: 28rpx;
-		font-weight: 600;
-		color: #333333;
-		line-height: 40rpx;
-	}
-
-	.st-save-btn {
-		height: 88rpx;
-		border-radius: 44rpx;
-		background-color: #2b59c3;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		margin-top: 8rpx;
-	}
-
-	.st-save-btn--disabled {
-		opacity: 0.6;
-	}
-
-	.st-save-btn-text {
-		font-size: 30rpx;
-		font-weight: 600;
-		color: #ffffff;
-		line-height: 42rpx;
-	}
+@use "../../styles/owner-workbench" as owner;
+.st-page { position: relative; min-height: 100vh; background: owner.$background; box-sizing: border-box; }
+.st-nav { height: 48px; margin: 0 16px; display: flex; flex-direction: row; align-items: center; }
+.st-nav > text { @include owner.title; }
+.st-content { margin: 0 16px; padding-bottom: 20px; }
+.st-note { @include owner.feature; padding: 14px; margin-bottom: 12px; }
+.st-note-title { display: block; font-size: 13px; font-weight: 600; line-height: 20px; color: #535d73; }
+.st-note-copy { display: block; margin-top: 6px; font-size: 12px; line-height: 20px; color: #7d869c; }
+.st-form { @include owner.card; padding: 0 14px; }
+.st-field { padding: 16px 0; border-bottom: 1px solid owner.$border; }
+.st-field--last { border: 0; }
+.st-label-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.st-label { font-size: 13px; font-weight: 500; line-height: 20px; color: owner.$text; }
+.st-count { font-size: 11px; line-height: 18px; color: #a2a9b5; }
+.st-input, .st-intro { width: 100%; background: #f8f9fb; border: 1px solid owner.$border; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 22px; color: owner.$text; box-sizing: border-box; }
+.st-input { height: 42px; }
+.st-intro { height: 110px; }
+.st-placeholder { font-size: 13px; color: #a2a9b5; }
+.st-logo-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid owner.$border; }
+.st-logo-actions { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.st-logo-box, .st-logo-image { width: 48px; height: 48px; border-radius: 12px; }
+.st-logo-box { background: #eef2ff; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.st-logo-text { color: owner.$primary; font-size: 20px; font-weight: 600; }
+.st-change-btn { @include owner.control; padding: 6px 12px; display: flex; align-items: center; justify-content: center; }
+.st-change-btn > text { font-size: 12px; line-height: 20px; color: owner.$primary; }
+.st-save-btn { margin-top: 16px; min-height: 44px; border-radius: 10px; background: owner.$primary; display: flex; align-items: center; justify-content: center; }
+.st-save-btn > text { font-size: 14px; line-height: 22px; font-weight: 600; color: #fff; }
+.st-save-btn--disabled { opacity: .55; }
+.st-loading-mask { position: fixed; inset: 0; z-index: 999; background: rgba(244,245,247,.8); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.st-loading-mask > text { font-size: 13px; color: owner.$muted; }
+@media (max-width: 360px) { .st-nav, .st-content { margin-left: 12px; margin-right: 12px; } }
+@media (min-width: 600px) { .st-nav, .st-content { width: calc(100% - 48px); max-width: 720px; margin-left: auto; margin-right: auto; } }
 </style>

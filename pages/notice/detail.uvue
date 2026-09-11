@@ -311,3 +311,23 @@
 		word-break: break-all;
 	}
 </style>
+
+<style lang="scss" scoped>
+@use "../../styles/owner-workbench" as owner;
+.nd-page { background: owner.$background; height: 100vh; height: 100dvh; min-height: 0; }
+.nd-scroll { flex: 1; height: 0; min-height: 0; }
+.nd-body { padding: 16px; }
+.nd-card { @include owner.card; padding: 16px; }
+.nd-card-head { margin-bottom: 10px; }
+.nd-card-tags { gap: 6px; flex-wrap: wrap; }
+.nd-tag { border-radius: 5px; padding: 3px 6px; }
+.nd-tag-text { font-size: 11px; line-height: 17px; }
+.nd-title { font-size: 18px; line-height: 27px; font-weight: 600; color: owner.$text; overflow-wrap: anywhere; }
+.nd-meta-row { margin-top: 10px; flex-wrap: wrap; gap: 4px 10px; }
+.nd-meta { font-size: 11px; line-height: 18px; color: owner.$muted; }
+.nd-divider { margin: 14px 0; height: 1px; background: owner.$border; }
+.nd-content { font-size: 14px; line-height: 24px; color: #535d73; white-space: pre-wrap; overflow-wrap: anywhere; }
+.nd-state { padding: 60px 16px; }
+.nd-state-text { font-size: 13px; color: owner.$muted; }
+@media (min-width: 600px) { .nd-body { max-width: 960px; width: calc(100% - 48px); margin: 0 auto; padding: 16px 0; } }
+</style>

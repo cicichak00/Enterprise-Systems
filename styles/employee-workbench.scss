@@ -1,0 +1,5 @@
+@import "./owner-workbench.scss";
+.employee-heading { display: flex; flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 12px; min-height: 30px; }
+.employee-heading > text { @include title; }
+.employee-help { margin: 0; padding: 0 10px; border-radius: 8px; background: #fff; color: $primary; font-size: 12px; line-height: 32px; }
+.employee-help::after { border: none; }

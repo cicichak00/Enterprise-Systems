@@ -1,0 +1,69 @@
+<template>
+	<cl-page :pt="{ className: 'cal-page' }" :back-top="false">
+		<view class="cal-page">
+			<view class="cal-header"><cl-safe-area type="top"></cl-safe-area><view class="cal-nav"><view class="cal-back" @tap="goBack"><cl-icon name="arrow-left-s-line" :size="24" color="#1f2937"></cl-icon></view><text class="cal-nav-title">收益日历</text><view class="cal-back"></view></view></view>
+			<scroll-view class="cal-scroll" scroll-y="true" :show-scrollbar="false"><view class="cal-inner">
+				<view class="cal-summary"><text class="cal-summary-label">总收益(元)</text><text class="cal-summary-total">{{ totalRevenue }}</text><view class="cal-summary-row"><view class="cal-summary-item"><text>本周收益(元)</text><b>{{ summary.week }}</b></view><view class="cal-summary-item"><text>本月收益(元)</text><b>{{ summary.month }}</b></view><view class="cal-summary-item"><text>本年收益(元)</text><b>{{ summary.year }}</b></view></view></view>
+				<view class="cal-card"><view class="cal-toolbar"><view class="cal-tabs"><view v-for="item in dimensions" :key="item.key" class="cal-tab" :class="{ 'cal-tab--active': dimension == item.key }" @tap="selectDimension(item.key)"><text>{{ item.label }}</text></view></view><view class="cal-period"><view class="cal-arrow" @tap="move(-1)"><cl-icon name="arrow-left-s-line" :size="16" color="#4b5870"></cl-icon></view><text>{{ periodTitle }}</text><view class="cal-arrow" @tap="move(1)"><cl-icon name="arrow-right-s-line" :size="16" color="#4b5870"></cl-icon></view></view></view>
+					<view v-if="dimension == 'day'" class="cal-week"><text v-for="item in weekdays" :key="item">{{ item }}</text></view>
+					<view class="cal-grid" :class="'cal-grid--' + dimension"><view v-for="cell in cells" :key="cell.key" class="cal-cell" :class="{ 'cal-cell--blank': cell.blank, 'cal-cell--today': cell.today, 'cal-cell--income': parseFloat(cell.amount) > 0 }" @tap="openDetail(cell)"><template v-if="!cell.blank"><text class="cal-cell-label">{{ cell.label }}</text><text class="cal-cell-amount">¥{{ cell.amount }}</text></template></view></view>
+				</view>
+			</view></scroll-view>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getOrderList } from "@/.cool/api/order";
+	import { isApiSuccess } from "@/.cool";
+	import type { OrderListItem, OrderListPayload } from "@/.cool/types/order";
+	type Dimension = "day" | "month" | "year";
+	type Cell = { key: string; label: string; amount: string; blank: boolean; today: boolean };
+	const dimensions: { key: Dimension; label: string }[] = [{key:"day",label:"日"},{key:"month",label:"月"},{key:"year",label:"年度"}];
+	const weekdays = ["日","一","二","三","四","五","六"];
+	const dimension = ref<Dimension>("month"); const cursor = ref(new Date()); const orders = ref<OrderListItem[]>([]);
+	function pad(value:number):string { return value < 10 ? `0${value}` : `${value}`; }
+	function dateKey(date:Date):string { return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`; }
+	function monthKey(date:Date):string { return `${date.getFullYear()}-${pad(date.getMonth()+1)}`; }
+	function normalizeOrderDate(value:any|null):string {
+		if(value==null||`${value}`.trim()=="") return "";
+		const raw=`${value}`.trim();
+		if(/^\d{10,13}$/.test(raw)){let stamp=parseInt(raw);if(raw.length==10)stamp*=1000;return dateKey(new Date(stamp));}
+		const matched=raw.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+		if(matched!=null)return `${matched[1]}-${pad(parseInt(matched[2]))}-${pad(parseInt(matched[3]))}`;
+		return "";
+	}
+	function auditKey(item:OrderListItem):string {
+		const values:any[]=[item.audit_time,item["audited_at"],item["audit_at"],item["review_time"],item["reviewed_at"]];
+		for(let i=0;i<values.length;i++){const key=normalizeOrderDate(values[i]);if(key!="")return key;}return "";
+	}
+	function promotionRevenue(item:OrderListItem):number {
+		const direct=item.share_profit??item["promo_revenue"]??item["promotion_revenue"]??item["revenue"]??item["amount"];
+		if(direct!=null&&`${direct}`!="")return parseFloat(`${direct}`)||0;
+		return (parseFloat(`${item.enterprise_profit??0}`)||0)+(parseFloat(`${item.user_profit??0}`)||0);
+	}
+	function enterpriseAllRevenue(item:OrderListItem):number {
+		const staffRevenue=parseFloat(`${item.user_profit??0}`)||0;
+		if(item.is_virtual==1)return staffRevenue;
+		return promotionRevenue(item)+staffRevenue;
+	}
+	function amount(key:string, mode:Dimension):string { let total=0; for(let i=0;i<orders.value.length;i++){const audited=auditKey(orders.value[i]); if((mode=="day"?audited==key:audited.indexOf(key)==0)) total+=enterpriseAllRevenue(orders.value[i]);} return total.toFixed(2); }
+	function rangeTotal(start:Date,end:Date):string { let total=0; for(let i=0;i<orders.value.length;i++){const key=auditKey(orders.value[i]); if(key=="") continue; const date=new Date(key.replace(/-/g,"/")); if(date.getTime()>=start.getTime()&&date.getTime()<=end.getTime()) total+=enterpriseAllRevenue(orders.value[i]);} return total.toFixed(2); }
+	const totalRevenue=computed(()=>{let total=0;for(let i=0;i<orders.value.length;i++)if(auditKey(orders.value[i])!="")total+=enterpriseAllRevenue(orders.value[i]);return total.toFixed(2);});
+	const summary=computed(()=>{const now=new Date();const weekday=now.getDay();const offset=weekday==0?-6:1-weekday;const end=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);return{week:rangeTotal(new Date(now.getFullYear(),now.getMonth(),now.getDate()+offset),end),month:rangeTotal(new Date(now.getFullYear(),now.getMonth(),1),end),year:rangeTotal(new Date(now.getFullYear(),0,1),end)}});
+	const periodTitle=computed(()=>dimension.value=="day"?`${cursor.value.getFullYear()}年${cursor.value.getMonth()+1}月`:dimension.value=="month"?`${cursor.value.getFullYear()}年`:`${cursor.value.getFullYear()-5} - ${cursor.value.getFullYear()+6}`);
+	const cells=computed(():Cell[]=>{const result:Cell[]=[];const now=new Date();if(dimension.value=="year"){for(let n=-5;n<=6;n++){const year=cursor.value.getFullYear()+n;result.push({key:`${year}`,label:`${year}年`,amount:amount(`${year}`,"year"),blank:false,today:year==now.getFullYear()});}return result;}if(dimension.value=="month"){for(let m=0;m<12;m++){const date=new Date(cursor.value.getFullYear(),m,1);const key=monthKey(date);result.push({key,label:`${m+1}月`,amount:amount(key,"month"),blank:false,today:key==monthKey(now)});}return result;}const first=new Date(cursor.value.getFullYear(),cursor.value.getMonth(),1).getDay();for(let i=0;i<first;i++)result.push({key:`blank-${i}`,label:"",amount:"",blank:true,today:false});const days=new Date(cursor.value.getFullYear(),cursor.value.getMonth()+1,0).getDate();for(let day=1;day<=days;day++){const date=new Date(cursor.value.getFullYear(),cursor.value.getMonth(),day);const key=dateKey(date);result.push({key,label:`${day}`,amount:amount(key,"day"),blank:false,today:key==dateKey(now)});}return result;});
+	function selectDimension(value:Dimension){dimension.value=value;}
+	function move(direction:number){const date=new Date(cursor.value.getTime());if(dimension.value=="day")date.setMonth(date.getMonth()+direction);else if(dimension.value=="month")date.setFullYear(date.getFullYear()+direction);else date.setFullYear(date.getFullYear()+direction*12);cursor.value=date;}
+	function openDetail(cell:Cell){if(cell.blank)return;uni.navigateTo({url:`/pages/revenue/detail?dimension=${dimension.value}&key=${cell.key}&label=${encodeURIComponent(cell.label)}`});}
+	function goBack(){uni.navigateBack();}
+	function parseOrders(res:any|null):OrderListPayload|null{if(res==null)return null;const env=res as UTSJSONObject;if(env["code"]!=null&&!isApiSuccess(env["code"]))return null;return(env["data"]??env)as OrderListPayload;}
+	function load(){getOrderList({page:1,limit:500,period:"total"}).then(res=>{orders.value=parseOrders(res)?.list??[];}).catch(()=>{});}
+	onShow(load);
+</script>
+
+<style lang="scss" scoped>
+	.cal-page{height:100vh;display:flex;flex-direction:column;background:#f4f6fa}.cal-header{background:#fff}.cal-nav{height:88rpx;display:flex;align-items:center;justify-content:space-between}.cal-back{width:88rpx;height:88rpx;display:flex;align-items:center;justify-content:center}.cal-nav-title{font-size:32rpx;font-weight:700;color:#171f31}.cal-scroll{flex:1;height:0}.cal-inner{padding:20rpx 26rpx 60rpx}.cal-summary,.cal-card{border-radius:24rpx;background:#fff;box-shadow:0 8rpx 24rpx rgba(30,45,78,.05)}.cal-summary{padding:26rpx 28rpx 22rpx}.cal-summary-label{font-size:21rpx;color:#71809a}.cal-summary-total{display:block;margin-top:4rpx;font-size:48rpx;font-weight:700;color:#1d2942}.cal-summary-row{margin-top:18rpx;padding-top:20rpx;display:flex;border-top:1rpx solid #edf0f5}.cal-summary-item{flex:1;display:flex;flex-direction:column;align-items:center;border-left:1rpx solid #edf0f5}.cal-summary-item:first-child{border-left:0}.cal-summary-item text{font-size:19rpx;color:#75829a}.cal-summary-item b{margin-top:5rpx;font-size:25rpx;color:#ff4d4f}.cal-card{margin-top:20rpx;padding:26rpx 22rpx}.cal-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20rpx}.cal-tabs{display:flex;padding:5rpx;border-radius:14rpx;background:#f1f3f7}.cal-tab{min-width:48rpx;padding:9rpx 10rpx;text-align:center;border-radius:9rpx;font-size:21rpx;color:#758197}.cal-tab--active{background:#fff;color:#2b59c3;font-weight:700}.cal-period{display:flex;align-items:center;font-size:23rpx;font-weight:700;color:#26324a}.cal-period>text{min-width:140rpx;text-align:center}.cal-arrow{width:44rpx;height:44rpx;display:flex;align-items:center;justify-content:center;border-radius:13rpx;background:#f1f3f7}.cal-week,.cal-grid--day{display:grid;grid-template-columns:repeat(7,1fr)}.cal-week{margin-bottom:8rpx}.cal-week text{text-align:center;font-size:19rpx;color:#74819a}.cal-grid{display:grid;gap:8rpx}.cal-grid--month,.cal-grid--year{grid-template-columns:repeat(3,1fr);gap:12rpx}.cal-cell{height:78rpx;padding:7rpx;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;border:1rpx solid transparent;border-radius:13rpx;background:#f4f6f9}.cal-grid--month .cal-cell,.cal-grid--year .cal-cell{height:108rpx;padding:16rpx}.cal-cell--blank{background:transparent}.cal-cell--today{border-color:#2b59c3}.cal-cell--income{border-color:#ff6b6b;background:#fff0ef}.cal-cell-label{font-size:21rpx;font-weight:700;color:#25324a}.cal-cell-amount{font-size:17rpx;color:#71809d}.cal-cell--income .cal-cell-amount{color:#ff4d4f}
+	.cal-nav,.cal-back,.cal-summary-row,.cal-toolbar,.cal-tabs,.cal-period,.cal-arrow{flex-direction:row}
+</style>

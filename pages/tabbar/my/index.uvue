@@ -1,6 +1,8 @@
 <template>
 	<cl-page :pt="{ className: 'me-page' }">
 		<view class="me-page">
+            <cl-safe-area type="top"></cl-safe-area>
+            <view class="me-workbench-nav"><text>我的</text></view>
 			<view class="me-profile" :style="profileStyle">
 				<view class="me-profile-main">
 					<view class="me-avatar">
@@ -16,6 +18,7 @@
 						<view class="me-name-row">
 							<text class="me-name">{{ profileName }}</text>
 						</view>
+						<text class="me-profile-role">企业管理中心</text>
 					</view>
 				</view>
 				<view class="me-profile-actions">
@@ -37,6 +40,7 @@
 						<view class="me-wallet-dot"></view>
 						<text class="me-wallet-label">{{ revenueTitle }}</text>
 					</view>
+					<text class="me-wallet-caption">企业主在企业号的实际所得</text>
 				</view>
 				<view class="me-wallet-amount">{{ revenueAmount }}</view>
 				<view class="me-wallet-divider"></view>
@@ -50,7 +54,7 @@
 					>
 						<view class="me-wallet-stat-label-row">
 							<text class="me-wallet-stat-label">{{ item.label }}</text>
-							<cl-icon v-if="item.clickable == true" name="arrow-right-s-line" :size="11" color="rgba(134,239,172,0.9)"></cl-icon>
+							<cl-icon v-if="item.clickable == true" name="arrow-right-s-line" :size="11" color="#5375ed"></cl-icon>
 						</view>
 						<text class="me-wallet-stat-value">{{ item.value }}</text>
 					</view>
@@ -61,35 +65,18 @@
 			</view>
 
 			<view v-if="mineDataReady && quickActions.length > 0" class="me-quick-grid">
-				<block v-for="(item, index) in quickActions" :key="index">
-					<view class="me-quick-item" @tap="onQuickAction(item)">
+				<view class="me-quick-item" v-for="(item, index) in quickActions" :key="index" @tap="onQuickAction(item)">
 						<view class="me-quick-icon">
 							<cl-icon :name="item.icon" :size="22" color="#2b59c3"></cl-icon>
 						</view>
-						<text class="me-quick-title">{{ item.title }}</text>
-						<text v-if="item.sub != ''" class="me-quick-sub">{{ item.sub }}</text>
+						<view class="me-quick-copy"><text class="me-quick-title">{{ item.title }}</text><text v-if="item.sub != ''" class="me-quick-sub">{{ item.sub }}</text></view>
+						<cl-icon name="arrow-right-s-line" :size="18" color="#a2a9b5"></cl-icon>
 					</view>
-					<view v-if="index < quickActions.length - 1" class="me-quick-divider"></view>
-				</block>
 			</view>
 
-			<view class="me-section-head">
-				<text class="me-section-label">设置</text>
-			</view>
-			<view class="me-settings">
-				<view
-					class="me-setting-item"
-					v-for="(item, index) in settingItems"
-					:key="index"
-					@tap="onSettingTap(item)"
-				>
-					<text class="me-setting-text">{{ item }}</text>
-					<cl-icon name="arrow-right-s-line" :size="18" color="#cccccc"></cl-icon>
-				</view>
-			</view>
 		</view>
 
-		<custom-tabbar></custom-tabbar>
+		<custom-tabbar :show-spacer="true"></custom-tabbar>
 
 		<cl-popup
 			v-model="invitePopupVisible"
@@ -101,7 +88,7 @@
 		>
 			<view class="me-invite-popup">
 				<view class="me-invite-header">
-					<text class="me-invite-title">获取员工邀请码</text>
+					<view class="me-invite-heading"><text class="me-invite-title">预设邀请设置</text><text class="me-invite-subtitle">统一设置新员工加入后的默认配置</text></view>
 					<view class="me-invite-close" @tap="onInviteCloseTap">
 						<cl-icon name="close-line" :size="18" color="#999999"></cl-icon>
 					</view>
@@ -113,7 +100,7 @@
 						:class="{ 'me-invite-tab--active': inviteTab == 'setting' }"
 						@tap="inviteTab = 'setting'"
 					>
-						<text class="me-invite-tab-text">邀请设置</text>
+						<text class="me-invite-tab-text">预设权限</text>
 						<view v-if="inviteTab == 'setting'" class="me-invite-tab-line"></view>
 					</view>
 					<view
@@ -121,7 +108,7 @@
 						:class="{ 'me-invite-tab--active': inviteTab == 'preset' }"
 						@tap="onInvitePresetTab"
 					>
-						<text class="me-invite-tab-text">项目预设</text>
+						<text class="me-invite-tab-text">预设项目</text>
 						<view v-if="inviteTab == 'preset'" class="me-invite-tab-line"></view>
 					</view>
 				</view>
@@ -132,8 +119,8 @@
 					<view class="me-invite-qr-section">
 						<view class="me-invite-qr-card">
 							<view class="me-invite-qr-copy">
-								<text class="me-invite-qr-title">微信扫码即可参与企业号任务</text>
-								<text class="me-invite-qr-desc">邀请微信好友扫码加入你的企业号，统一结算提高效率</text>
+								<text class="me-invite-qr-title">扫码加入企业</text>
+								<text class="me-invite-qr-desc">员工使用微信扫码，确认后即可加入</text>
 							</view>
 							<view class="me-invite-qr-box">
 								<image
@@ -169,13 +156,13 @@
 						</view>
 
 						<view class="me-invite-qr-btn" @tap="copyInviteLink">
-							<text class="me-invite-qr-btn-text">长按识别二维码 · 点击复制链接</text>
+							<cl-icon name="file-copy-line" :size="16" color="#ffffff"></cl-icon><text class="me-invite-qr-btn-text">复制邀请链接</text>
 						</view>
 					</view>
 
 					<view class="me-invite-field">
-						<text class="me-invite-field-label">设置企业号品牌</text>
-						<text class="me-invite-field-sub">员工端顶部品牌标识</text>
+						<text class="me-invite-field-label">员工端品牌名称</text>
+						<text class="me-invite-field-sub">员工加入后，将显示在员工端顶部</text>
 						<input
 							class="me-invite-input"
 							v-model="brandName"
@@ -186,8 +173,8 @@
 
 					<view class="me-invite-perm">
 						<view class="me-invite-perm-head">
-							<text class="me-invite-perm-label">员工权限预设</text>
-							<text class="me-invite-perm-tip">*仅对更改设置后新加入的员工生效</text>
+							<text class="me-invite-perm-label">新员工默认权限</text>
+							<text class="me-invite-perm-tip">仅对之后加入的员工生效</text>
 						</view>
 						<view class="me-invite-switch-card">
 							<view class="me-invite-switch-copy">
@@ -196,11 +183,16 @@
 							</view>
 							<cl-switch v-model="incomeDataEnabled" :height="24" :width="44"></cl-switch>
 						</view>
+						<view class="me-invite-rate-card">
+							<view class="me-invite-rate-head"><view><text class="me-invite-switch-title">预设分成比例</text><text class="me-invite-switch-desc">新员工加入后默认使用此比例</text></view><text class="me-invite-rate-value">{{ presetCommissionRate }}%</text></view>
+							<slider :value="presetCommissionRate" :min="0" :max="100" :step="1" activeColor="#5375ed" backgroundColor="#e5e9f2" block-color="#5375ed" :block-size="18" @changing="onPresetCommissionRateChange" @change="onPresetCommissionRateChange" />
+							<view class="me-invite-rate-scale"><text>0%</text><text>50%</text><text>100%</text></view>
+						</view>
 					</view>
 					</scroll-view>
 
 					<view class="me-invite-save-btn" @tap="saveInviteConfig">
-						<text class="me-invite-save-text">保存并启用配置</text>
+						<text class="me-invite-save-text">保存邀请设置</text>
 					</view>
 					</view>
 
@@ -374,6 +366,7 @@
 	const inviteTab = ref<string>("setting");
 	const brandName = ref<string>("");
 	const incomeDataEnabled = ref<boolean>(false);
+	const presetCommissionRate = ref<number>(20);
 	const inviteInfoLoading = ref<boolean>(false);
 	const inviteSaving = ref<boolean>(false);
 	const inviteQrText = ref<string>("");
@@ -910,7 +903,7 @@
 	const profileStyle = computed(() => {
 		const style = getCapsuleNavStyle(8);
 		return {
-			paddingRight: style.paddingRight
+			paddingRight: `max(12px, ${style.paddingRight})`
 		};
 	});
 
@@ -919,10 +912,9 @@
 		if (text == "") {
 			return "";
 		}
-		if (text.startsWith("¥")) {
-			return text;
-		}
-		return `¥${text}`;
+		const amountText = text.startsWith("¥") ? text.substring(1).trim() : text;
+		const amount = parseFloat(amountText);
+		return isNaN(amount) ? `¥${amountText}` : `¥${amount.toFixed(2)}`;
 	}
 
 	function normalizeQuickKey(key: string): string {
@@ -962,7 +954,7 @@
 	function mapShortcut(item: MineShortcut): QuickAction {
 		const keyRaw = `${item.key ?? ""}`.trim();
 		const key = normalizeQuickKey(keyRaw);
-		const title = `${item.title ?? ""}`.trim();
+		const title = key == "settings" ? "定制企业信息" : `${item.title ?? ""}`.trim();
 		return {
 			key: key,
 			icon: resolveShortcutIcon(key),
@@ -982,6 +974,8 @@
 				revenue: "145.59",
 				pending_settlement: "41.59",
 				departure_recovery_amount: "104.00",
+				online_revenue: "29.91",
+				offline_revenue: "11.68",
 				staff_normal: 5,
 				staff_count: 8,
 				keyword_count: 174
@@ -990,7 +984,7 @@
 				{ key: "staff", title: "员工", subtitle: "8人" },
 				{ key: "keyword", title: "账号", subtitle: "推广账号" },
 				{ key: "invite", title: "邀请码", subtitle: "扫码员工" },
-				{ key: "settings", title: "设置", subtitle: "资料/合规" }
+				{ key: "settings", title: "定制企业信息", subtitle: "品牌资料与企业展示" }
 			]
 		};
 	}
@@ -1022,33 +1016,27 @@
 			const rev = `${card.revenue ?? ""}`.trim();
 			revenueAmount.value = formatMoneyDisplay(rev);
 			revenueCardReady.value = title != "" || rev != "";
-			const pending = `${card.pending_settlement ?? ""}`.trim();
 			const stats: WalletStat[] = [];
-			if (pending != "") {
-				stats.push({ key: "pending", label: "待结算", value: formatMoneyDisplay(pending) });
-			}
 			const recoveryAmountRaw =
 				card.resigned_staff_recovery_amount ??
 				card.former_staff_recovery_amount ??
 				card.departure_recovery_amount;
-			const recoveryAmount = recoveryAmountRaw ?? (isLocalUiPreview() ? 104 : null);
-			if (recoveryAmount != null) {
-				stats.push({
-					key: "departure_recovery",
-					label: "离职回收金额",
-					value: formatMoneyDisplay(`${recoveryAmount}`),
-					highlight: true,
-					clickable: true
-				});
-			}
-			if (card.staff_normal != null || card.staff_count != null) {
-				const staffN = card.staff_normal != null ? `${card.staff_normal}` : "";
-				const staffC = card.staff_count != null ? `${card.staff_count}` : "";
-				stats.push({ key: "staff", label: "在职员工", value: staffN != "" && staffC != "" ? `${staffN}/${staffC}` : staffN != "" ? staffN : staffC });
-			}
-			if (card.keyword_count != null) {
-				stats.push({ key: "keyword", label: "推广任务", value: `${card.keyword_count}` });
-			}
+			const recoveryAmount = recoveryAmountRaw ?? 0;
+			const onlineRevenue =
+				card.online_revenue ??
+				card.online_income ??
+				card.online_settlement_revenue ??
+				card.online_profit ??
+				0;
+			const offlineRevenue =
+				card.offline_revenue ??
+				card.offline_income ??
+				card.offline_settlement_revenue ??
+				card.offline_profit ??
+				0;
+			stats.push({ key: "departure_recovery", label: "已回收金额", value: formatMoneyDisplay(`${recoveryAmount}`), highlight: true, clickable: true });
+			stats.push({ key: "online_revenue", label: "线上收益", value: formatMoneyDisplay(`${onlineRevenue}`) });
+			stats.push({ key: "offline_revenue", label: "线下收益", value: formatMoneyDisplay(`${offlineRevenue}`) });
 			walletStats.value = stats;
 		}
 		const shortcuts = data.shortcuts;
@@ -1056,7 +1044,7 @@
 			const mapped: QuickAction[] = [];
 			for (let i = 0; i < shortcuts.length; i++) {
 				const row = mapShortcut(shortcuts[i]);
-				if (row.title != "") {
+				if (row.title != "" && row.key != "staff" && row.key != "keyword") {
 					mapped.push(row);
 				}
 			}
@@ -1242,6 +1230,9 @@
 		const name = nameRaw != null ? `${nameRaw}`.trim() : "";
 		brandName.value = name;
 		incomeDataEnabled.value = toRevenueSwitchEnabled(data["preset_can_view_revenue"]);
+		const rateRaw = data["preset_commission_rate"] ?? data["commission_rate"];
+		const rate = rateRaw != null ? parseInt(`${rateRaw}`) : 20;
+		presetCommissionRate.value = isNaN(rate) ? 20 : Math.max(0, Math.min(100, rate));
 		inviteQrText.value = resolveInviteQrContent(data);
 		presetInviteInfoReady.value = true;
 		if (!shouldConfirmPresetClose()) {
@@ -1327,6 +1318,11 @@
 		loadInviteEnterpriseInfo();
 	}
 
+	function onPresetCommissionRateChange(e: UniSliderChangeEvent) {
+		const value = Math.round(e.detail.value);
+		presetCommissionRate.value = Math.max(0, Math.min(100, value));
+	}
+
 	function saveInviteConfig() {
 		if (inviteSaving.value || inviteInfoLoading.value) {
 			return;
@@ -1340,7 +1336,8 @@
 		uni.showLoading({ title: "保存中..." });
 		saveEnterpriseInviteConfig({
 			name: name,
-			preset_can_view_revenue: incomeDataEnabled.value ? "1" : "0"
+			preset_can_view_revenue: incomeDataEnabled.value ? "1" : "0",
+			preset_commission_rate: presetCommissionRate.value
 		})
 			.then((res) => {
 				if (res == null) {
@@ -1417,8 +1414,6 @@
 				presetSyncing.value = false;
 			});
 	}
-
-	const settingItems = ["账户安全", "关于企业号"];
 
 	onShow(() => {
 		syncTabbarRoutePath();
@@ -2336,5 +2331,121 @@
 		font-weight: 600;
 		color: #ffffff;
 	}
+}
+</style>
+
+<style lang="scss" scoped>
+@use "../../../styles/owner-workbench" as owner;
+.me-page { background: owner.$background; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; color: owner.$text; }
+.me-workbench-nav { height: 48px; margin: 0 16px; display: flex; flex-direction: row; align-items: center; }
+.me-workbench-nav > text { @include owner.title; }
+.me-profile { @include owner.feature; width: auto; margin: 0 16px 12px; padding: 16px 12px; gap: 10px; }
+.me-profile .me-avatar, .me-profile .me-avatar-img { width: 42px; height: 42px; border-radius: 50%; }
+.me-profile .me-avatar { margin-right: 10px; background: #dce5ff; }
+.me-profile .me-avatar-text { font-size: 20px; color: owner.$primary; }
+.me-profile .me-name { min-height: 0; font-size: 15px; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me-profile .me-profile-actions { gap: 6px; }
+.me-profile .me-action-icon { width: 34px; height: 34px; margin: 0; background: rgba(255,255,255,.75); border: 1px solid #fff; border-radius: 9px; }
+.me-profile .me-action-badge { top: -4px; right: -4px; min-width: 14px; height: 14px; padding: 0 3px; border: 2px solid #f0edfc; }
+.me-profile .me-action-badge-text { font-size: 10px; }
+.me-wallet-card { @include owner.card; margin: 0 16px 12px; padding: 14px; background-image: none; }
+.me-wallet-card .me-wallet-label-wrap { display: flex; flex-direction: column; align-items: flex-start; }
+.me-wallet-card .me-wallet-label-tag { padding: 0; border: 0; background: transparent; border-radius: 0; }
+.me-wallet-card .me-wallet-dot { width: 3px; height: 13px; border-radius: 3px; background: owner.$primary; margin-right: 6px; box-shadow: none; }
+.me-wallet-card .me-wallet-label { @include owner.section; letter-spacing: 0; }
+.me-wallet-card .me-wallet-caption { display: block; margin-top: 3px; font-size: 10px; line-height: 16px; color: owner.$muted; }
+.me-wallet-card .me-wallet-amount { min-height: 0; margin-top: 12px; font-size: 30px; line-height: 38px; color: owner.$primary; letter-spacing: 0; overflow-wrap: anywhere; }
+.me-wallet-card .me-wallet-divider { margin: 14px 0 12px; height: 1px; background: owner.$border; }
+.me-wallet-card .me-wallet-stats { flex-wrap: wrap; row-gap: 12px; }
+.me-wallet-card .me-wallet-stat { width: 33.333%; min-width: 0; padding: 0 8px; box-sizing: border-box; }
+.me-wallet-card .me-wallet-stat--divider { border-color: owner.$border; }
+.me-wallet-card .me-wallet-stat-label { font-size: 11px; line-height: 17px; color: owner.$muted; }
+.me-wallet-card .me-wallet-stat-value { font-size: 16px; line-height: 22px; margin-top: 5px; color: owner.$primary; overflow-wrap: anywhere; }
+.me-wallet-card .me-wallet-stat--clickable { background: transparent; border-radius: 0; }
+.me-quick-grid { @include owner.card; margin: 0 16px 12px; padding: 14px 8px; display: flex; flex-direction: row; flex-wrap: wrap; row-gap: 14px; }
+.me-quick-grid .me-quick-item { flex: 1; min-width: 70px; padding: 0 4px; }
+.me-quick-grid .me-quick-icon { width: 36px; height: 36px; border-radius: 10px; background: #eef2ff; margin-bottom: 6px; }
+.me-quick-grid .me-quick-title { font-size: 12px; line-height: 18px; }
+.me-quick-grid .me-quick-sub { font-size: 10px; line-height: 16px; color: owner.$muted; margin-top: 3px; }
+.me-quick-divider { display: none; }
+.me-section-head { margin: 16px 16px 8px; }
+.me-section-label { @include owner.section; }
+.me-section-label:before { @include owner.marker; }
+.me-settings { @include owner.card; margin: 0 16px 16px; padding: 0 14px; }
+.me-settings .me-setting-item { min-height: 48px; padding: 12px 0; box-sizing: border-box; border-color: owner.$border; }
+.me-settings .me-setting-text { font-size: 13px; line-height: 20px; color: owner.$text; }
+@media (max-width: 360px) { .me-profile, .me-wallet-card, .me-quick-grid, .me-settings { margin-left: 12px; margin-right: 12px; } .me-profile { gap: 6px; } }
+@media (min-width: 600px) { .me-profile, .me-wallet-card, .me-quick-grid, .me-settings { max-width: 960px; width: calc(100% - 48px); margin-left: auto; margin-right: auto; } .me-workbench-nav, .me-section-head { width: calc(100% - 48px); max-width: 960px; margin-left: auto; margin-right: auto; } }
+
+.me-wallet-card .me-wallet-stat--recovery .me-wallet-stat-label { color: owner.$muted; }
+.me-wallet-card .me-wallet-stat--recovery .me-wallet-stat-value { color: owner.$primary; }
+.me-section-head { padding-top: 0; margin-top: 12px; }
+.me-quick-grid { min-height: 0; }
+.me-quick-grid .me-quick-item { min-height: 78px; border-radius: 10px; justify-content: center; }
+.me-quick-grid .me-quick-item:active { background: #f5f7ff; }
+.me-quick-grid .me-quick-item + .me-quick-item { border-left: 1px solid owner.$border; }
+.me-profile .me-action-icon { flex-shrink: 0; }
+.me-profile { padding: 14px; border: 1px solid #e2e7f7; background: linear-gradient(120deg, #eef2ff 0%, #f4f1ff 100%); }
+.me-profile .me-profile-role { display: block; margin-top: 3px; font-size: 11px; line-height: 17px; color: #7d869c; }
+.me-wallet-card { position: relative; overflow: hidden; padding: 16px; background: linear-gradient(135deg, #ffffff 0%, #f7f9ff 100%); border: 1px solid #e7ebf5; }
+.me-wallet-card:after { content: ''; position: absolute; right: -32px; top: -42px; width: 112px; height: 112px; border-radius: 50%; background: rgba(83,117,237,.07); pointer-events: none; }
+.me-wallet-card .me-wallet-amount { margin-top: 8px; font-size: 32px; line-height: 40px; }
+.me-wallet-card .me-wallet-divider { margin: 12px 0 10px; }
+.me-quick-grid { padding: 0 14px; flex-direction: column; row-gap: 0; }
+.me-quick-grid .me-quick-item { width: 100%; min-height: 62px; padding: 10px 0; flex-direction: row; justify-content: flex-start; align-items: center; box-sizing: border-box; }
+.me-quick-grid .me-quick-item + .me-quick-item { border-left: 0; border-top: 1px solid owner.$border; }
+.me-quick-grid .me-quick-icon { width: 38px; height: 38px; margin: 0 12px 0 0; flex-shrink: 0; }
+.me-quick-grid .me-quick-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.me-quick-grid .me-quick-title { font-size: 13px; line-height: 20px; color: owner.$text; }
+.me-quick-grid .me-quick-sub { margin-top: 1px; font-size: 11px; line-height: 17px; }
+.me-section-head { margin-top: 16px; }
+.me-settings { overflow: hidden; }
+.me-settings .me-setting-item { min-height: 52px; }
+</style>
+
+<style lang="scss">
+.me-invite-popup {
+	padding: 0 16px calc(14px + env(safe-area-inset-bottom));
+	background: #ffffff;
+
+	.me-invite-header { padding: 14px 44px 10px; }
+	.me-invite-heading { display: flex; flex-direction: column; align-items: center; }
+	.me-invite-title { font-size: 17px; line-height: 24px; color: #252b3b; }
+	.me-invite-subtitle { margin-top: 2px; font-size: 11px; line-height: 17px; color: #89909e; text-align: center; }
+	.me-invite-close { top: 12px; right: 0; width: 30px; height: 30px; border-radius: 50%; }
+	.me-invite-tabs { margin: 4px 0 0; padding: 3px; border: 0; border-radius: 10px; background: #eef1f8; gap: 4px; }
+	.me-invite-tab { padding: 8px 0; border-radius: 8px; }
+	.me-invite-tab--active { background: #ffffff; }
+	.me-invite-tab-text { font-size: 13px; line-height: 20px; }
+	.me-invite-tab-line { display: none; }
+	.me-invite-panel { height: min(660px, 72vh); padding-top: 12px; }
+	.me-invite-qr-section { min-height: 0; }
+	.me-invite-qr-card { min-height: 0; padding: 14px; border: 1px solid #e7ebf5; border-radius: 12px; background: #f7f9ff; }
+	.me-invite-qr-copy { min-height: 0; margin-right: 12px; }
+	.me-invite-qr-title { font-size: 15px; line-height: 22px; color: #315acb; }
+	.me-invite-qr-desc { margin-top: 5px; font-size: 11px; line-height: 18px; color: #778197; }
+	.me-invite-qr-box { width: 118px; height: 118px; min-width: 118px; min-height: 118px; border-radius: 10px; }
+	.me-invite-qr-image { width: 108px; height: 108px; min-width: 108px; min-height: 108px; }
+	.me-invite-qr-btn { height: 42px; min-height: 42px; margin-top: 10px; border-radius: 10px; gap: 6px; background: #5375ed; }
+	.me-invite-qr-btn-text { font-size: 14px; line-height: 20px; }
+	.me-invite-field, .me-invite-perm { margin-top: 16px; }
+	.me-invite-field-label, .me-invite-perm-label { font-size: 14px; line-height: 21px; color: #303649; }
+	.me-invite-field-sub { margin-top: 2px; font-size: 11px; line-height: 17px; }
+	.me-invite-input { height: 42px; margin-top: 8px; padding: 0 12px; border: 1px solid #edf0f5; border-radius: 9px; background: #f8f9fb; font-size: 13px; }
+	.me-invite-input-placeholder { font-size: 13px; }
+	.me-invite-perm-head { align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+	.me-invite-perm-tip { font-size: 10px; line-height: 16px; color: #929aaa; }
+	.me-invite-switch-card { margin-top: 8px; padding: 12px; border-color: #edf0f5; border-radius: 10px; background: #f8f9fb; }
+	.me-invite-rate-card { margin-top: 8px; padding: 12px; border: 1px solid #edf0f5; border-radius: 10px; background: #f8f9fb; }
+	.me-invite-rate-head { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; }
+	.me-invite-rate-head > view { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+	.me-invite-rate-value { flex-shrink: 0; font-size: 20px; line-height: 26px; font-weight: 700; color: #5375ed; }
+	.me-invite-rate-card slider { margin: 10px 0 0; }
+	.me-invite-rate-scale { display: flex; flex-direction: row; justify-content: space-between; margin-top: -2px; }
+	.me-invite-rate-scale > text { font-size: 9px; line-height: 14px; color: #a0a7b4; }
+	.me-invite-switch-title { font-size: 13px; line-height: 20px; }
+	.me-invite-switch-desc { margin-top: 2px; font-size: 11px; line-height: 17px; }
+	.me-invite-save-btn { height: 44px; margin-top: 12px; border-radius: 10px; background: #5375ed; }
+	.me-invite-save-text { font-size: 15px; line-height: 22px; }
 }
 </style>

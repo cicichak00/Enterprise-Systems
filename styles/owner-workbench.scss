@@ -1,0 +1,12 @@
+// Enterprise workbench visual language, matching the home screen.
+$background: #f4f5f7;
+$primary: #5375ed;
+$text: #303649;
+$muted: #89909e;
+$border: #edf0f5;
+@mixin card { background: #fff; border: 0; border-radius: 12px; box-shadow: none; box-sizing: border-box; }
+@mixin feature { background: linear-gradient(115deg, #e8edff 0%, #f0edfc 100%); border: 1px solid #e2e7f7; border-radius: 14px; box-sizing: border-box; }
+@mixin title { font-size: 19px; line-height: 26px; font-weight: 700; color: $text; }
+@mixin section { font-size: 15px; line-height: 22px; font-weight: 600; color: $text; }
+@mixin control { min-height: 34px; border-radius: 8px; background: #f8f9fb; border: 1px solid $border; box-sizing: border-box; }
+@mixin marker { content: ''; width: 3px; height: 13px; border-radius: 3px; background: $primary; display: inline-block; margin-right: 6px; }

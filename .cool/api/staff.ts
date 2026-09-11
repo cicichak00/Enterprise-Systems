@@ -7,7 +7,7 @@ export type GetStaffListParams = {
 	/** 0 离职/禁用，1 正常 */
 	status?: number;
 	keyword?: string;
-	/** 收益排序 desc 从高到低 / asc 从低到高 */
+	/** 收益排序 desc/asc；加入时间排序 join_desc/join_asc */
 	order?: string;
 	/** normal 普通员工 / leader 小组长 / member 组员 */
 	role?: string;
@@ -314,6 +314,33 @@ export function saveStaffQuickPromptPermission(params: SaveStaffQuickPromptPermi
 	});
 }
 
+export type StaffSettlementMethod = "offline" | "online";
+
+export type SaveStaffSettlementMethodParams = {
+	/** 企业员工关系 ID，支持单个或批量 */
+	ids: number[];
+	settlement_method: StaffSettlementMethod;
+};
+
+/**
+ * 批量设置员工结算方式。
+ * offline：员工仅可查看分成订单，钱包保持关闭，订单收益归企业主；
+ * online：员工可查看并提现分成收益，已结算订单数据同步主站。
+ */
+export function saveStaffSettlementMethod(params: SaveStaffSettlementMethodParams) {
+	return requestJson({
+		url: "/api/v1.enterprise.staff/settlementMethodSave",
+		method: "POST",
+		data: {
+			ids: params.ids,
+			settlement_method: params.settlement_method,
+			wallet_enabled: params.settlement_method == "online" ? 1 : 0,
+			income_owner: params.settlement_method == "online" ? "staff" : "enterprise",
+			push_main_site: params.settlement_method == "online" ? 1 : 0
+		}
+	});
+}
+
 export type GetStaffByteBindingListParams = {
 	page?: number;
 	limit?: number;
@@ -337,8 +364,12 @@ export function getStaffByteBindingList(params: GetStaffByteBindingListParams = 
 }
 
 /** 员工侧字节任务台信息 */
-export function getStaffByteTaskInfo() {
-	return request({ url: "/api/v1.enterprise.staff/byteTaskInfo", method: "GET" });
+export function getStaffByteTaskInfo(taskId: number = 0, projectId: number = 0) {
+	const query: string[] = [];
+	if (taskId > 0) query.push(`task_id=${taskId}`);
+	if (projectId > 0) query.push(`project_id=${projectId}`);
+	const suffix = query.length > 0 ? `?${query.join("&")}` : "";
+	return request({ url: `/api/v1.enterprise.staff/byteTaskInfo${suffix}`, method: "GET" });
 }
 
 export type SubmitStaffByteBindingParams = {
@@ -346,6 +377,8 @@ export type SubmitStaffByteBindingParams = {
 	mobile: string;
 	screenshot_1: string;
 	screenshot_2: string;
+	task_id?: number;
+	project_id?: number;
 };
 
 /** 员工提交字节 UID 绑定申请 */

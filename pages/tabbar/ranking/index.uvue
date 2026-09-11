@@ -1,0 +1,104 @@
+<template>
+	<cl-page :pt="{ className: 'rank-page' }" :back-top="false">
+		<view class="rank-page">
+			<view class="rank-hero">
+				<cl-safe-area type="top"></cl-safe-area>
+				<text class="rank-title">排行榜</text>
+				<text class="rank-update">更新于 {{ updatedAt }}</text>
+				<view class="rank-range"><text>时间范围</text><view class="rank-tabs"><view class="rank-tab" :class="{ 'rank-tab--active': rangeDays == 7 }" @tap="selectRange(7)"><text>7天</text></view><view class="rank-tab" :class="{ 'rank-tab--active': rangeDays == 30 }" @tap="selectRange(30)"><text>30天</text></view></view></view>
+			</view>
+			<scroll-view class="rank-scroll" scroll-y="true" :show-scrollbar="false">
+				<view class="rank-inner">
+					<view class="rank-award"><view><text class="rank-award-title">{{ rangeDays }}天收益冠军</text><text class="rank-award-name">{{ championName }}</text><text class="rank-award-copy">{{ enterpriseName }}</text></view><text class="rank-award-status">{{ rankingRows.length > 0 ? '已生成' : '待生成' }}</text></view>
+					<view class="rank-section-head"><view><text class="rank-section-title">收益排名</text><text class="rank-count">{{ rankingRows.length }} 位员工</text></view><text class="rank-sort">收益降序</text></view>
+					<view v-if="loading" class="rank-empty"><cl-loading :loading="true" :size="28"></cl-loading><text>加载中...</text></view>
+					<view v-else-if="rankingRows.length == 0" class="rank-empty"><view class="rank-empty-icon"><cl-icon name="bar-chart-2-line" :size="34" color="#8d9ab0"></cl-icon></view><text class="rank-empty-title">暂无排行数据</text><text class="rank-empty-copy">所选时间内暂无收益</text></view>
+					<view v-else class="rank-list"><view v-for="(item,index) in rankingRows" :key="item.key" class="rank-card"><text class="rank-index">{{ index + 1 }}</text><view class="rank-avatar"><text>{{ item.avatar }}</text></view><view class="rank-info"><text class="rank-name">{{ item.name }}</text><text class="rank-meta">{{ item.count }} 笔已审核订单</text></view><text class="rank-amount">¥{{ item.amount }}</text></view></view>
+				</view>
+			</scroll-view>
+			<custom-tabbar :show-spacer="true"></custom-tabbar>
+		</view>
+	</cl-page>
+</template>
+
+<script lang="ts" setup>
+	import { computed, ref } from "vue";
+	import { getOrderList } from "@/.cool/api/order";
+	import { getEnterpriseInfo } from "@/.cool/api/enterprise";
+	import { getApiMessage, isApiSuccess } from "@/.cool";
+	import type { OrderListItem, OrderListPayload } from "@/.cool/types/order";
+	import CustomTabbar from "@/components/tabbar.uvue";
+	import { syncTabbarRoutePath } from "@/.cool/store/tabbar";
+
+	type RankingRow = { key: string; name: string; avatar: string; amount: string; count: number };
+	const enterpriseName = ref("企业号");
+	const rangeDays = ref(30);
+	const loading = ref(false);
+	const orders = ref<OrderListItem[]>([]);
+	const updatedAt = ref("--");
+	const rankingRows = computed((): RankingRow[] => {
+		const map: Record<string, { name: string; total: number; count: number }> = {};
+		for (let i = 0; i < orders.value.length; i++) {
+			const item = orders.value[i];
+			const key = `${item.user_id ?? item.user_sn ?? item.user_nickname ?? i}`;
+			if (map[key] == null) map[key] = { name: `${item.user_nickname ?? '未命名员工'}`, total: 0, count: 0 };
+			map[key].total += parseFloat(`${item.user_profit ?? 0}`) || 0;
+			map[key].count++;
+		}
+		const rows: RankingRow[] = [];
+		for (const key in map) rows.push({ key, name: map[key].name, avatar: map[key].name.substring(0, 1), amount: map[key].total.toFixed(2), count: map[key].count });
+		rows.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
+		return rows;
+	});
+	const championName = computed(() => rankingRows.value.length > 0 ? rankingRows.value[0].name : "暂无冠军");
+	function parsePayload(res: any | null): OrderListPayload | null { if (res == null) return null; const env = res as UTSJSONObject; if (env["code"] != null && !isApiSuccess(env["code"])) return null; return (env["data"] ?? env) as OrderListPayload; }
+	function loadRanking() { loading.value = true; getOrderList({ page: 1, limit: 100, period: rangeDays.value == 7 ? "last_7_days" : "last_30_days", audit_status: "approved", settlement_status: "settled", time_field: "settlement_time" }).then((res) => { const data = parsePayload(res); orders.value = data?.list ?? []; const now = new Date(); updatedAt.value = `${now.getFullYear()}-${`${now.getMonth()+1}`.padStart(2,'0')}-${`${now.getDate()}`.padStart(2,'0')}`; }).catch((err) => uni.showToast({ title: getApiMessage(err, "加载失败"), icon: "none" })).finally(() => { loading.value = false; }); }
+	function selectRange(days: number) { if (rangeDays.value == days) return; rangeDays.value = days; loadRanking(); }
+	function loadName() { getEnterpriseInfo().then((res) => { const env = res as UTSJSONObject; const data = (env["data"] ?? env) as UTSJSONObject; const name = `${data["name"] ?? ""}`.trim(); if (name != "") enterpriseName.value = name; }).catch(() => {}); }
+	onShow(() => { syncTabbarRoutePath(); loadName(); loadRanking(); });
+</script>
+
+<style lang="scss" scoped>
+@use "../../../styles/owner-workbench" as owner;
+.rank-page { height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: owner.$background; overflow: hidden; }
+.rank-hero { padding: 0 16px 12px; flex-shrink: 0; }
+.rank-title { @include owner.title; display: flex; align-items: center; height: 48px; }
+.rank-update { display: block; font-size: 11px; line-height: 18px; color: owner.$muted; }
+.rank-range { @include owner.card; display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 12px; margin-top: 10px; }
+.rank-range > text { font-size: 12px; color: owner.$muted; }
+.rank-tabs { display: flex; flex-direction: row; padding: 3px; gap: 4px; border-radius: 8px; background: #f2f4f8; }
+.rank-tab { min-width: 56px; padding: 5px 8px; border-radius: 6px; align-items: center; }
+.rank-tab > text { font-size: 12px; line-height: 18px; color: #687182; }
+.rank-tab--active { background: #fff; }
+.rank-tab--active > text { color: owner.$primary; font-weight: 600; }
+.rank-scroll { flex: 1; height: 0; min-height: 0; }
+.rank-inner { padding: 0 16px 20px; }
+.rank-award { @include owner.feature; padding: 16px 14px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.rank-award > view { flex: 1; min-width: 0; }
+.rank-award-title { display: block; font-size: 12px; line-height: 18px; color: #75809b; }
+.rank-award-name { display: block; margin-top: 6px; font-size: 19px; line-height: 26px; font-weight: 700; color: owner.$primary; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rank-award-copy { display: block; font-size: 11px; line-height: 17px; margin-top: 4px; color: owner.$muted; overflow-wrap: anywhere; }
+.rank-award-status { padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,.7); font-size: 11px; line-height: 18px; color: owner.$primary; flex-shrink: 0; }
+.rank-section-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin: 16px 0 10px; gap: 8px; }
+.rank-section-head > view { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.rank-section-title { @include owner.section; }
+.rank-section-title:before { @include owner.marker; }
+.rank-count, .rank-sort { font-size: 11px; line-height: 18px; color: owner.$muted; }
+.rank-empty { @include owner.card; min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: owner.$muted; }
+.rank-empty > text { font-size: 12px; }
+.rank-empty-icon { width: 44px; height: 44px; background: #eef2ff; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.rank-empty .rank-empty-title { font-size: 14px; color: #535d73; }
+.rank-list { @include owner.card; padding: 0 14px; }
+.rank-card { display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid owner.$border; }
+.rank-card:last-child { border-bottom: 0; }
+.rank-index { width: 16px; font-size: 14px; font-weight: 700; color: owner.$muted; flex-shrink: 0; }
+.rank-card:nth-child(-n+3) .rank-index { color: owner.$primary; }
+.rank-avatar { width: 36px; height: 36px; background: #eef2ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rank-avatar > text { font-size: 15px; color: owner.$primary; }
+.rank-info { flex: 1; min-width: 0; }
+.rank-name { display: block; font-size: 14px; font-weight: 600; line-height: 20px; color: owner.$text; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rank-meta { display: block; font-size: 10px; line-height: 16px; margin-top: 4px; color: owner.$muted; }
+.rank-amount { font-size: 16px; font-weight: 700; color: owner.$primary; max-width: 40%; overflow-wrap: anywhere; }
+@media (max-width: 360px) { .rank-hero { padding-left: 12px; padding-right: 12px; } .rank-inner { padding-left: 12px; padding-right: 12px; } .rank-count { display: none; } }
+@media (min-width: 600px) { .rank-hero, .rank-inner { width: calc(100% - 48px); max-width: 960px; margin-left: auto; margin-right: auto; padding-left: 0; padding-right: 0; } }
+</style>

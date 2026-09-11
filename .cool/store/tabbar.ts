@@ -24,6 +24,8 @@ const KEY_ICON_FALLBACK: UTSJSONObject = {
 	income: "money-cny-circle-line",
 	revenue: "money-cny-circle-line",
 	profit: "money-cny-circle-line",
+	ranking: "trophy-line",
+	rank: "trophy-line",
 	my: "user-line",
 	profile: "user-line",
 	me: "user-line"
@@ -136,6 +138,7 @@ export function resolveActiveTabPath(currentPath: string, menus: TabbarMenuItem[
 		) {
 			return menus[i].path;
 		}
+		if ((key == "ranking" || key == "rank") && current.indexOf("/tabbar/ranking/") >= 0) return menus[i].path;
 	}
 	return "";
 }
@@ -235,7 +238,21 @@ export function parseMenusFromResponse(res: any | null): TabbarMenuItem[] {
 
 function applyMenus(parsed: TabbarMenuItem[]) {
 	if (parsed.length > 0) {
-		tabbarMenus.value = parsed;
+		const menus = parsed.slice();
+		let hasRanking = false;
+		let enterpriseMenu = false;
+		for (let i = 0; i < menus.length; i++) {
+			if (menus[i].key == "ranking" || menus[i].path == "/pages/tabbar/ranking/index") hasRanking = true;
+			if (menus[i].key == "overview" || menus[i].key == "operations" || menus[i].key == "business") enterpriseMenu = true;
+		}
+		if (enterpriseMenu && !hasRanking) {
+			let insertIndex = menus.length;
+			for (let i = 0; i < menus.length; i++) {
+				if (menus[i].key == "my" || menus[i].key == "profile" || menus[i].key == "me") { insertIndex = i; break; }
+			}
+			menus.splice(insertIndex, 0, { id: -100, key: "ranking", path: "/pages/tabbar/ranking/index", text: "排行榜", icon: "trophy-line", iconUrl: "", iconActiveUrl: "", badge: "", sort: 0 });
+		}
+		tabbarMenus.value = menus;
 	}
 }
 

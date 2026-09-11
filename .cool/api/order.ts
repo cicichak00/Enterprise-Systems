@@ -45,6 +45,9 @@ export function getOrderList(params: OrderListParams = {}) {
 	if (params.end_date != null && params.end_date != "") {
 		query.push(`end_date=${params.end_date}`);
 	}
+	if (params.audit_status != null && params.audit_status != "") query.push(`audit_status=${params.audit_status}`);
+	if (params.settlement_status != null && params.settlement_status != "") query.push(`settlement_status=${params.settlement_status}`);
+	if (params.time_field != null && params.time_field != "") query.push(`time_field=${params.time_field}`);
 	return request({
 		url: `/api/v1.enterprise.Order/list?${query.join("&")}`,
 		method: "GET"

@@ -2,8 +2,15 @@
 	<cl-page :pt="{ className: 'lg-page' }">
 		<view class="lg-page">
 			<view class="lg-body">
-				<text class="lg-title">账号密码登录</text>
-				<text class="lg-sub">使用密码登录企业号</text>
+				<view class="lg-welcome">
+					<view class="lg-brand">
+						<view class="lg-brand-accent"></view><image class="lg-brand-logo" src="/static/images/enterprise-login-logo.png" mode="aspectFit" alt="企业号 Logo"></image>
+						
+					</view>
+					<text class="lg-title">欢迎回来</text>
+					<text class="lg-sub">让协作更轻松，让每一份努力都有回响</text>
+				</view>
+				<view class="lg-form">
 				<view class="lg-field">
 					<text class="lg-label">手机号</text>
 					<input
@@ -44,6 +51,7 @@
 				<view class="lg-switch" @tap="toMobileLogin">
 					<text class="lg-switch-text">验证码登录</text>
 				</view>
+			</view>
 			</view>
 		</view>
 
@@ -524,4 +532,8 @@
 			font-weight: 600;
 		}
 	}
+</style>
+
+<style lang="scss" scoped>
+@import "@/styles/login-workbench.scss";
 </style>

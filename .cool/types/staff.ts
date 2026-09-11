@@ -61,6 +61,9 @@ export type StaffListItem = {
 	can_quick_prompt?: number | boolean;
 	quick_prompt_enabled?: number | boolean;
 	commission_rate?: string | number;
+	/** 结算方式：offline 线下结算 / online 线上结算；分成比例大于 0 时必填 */
+	settlement_method?: "offline" | "online" | string;
+	settlement_method_text?: string;
 	stats?: StaffStats;
 	join_time?: string;
 	create_time?: string;
@@ -296,6 +299,8 @@ export type StaffByteTaskInfo = {
 	screenshot_2?: string;
 	audit_status?: number;
 	audit_status_text?: string;
+	whitelist_status?: number;
+	whitelist_status_text?: string;
 	reject_reason?: string;
 	fail_reason?: string;
 	[key: string]: any;
