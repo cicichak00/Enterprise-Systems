@@ -311,7 +311,14 @@
 		</view>
 
         <cl-popup v-model="inviteVisible" direction="center" :show-close="true">
-            <view class="wb-invite-popup"><text class="wb-name">{{ enterpriseName }}</text><text class="wb-muted">扫码加入企业</text><cl-qrcode v-if="inviteVisible && inviteContent" :text="inviteContent" mode="rect" :pd-radius="0" :width="220" :height="220"></cl-qrcode><text v-else class="wb-muted">{{ enterpriseInfoLoading ? '邀请码加载中' : '邀请码暂不可用' }}</text><text v-if="!inviteContent && !enterpriseInfoLoading" class="wb-link" @tap="loadEnterpriseInfo">重试</text><text v-if="inviteContent" class="wb-copy-button" role="button" @tap="copyWorkbenchInvite">复制链接</text></view>
+            <view class="wb-invite-popup">
+                <view class="wb-invite-heading"><text class="wb-invite-title">邀请员工</text><text class="wb-invite-subtitle">扫码或复制链接加入企业</text></view>
+                <view class="wb-invite-enterprise"><image v-if="enterpriseLogo" class="wb-invite-logo" :src="enterpriseLogo" mode="aspectFill"></image><view v-else class="wb-invite-logo wb-avatar-placeholder"><text>{{ enterpriseName.slice(0, 1) }}</text></view><view class="wb-invite-enterprise-copy"><text>加入企业</text><b>{{ enterpriseName }}</b></view></view>
+                <view v-if="inviteVisible && inviteContent" class="wb-invite-qr"><cl-qrcode :text="inviteContent" mode="rect" :pd-radius="0" :width="196" :height="196"></cl-qrcode></view>
+                <view v-else class="wb-invite-state"><cl-loading v-if="enterpriseInfoLoading" :loading="true" :size="24"></cl-loading><text>{{ enterpriseInfoLoading ? '邀请码加载中' : '邀请码暂不可用' }}</text><text v-if="!enterpriseInfoLoading" class="wb-link" @tap="loadEnterpriseInfo">点击重试</text></view>
+                <text v-if="inviteContent" class="wb-invite-tip">员工使用微信扫码，确认后即可加入</text>
+                <view v-if="inviteContent" class="wb-copy-button" role="button" @tap="copyWorkbenchInvite"><cl-icon name="file-copy-line" :size="17" color="#ffffff"></cl-icon><text>复制邀请链接</text></view>
+            </view>
         </cl-popup>
 
 		<custom-tabbar :show-spacer="true"></custom-tabbar>
@@ -2792,8 +2799,22 @@
 .ov-emp-card .ov-emp-cell-value { font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
 .ov-list-state { min-height: 120px; gap: 12px; padding: 20px 0; }
 .ov-list-footer { padding: 8px 0 12px; }
-.wb-invite-popup { width: 288px; max-width: 90vw; box-sizing: border-box; padding: 28px 20px 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; background: #fff; }
-.wb-copy-button { width: 100%; padding: 12px 0; background: #5375ed; color: #fff; text-align: center; font-size: 14px; line-height: 20px; border-radius: 10px; }
+.wb-invite-popup { width: 304px; max-width: 90vw; box-sizing: border-box; padding: 24px 18px 18px; display: flex; flex-direction: column; align-items: stretch; background: #fff; }
+.wb-invite-heading { padding: 0 26px 16px; display: flex; flex-direction: column; align-items: center; }
+.wb-invite-title { font-size: 17px; line-height: 24px; font-weight: 600; color: #252b3b; }
+.wb-invite-subtitle { margin-top: 3px; font-size: 11px; line-height: 17px; color: #89909e; }
+.wb-invite-enterprise { padding: 10px 11px; display: flex; flex-direction: row; align-items: center; border: 1px solid #e4e9f7; border-radius: 11px; background: #f6f8ff; }
+.wb-invite-logo { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; }
+.wb-invite-logo.wb-avatar-placeholder { display: flex; align-items: center; justify-content: center; background: #dce5ff; }
+.wb-invite-logo.wb-avatar-placeholder text { font-size: 14px; font-weight: 600; color: #5375ed; }
+.wb-invite-enterprise-copy { flex: 1; min-width: 0; margin-left: 9px; display: flex; flex-direction: column; }
+.wb-invite-enterprise-copy text { font-size: 10px; line-height: 15px; color: #8a93a5; }
+.wb-invite-enterprise-copy b { margin-top: 1px; font-size: 13px; line-height: 19px; font-weight: 600; color: #30384b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-invite-qr { width: 216px; height: 216px; margin: 14px auto 0; padding: 10px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid #e7eaf0; border-radius: 13px; background: #fff; }
+.wb-invite-tip { margin-top: 9px; font-size: 10px; line-height: 16px; color: #89909e; text-align: center; }
+.wb-invite-state { min-height: 216px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: #89909e; }
+.wb-copy-button { width: 100%; height: 44px; margin-top: 14px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; background: #5375ed; border-radius: 10px; }
+.wb-copy-button text { color: #fff; font-size: 14px; line-height: 20px; font-weight: 600; }
 @media (max-width: 360px) {
     .ov-card, .wb-activity, .ov-body { margin-left: 12px; margin-right: 12px; }
     .wb-header { padding-left: 12px; padding-right: 12px; }
