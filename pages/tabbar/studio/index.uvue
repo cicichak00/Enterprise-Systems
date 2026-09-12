@@ -163,6 +163,46 @@
 		<custom-tabbar></custom-tabbar>
 
 		<cl-popup
+			v-model="taskPreviewVisible"
+			direction="bottom"
+			size="auto"
+			:show-header="false"
+			:show-close="false"
+			:mask-closable="true"
+			:swipe-close="true"
+			:pt="{ className: 'st-task-preview-wrap' }"
+		>
+			<view v-if="previewTask != null" class="st-task-preview">
+				<view class="st-preview-handle"></view>
+				<view class="st-preview-head">
+					<image v-if="previewLogo != ''" class="st-preview-logo" :src="previewLogo" mode="aspectFill"></image>
+					<view v-else class="st-preview-logo st-preview-logo--text"><text>{{ getTaskIconText(`${previewTask?.title ?? ''}`) }}</text></view>
+					<view class="st-preview-copy">
+						<text class="st-preview-title">{{ previewTask?.title ?? "任务详情" }}</text>
+						<text class="st-preview-meta">{{ previewTask?.category_text ?? previewTask?.type_text ?? "项目任务" }} · 更新 {{ formatTaskUpdateDate(`${previewTask?.update_time ?? ''}`) }}</text>
+					</view>
+					<view class="st-preview-close" @tap="closeTaskPreview"><cl-icon name="close-line" :size="20" color="#7f8798"></cl-icon></view>
+				</view>
+
+				<view class="st-preview-guide">
+					<view class="st-preview-guide-icon"><cl-icon name="file-list-3-line" :size="20" color="#5375ed"></cl-icon></view>
+					<view class="st-preview-guide-copy"><text class="st-preview-guide-title">参与说明</text><text class="st-preview-guide-text">确认项目后进入提词表单，完成内容即可提交参与。</text></view>
+				</view>
+
+				<project-whitelist
+					v-if="previewNeedsWhitelist"
+					:task-id="previewTaskId"
+					:project-id="previewProjectId"
+				></project-whitelist>
+
+				<view class="st-preview-actions">
+					<view class="st-preview-btn st-preview-btn--light" @tap="openPreviewRecords"><text>参与记录</text></view>
+					<view class="st-preview-btn st-preview-btn--primary" @tap="continuePreviewTask"><text>{{ previewNeedsWhitelist ? "继续参与" : "立即参与" }}</text></view>
+				</view>
+			</view>
+		</cl-popup>
+
+		<cl-popup
 			v-model="resignedNoticeVisible"
 			direction="center"
 			size="560rpx"
@@ -198,6 +238,7 @@
 	import type { TaskListParams } from "@/.cool/types/task";
 	import type { ClTabsItem } from "@/uni_modules/cool-ui/types/index";
 	import CustomTabbar from "@/components/tabbar.uvue";
+	import ProjectWhitelist from "@/components/task/project-whitelist.uvue";
 	import { syncTabbarRoutePath } from "@/.cool/store/tabbar";
 
 	const taskLayout = ref("grid");
@@ -244,6 +285,19 @@
 	};
 
 	const taskRows = ref<TaskListItem[]>([]);
+	const taskPreviewVisible = ref(false);
+	const previewTask = ref<TaskListItem | null>(null);
+	const previewTaskId = computed((): number => previewTask.value?.id ?? 0);
+	const previewProjectId = computed((): number => previewTask.value?.project_id ?? 0);
+	const previewLogo = computed((): string => {
+		const item = previewTask.value;
+		return item == null ? "" : getTaskLogoUrl(item);
+	});
+	const previewNeedsWhitelist = computed((): boolean => {
+		const item = previewTask.value;
+		if (item == null) return false;
+		return `${item.category_text ?? item.type_text ?? ""}`.indexOf("品牌应用") >= 0;
+	});
 	const promptToolsEnabled = ref(true);
 	const composeEntryTask = computed((): TaskListItem | null => {
 		for (let i = 0; i < taskRows.value.length; i++) {
@@ -650,12 +704,45 @@
 	}
 
 	function onParticipateTask(item: TaskListItem) {
+		previewTask.value = item;
+		taskPreviewVisible.value = true;
+	}
+
+	function closeTaskPreview() {
+		taskPreviewVisible.value = false;
+	}
+
+	function openPreviewRecords() {
+		const item = previewTask.value;
+		if (item == null) return;
+		closeTaskPreview();
+		const query: UTSJSONObject = {
+			id: item.id ?? 0,
+			title: item.title ?? "",
+			logo: getTaskLogoUrl(item),
+			is_batch_back: item.is_batch_back ?? 0
+		};
+		router.push({
+			path: `${item.id ?? ""}` == "900001" ? "/pages/task/prompt-record" : "/pages/task/record-list",
+			query: query
+		});
+	}
+
+	function continuePreviewTask() {
+		const item = previewTask.value;
+		if (item == null) return;
+		closeTaskPreview();
 		const title = `${item.title ?? ""}`;
-		const isPromotionTask = title.indexOf("番茄") >= 0 || title.indexOf("红果") >= 0;
-		if (!isPromotionTask) {
+		const cid = item.category_id ?? 0;
+		if (cid == 5 || cid == 6) {
 			onTaskDetail(item);
 			return;
 		}
+		if (`${item.id ?? ""}` == "900001") {
+			openComposePrompt();
+			return;
+		}
+		const isPromotionTask = title.indexOf("番茄") >= 0 || title.indexOf("红果") >= 0;
 		const query: UTSJSONObject = {
 			id: item.id,
 			task_id: item.id,
@@ -665,7 +752,7 @@
 			logo: getTaskLogoUrl(item)
 		};
 		router.push({
-			path: "/pages/task/promotion-content",
+			path: isPromotionTask ? "/pages/task/promotion-content" : "/pages/task/form",
 			query: query
 		});
 	}
@@ -1203,6 +1290,28 @@
 .st-task-grid--list .st-task-btn { flex: 0 1 100px; }
 .st-task-grid--list .st-task-btn-text { font-size: 12px; }
 .st-footer { padding-top: 18px; }
+	.st-task-preview { width: 100%; max-height: 86vh; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; background: #fff; }
+	.st-preview-handle { width: 38px; height: 4px; margin: 0 auto 12px; border-radius: 2px; background: #dfe3eb; }
+	.st-preview-head { display: flex; flex-direction: row; align-items: center; padding: 2px 0 16px; }
+	.st-preview-logo { width: 50px; height: 50px; flex-shrink: 0; border-radius: 14px; background: #f1f4fa; }
+	.st-preview-logo--text { display: flex; align-items: center; justify-content: center; background: #eef2ff; }
+	.st-preview-logo--text text { color: $primary; font-size: 18px; font-weight: 700; }
+	.st-preview-copy { flex: 1; min-width: 0; margin-left: 12px; display: flex; flex-direction: column; }
+	.st-preview-title { color: $text; font-size: 18px; line-height: 25px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.st-preview-meta { margin-top: 4px; color: $muted; font-size: 11px; line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.st-preview-close { width: 32px; height: 32px; margin-left: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #f3f5f8; }
+	.st-preview-guide { margin-bottom: 12px; padding: 14px; display: flex; flex-direction: row; align-items: flex-start; border: 1px solid #e7ebf5; border-radius: 14px; background: #f8faff; }
+	.st-preview-guide-icon { width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: #eaf0ff; }
+	.st-preview-guide-copy { flex: 1; min-width: 0; margin-left: 10px; display: flex; flex-direction: column; }
+	.st-preview-guide-title { color: $text; font-size: 14px; line-height: 20px; font-weight: 600; }
+	.st-preview-guide-text { margin-top: 3px; color: $muted; font-size: 12px; line-height: 18px; }
+	.st-preview-actions { display: flex; flex-direction: row; gap: 10px; margin-top: 14px; }
+	.st-preview-btn { flex: 1; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+	.st-preview-btn text { font-size: 14px; line-height: 20px; font-weight: 600; }
+	.st-preview-btn--light { background: #eef2ff; }
+	.st-preview-btn--light text { color: $primary; }
+	.st-preview-btn--primary { background: $primary; }
+	.st-preview-btn--primary text { color: #fff; }
 	@media (max-width: 350px) { .st-task-card { padding: 10px; } .st-task-logo, .st-task-icon { width: 24px; height: 24px; } }
 	.st-prompt-tools { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 10px; }
 	.st-prompt-tool { min-width: 0; min-height: 58px; padding: 10px; display: flex; flex-direction: row; align-items: center; box-sizing: border-box; border: 1px solid #e7ebf5; border-radius: 12px; background: #fff; }
@@ -1213,4 +1322,8 @@
 	.st-prompt-tool-title { font-size: 13px; line-height: 19px; font-weight: 600; color: $text; white-space: nowrap; }
 	.st-prompt-tool-sub { margin-top: 2px; font-size: 10px; line-height: 15px; color: $muted; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	@media (max-width: 350px) { .st-prompt-tool { padding: 8px; } .st-prompt-tool-icon { width: 30px; height: 30px; margin-right: 6px; } .st-prompt-tool-sub { display: none; } }
+</style>
+
+<style lang="scss">
+	.st-task-preview-wrap .cl-popup__inner { border-radius: 20px 20px 0 0; overflow: hidden; background: #fff; }
 </style>
