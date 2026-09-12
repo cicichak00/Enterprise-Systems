@@ -25,6 +25,11 @@
 								<cl-icon name="notification-4-line" :size="19" color="#5375ed"></cl-icon>
 							</view>
 						</view>
+						<view class="st-member-line">
+							<view class="st-member-avatar"><text>{{ employeeAvatarText }}</text></view>
+							<view class="st-member-copy"><text class="st-member-name">{{ employeeNickname }}</text><text class="st-member-id">用户 ID：{{ employeeUserId }}</text></view>
+							<view class="st-member-tag"><text>员工</text></view>
+						</view>
 					</view>
 
 						<view v-if="promptToolsEnabled" class="st-prompt-tools">
@@ -261,6 +266,10 @@
 			const envelope = res as UTSJSONObject;
 			const data = (envelope["data"] ?? envelope) as UTSJSONObject;
 			const staff = data["staff"] as UTSJSONObject | null;
+			const nickname = `${data["nickname"] ?? data["nick_name"] ?? data["username"] ?? ""}`.trim();
+			const userId = `${data["sn"] ?? data["user_sn"] ?? data["user_id"] ?? data["id"] ?? ""}`.trim();
+			employeeNickname.value = nickname != "" ? nickname : "未命名员工";
+			employeeUserId.value = userId != "" ? userId : "--";
 			const raw = data["can_quick_prompt"] ?? data["quick_prompt_enabled"] ?? staff?.["can_quick_prompt"] ?? staff?.["quick_prompt_enabled"];
 			if (raw != null) promptToolsEnabled.value = raw === true || `${raw}` == "1";
 		}).catch(() => {});
@@ -276,6 +285,12 @@
 	const enterpriseLogo = ref("");
 	const enterpriseLogoText = ref("企");
 	const enterpriseFooterLine = ref("");
+	const employeeNickname = ref("未命名员工");
+	const employeeUserId = ref("--");
+	const employeeAvatarText = computed((): string => {
+		const name = employeeNickname.value.trim();
+		return name != "" && name != "未命名员工" ? name.substring(0, 1) : "员";
+	});
 	const enterpriseInfoLoading = ref(false);
 	const resignedNoticeVisible = ref(false);
 
@@ -1153,6 +1168,14 @@
 .st-brand-name { display: block; font-size: 16px; line-height: 22px; color: $text; overflow-wrap: anywhere; }
 .st-brand-sub { display: block; font-size: 12px; line-height: 18px; color: $muted; overflow-wrap: anywhere; }
 .st-settings-btn { width: 34px; height: 34px; border-radius: 9px; background: #ffffffb3; }
+.st-member-line { margin: 0 12px; padding: 11px 0 12px; display: flex; flex-direction: row; align-items: center; border-top: 1px solid rgba(116,137,197,.16); }
+.st-member-avatar { width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #5375ed; }
+.st-member-avatar text { font-size: 12px; line-height: 18px; font-weight: 600; color: #fff; }
+.st-member-copy { flex: 1; min-width: 0; margin-left: 9px; display: flex; flex-direction: column; }
+.st-member-name { font-size: 12px; line-height: 18px; font-weight: 600; color: $text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-member-id { margin-top: 1px; font-size: 10px; line-height: 15px; color: $muted; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-member-tag { margin-left: 8px; padding: 2px 7px; flex-shrink: 0; border-radius: 6px; background: rgba(83,117,237,.1); }
+.st-member-tag text { font-size: 10px; line-height: 15px; color: $primary; }
 .st-type-card { @include card; padding: 5px 4px; margin-bottom: 12px; }
 .st-type-text { font-size: 12px; }
 .st-layout-bar { display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin: 0 0 10px; }
