@@ -1,0 +1,1 @@
+import{P as e}from"./index-Bf4W6Rx8.js";function i(){return e({url:"/api/v1.enterprise.Mine/index",method:"GET"})}function r(i={}){var r,n;return e({url:"/api/v1.enterprise.Mine/departureRecoveryList?page=".concat(null!==(r=i.page)&&void 0!==r?r:1,"&limit=").concat(null!==(n=i.limit)&&void 0!==n?n:20),method:"GET"})}export{r as a,i as g};
