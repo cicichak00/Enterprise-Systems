@@ -1085,31 +1085,31 @@
 				</view>
 				<view class="bs-batch-action-list">
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('commission')">
-						<view class="bs-batch-action-icon"><cl-icon name="percent-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-icon bs-batch-action-icon--commission"><cl-icon name="percent-line" :size="20" color="#3f6ee8"></cl-icon></view>
 						<view class="bs-batch-action-copy">
 							<text class="bs-batch-action-title">设置分成</text>
 							<text class="bs-batch-action-desc">选择员工后统一调整常规分成比例</text>
 						</view>
-						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+						<cl-icon class="bs-batch-action-arrow" name="arrow-right-s-line" :size="17" color="#a7afbd"></cl-icon>
 					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('settlement')">
-						<view class="bs-batch-action-icon"><cl-icon name="bank-card-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-icon bs-batch-action-icon--settlement"><cl-icon name="bank-card-line" :size="20" color="#167dcb"></cl-icon></view>
 						<view class="bs-batch-action-copy">
 							<text class="bs-batch-action-title">设置结算方式</text>
 							<text class="bs-batch-action-desc">线下结算或线上结算，支持单人及多人设置</text>
 						</view>
-						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+						<cl-icon class="bs-batch-action-arrow" name="arrow-right-s-line" :size="17" color="#a7afbd"></cl-icon>
 					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('role_label')">
-						<view class="bs-batch-action-icon"><cl-icon name="price-tag-3-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-icon bs-batch-action-icon--tag"><cl-icon name="price-tag-3-line" :size="20" color="#7c55d9"></cl-icon></view>
 						<view class="bs-batch-action-copy">
 							<text class="bs-batch-action-title">自定义标签</text>
 							<text class="bs-batch-action-desc">统一设置姓名旁标签，不改变员工真实角色</text>
 						</view>
-						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+						<cl-icon class="bs-batch-action-arrow" name="arrow-right-s-line" :size="17" color="#a7afbd"></cl-icon>
 					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('quick_prompt')">
-						<view class="bs-batch-action-icon bs-batch-action-icon--prompt"><cl-icon name="message-3-line" :size="18" color="#7c3aed"></cl-icon></view>
+						<view class="bs-batch-action-icon bs-batch-action-icon--prompt"><cl-icon name="message-3-line" :size="20" color="#7c55d9"></cl-icon></view>
 						<view class="bs-batch-action-copy">
 							<view class="bs-batch-action-title-row">
 								<text class="bs-batch-action-title">快捷提词</text>
@@ -1117,23 +1117,23 @@
 							</view>
 							<text class="bs-batch-action-desc">控制员工字节项目中的快捷提词组件</text>
 						</view>
-						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+						<cl-icon class="bs-batch-action-arrow" name="arrow-right-s-line" :size="17" color="#a7afbd"></cl-icon>
 					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('project')">
-						<view class="bs-batch-action-icon"><cl-icon name="apps-2-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-icon bs-batch-action-icon--project"><cl-icon name="apps-line" :size="20" color="#0f9b76"></cl-icon></view>
 						<view class="bs-batch-action-copy">
 							<text class="bs-batch-action-title">项目管理</text>
 							<text class="bs-batch-action-desc">统一配置所选员工可使用的项目</text>
 						</view>
-						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+						<cl-icon class="bs-batch-action-arrow" name="arrow-right-s-line" :size="17" color="#a7afbd"></cl-icon>
 					</view>
 					<view class="bs-batch-action-item" @tap="selectEmployeeBatchAction('wallet')">
-						<view class="bs-batch-action-icon"><cl-icon name="wallet-line" :size="18" color="#2b59c3"></cl-icon></view>
+						<view class="bs-batch-action-icon bs-batch-action-icon--wallet"><cl-icon name="wallet-line" :size="20" color="#d18127"></cl-icon></view>
 						<view class="bs-batch-action-copy">
 							<text class="bs-batch-action-title">设置钱包</text>
 							<text class="bs-batch-action-desc">统一调整员工钱包相关权限</text>
 						</view>
-						<cl-icon name="arrow-right-s-line" :size="18" color="#9aa6b6"></cl-icon>
+						<cl-icon class="bs-batch-action-arrow" name="arrow-right-s-line" :size="17" color="#a7afbd"></cl-icon>
 					</view>
 				</view>
 				<cl-safe-area type="bottom"></cl-safe-area>
@@ -10992,13 +10992,30 @@
  .bs-perm-footer { padding-top: 9px; padding-bottom: calc(9px + env(safe-area-inset-bottom)); }
  .bs-perm-save-btn { height: 42px; }
 }
-.bs-batch-action-popup, .bs-revenue-rank-popup { background: owner.$background; padding: 16px 14px calc(16px + env(safe-area-inset-bottom)); }
-.bs-batch-action-popup .bs-batch-action-title, .bs-revenue-rank-popup .bs-revenue-rank-popup-title { font-size: 16px; line-height: 24px; color: owner.$text; }
-.bs-batch-action-popup .bs-batch-action-list { border-radius: 12px; margin-top: 12px; }
-.bs-batch-action-popup .bs-batch-action-item { min-height: 64px; padding: 12px; border-color: owner.$border; }
-.bs-batch-action-popup .bs-batch-action-icon { width: 32px; height: 32px; border-radius: 8px; margin-right: 10px; background: #eef2ff; }
-.bs-batch-action-popup .bs-batch-action-title { font-size: 14px; }
-.bs-batch-action-popup .bs-batch-action-desc { font-size: 12px; line-height: 18px; color: owner.$muted; }
+.bs-batch-action-popup, .bs-revenue-rank-popup { background: owner.$background; padding: 12px 14px calc(16px + env(safe-area-inset-bottom)); }
+.bs-batch-action-popup .bs-batch-rate-header { margin-bottom: 0; padding: 2px 2px 0; }
+.bs-batch-action-popup .bs-batch-rate-title, .bs-revenue-rank-popup .bs-revenue-rank-popup-title { font-size: 18px; line-height: 26px; color: owner.$text; }
+.bs-batch-action-popup .bs-batch-action-subtitle { margin-top: 2px; font-size: 11px; line-height: 17px; color: owner.$muted; }
+.bs-batch-action-popup .bs-batch-rate-close { width: 32px; height: 32px; border-radius: 50%; background: #ebeef4; }
+.bs-batch-action-popup .bs-batch-action-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; border-radius: 0; background: transparent; overflow: visible; }
+.bs-batch-action-popup .bs-batch-action-item { position: relative; min-width: 0; min-height: 124px; padding: 13px 12px 12px; flex-direction: column; align-items: flex-start; border: 1px solid owner.$border; border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(31, 48, 91, .03); }
+.bs-batch-action-popup .bs-batch-action-item:active { border-color: #cdd8fb; background: #f8faff; }
+.bs-batch-action-popup .bs-batch-action-icon { width: 36px; height: 36px; margin: 0 0 9px; border-radius: 10px; background: #edf2ff; }
+.bs-batch-action-popup .bs-batch-action-icon--settlement { background: #eaf6ff; }
+.bs-batch-action-popup .bs-batch-action-icon--tag, .bs-batch-action-popup .bs-batch-action-icon--prompt { background: #f3efff; }
+.bs-batch-action-popup .bs-batch-action-icon--project { background: #eaf8f3; }
+.bs-batch-action-popup .bs-batch-action-icon--wallet { background: #fff4e8; }
+.bs-batch-action-popup .bs-batch-action-copy { width: 100%; padding-top: 0; }
+.bs-batch-action-popup .bs-batch-action-title { font-size: 14px; line-height: 20px; font-weight: 600; color: owner.$text; }
+.bs-batch-action-popup .bs-batch-action-desc { margin-top: 5px; font-size: 11px; line-height: 17px; color: owner.$muted; overflow-wrap: anywhere; }
+.bs-batch-action-popup .bs-batch-action-arrow { position: absolute; top: 15px; right: 8px; }
+.bs-batch-action-popup .bs-batch-action-title-row { padding-right: 10px; flex-wrap: wrap; gap: 3px; }
+.bs-batch-action-popup .bs-batch-action-default-tag { margin-left: 0; padding: 1px 5px; font-size: 9px; line-height: 14px; }
+@media (max-width: 350px) {
+ .bs-batch-action-popup .bs-batch-action-item { min-height: 118px; padding: 11px 9px; }
+ .bs-batch-action-popup .bs-batch-action-icon { width: 32px; height: 32px; margin-bottom: 7px; }
+ .bs-batch-action-popup .bs-batch-action-title { font-size: 13px; }
+}
 .bs-revenue-rank-popup .bs-revenue-rank-popup-item { padding: 12px; border-radius: 9px; margin-top: 8px; background: #fff; }
 .bs-revenue-rank-popup .bs-revenue-rank-popup-item--active { background: #eef2ff; }
 .bs-revenue-rank-popup .bs-revenue-rank-popup-item-text { font-size: 14px; line-height: 22px; color: owner.$text; }
