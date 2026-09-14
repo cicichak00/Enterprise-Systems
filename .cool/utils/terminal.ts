@@ -1,3 +1,7 @@
+import { uuid } from "./comm";
+
+const LOGIN_DEVICE_ID_KEY = "enterprise_login_device_id";
+
 /** 企业号登录 terminal（与接口文档一致：app / h5 / mp） */
 export function getLoginTerminal(): string {
 	// #ifdef MP-WEIXIN
@@ -18,9 +22,30 @@ export function getLoginTerminal(): string {
 	return "app";
 }
 
-export function getDeviceId() {
+/**
+ * 登录设备唯一标识。
+ * 首次调用生成 UUID 并写入本地，后续登录复用；不能使用 terminal/channel 代替。
+ */
+export function getDeviceId(): string {
+	const stored = `${uni.getStorageSync(LOGIN_DEVICE_ID_KEY) ?? ""}`.trim();
+	if (stored != "" && stored.length <= 64) {
+		return stored;
+	}
+	const deviceId = uuid();
+	uni.setStorageSync(LOGIN_DEVICE_ID_KEY, deviceId);
+	return deviceId;
+}
+
+/** 用于后端排查的可读设备名称，最长 64 字符。 */
+export function getDeviceName(): string {
 	const info = uni.getSystemInfoSync();
-	return info.deviceId ?? "";
+	const deviceModel = `${info.model ?? ""}`.trim();
+	const osName = `${info.platform ?? ""}`.trim();
+	const parts: string[] = [];
+	if (deviceModel != "") parts.push(deviceModel);
+	if (osName != "" && parts.indexOf(osName) < 0) parts.push(osName);
+	const name = parts.length > 0 ? parts.join(" ") : getLoginTerminal().toUpperCase();
+	return name.substring(0, 64);
 }
 
 /** 请求头 yb-client-os */

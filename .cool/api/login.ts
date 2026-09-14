@@ -1,5 +1,5 @@
 import { request, requestJson } from "../service/core";
-import { getLoginTerminal } from "../utils/terminal";
+import { getDeviceId, getDeviceName, getLoginTerminal } from "../utils/terminal";
 
 const FORM_URLENCODED = "application/x-www-form-urlencoded";
 
@@ -33,6 +33,8 @@ export function loginByMobile(mobile: string, code: string) {
 		data: {
 			mobile: mobile,
 			code: code,
+			device_id: getDeviceId(),
+			device_name: getDeviceName(),
 			terminal: getLoginTerminal()
 		}
 	});
@@ -46,6 +48,8 @@ export function loginByAccount(mobile: string, password: string) {
 		data: {
 			mobile: mobile,
 			password: password,
+			device_id: getDeviceId(),
+			device_name: getDeviceName(),
 			terminal: getLoginTerminal()
 		}
 	});
