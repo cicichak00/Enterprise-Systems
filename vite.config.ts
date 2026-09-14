@@ -55,7 +55,7 @@ function h5VersionPlugin(): Plugin {
 export default defineConfig({
 	base:
 		process.env.UNI_PLATFORM == "h5" && process.env.NODE_ENV == "production"
-			? (process.env.H5_PUBLIC_BASE ?? "/Enterprise-Systems-Web/")
+			? (process.env.H5_PUBLIC_BASE ?? "/Enterprise-Systems/")
 			: "/",
 
 	plugins: [
