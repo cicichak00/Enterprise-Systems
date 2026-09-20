@@ -12,23 +12,20 @@
 <div class="app">
   <aside class="side">
     <div class="brand"><div class="brand-logo">豹</div><b>右豹 2.0 工作台</b></div>
-    <div class="menu-title">工作台</div>
-    <div class="menu-item"><span class="menu-ico">⌂</span>首页</div>
-    <div class="menu-item"><span class="menu-ico">▥</span>数据中心</div>
-    <div class="menu-title">经营协作</div>
-    <div class="menu-item"><span class="menu-ico">♙</span>我的团队</div>
-    <div class="menu-item active"><span class="menu-ico">▣</span>企业号</div>
-    <div class="menu-item"><span class="menu-ico">▤</span>协作结算</div>
-    <div class="menu-item"><span class="menu-ico">◇</span>商务经纪</div>
-    <div class="menu-title">服务</div>
-    <div class="menu-item"><span class="menu-ico">♢</span>服务增长</div>
-    <div class="menu-item"><span class="menu-ico">⬡</span>保障</div>
-    <div class="side-foot">v1.7.0 · 企业号工作台</div>
+    <div class="menu-title">企业主工作台</div>
+    <div class="menu-item active"><span class="menu-ico">⌂</span>总览</div>
+    <div class="menu-item" onclick="openPanel('employees')"><span class="menu-ico">♙</span>员工管理</div>
+    <div class="menu-item" onclick="openPanel('projects')"><span class="menu-ico">▦</span>任务管理</div>
+    <div class="menu-item" onclick="openPanel('revenue')"><span class="menu-ico">▤</span>收益管理</div>
+    <div class="menu-title">企业设置</div>
+    <div class="menu-item" onclick="tip('已打开预设邀请设置')"><span class="menu-ico">码</span>邀请员工</div>
+    <div class="menu-item" onclick="tip('已打开定制企业信息')"><span class="menu-ico">◇</span>定制企业信息</div>
+    <div class="side-foot">企业号 PC 端 · 企业主业务侧</div>
   </aside>
   <main class="main">
-    <header class="topbar"><div class="crumbs">右豹工作台　›　经营协作　›　企业号</div><div class="top-actions"><input class="search" placeholder="搜索员工、任务或订单"/><button class="circle">?</button><button class="circle">⚙</button></div></header>
+    <header class="topbar"><div class="crumbs">右豹工作台　›　企业号　›　企业主工作台</div><div class="top-actions"><input class="search" placeholder="搜索员工、任务或订单"/><button class="circle">?</button><button class="circle">⚙</button></div></header>
     <div class="content">
-      <div class="page-head"><div><div class="page-title">企业号管理中心</div><div class="page-sub">查看经营数据，统一管理员工与项目</div></div><button class="btn primary" onclick="tip('已打开邀请员工设置')">＋ 邀请员工</button></div>
+      <div class="page-head"><div><div class="page-title">企业主工作台</div><div class="page-sub">与企业号移动端同步：看经营数据、管理员工、配置项目</div></div><button class="btn primary" onclick="tip('已打开预设邀请设置')">＋ 邀请员工</button></div>
       <section class="enterprise">
         <div class="enterprise-top"><div class="avatar">企</div><div class="ent-copy"><div class="ent-name">嘟嘟拉拉诶</div><div class="ent-intro">山上有点凉不然专号哈</div></div><div class="ent-actions"><button class="btn">定制企业信息</button></div></div>
         <div class="metric-strip">
@@ -57,6 +54,7 @@
 const overview=document.getElementById('mainPanel').innerHTML;
 const panels={employees:`<div class="notice"><b>2 条员工加入申请待处理</b><span>审核已合并到员工操作台。</span><button class="btn" style="margin-left:auto">查看申请</button></div><div class="toolbar"><input class="search" placeholder="员工 ID 或昵称"><button class="btn">搜索</button><select class="date"><option>全部员工</option><option>在职员工</option><option>离职员工</option></select><div class="spacer"></div><button class="btn">员工排序</button><button class="btn primary" onclick="tip('已打开批量操作')">批量操作</button></div><table class="table"><thead><tr><th>员工</th><th>状态 / 角色</th><th>结算</th><th>任务</th><th>回填</th><th>推广收益</th><th>员工收益</th><th>操作</th></tr></thead><tbody><tr><td><b>用户1641</b><br><small>ID 530</small></td><td><span class="status">在职</span> 普通员工</td><td>线下结算</td><td>1</td><td>1</td><td>¥0.45</td><td>¥0.09</td><td><a class="link">管理</a></td></tr><tr><td><b>用户6569</b><br><small>ID 529</small></td><td><span class="status">在职</span> 普通员工</td><td>线上结算</td><td>18</td><td>1</td><td>¥14.04</td><td>¥0.96</td><td><a class="link">管理</a></td></tr></tbody></table>`,projects:`<div class="toolbar"><div class="seg"><button class="active">全部</button><button>品牌短剧</button><button>品牌网盘</button><button>品牌应用</button></div><div class="spacer"></div><input class="search" placeholder="搜索项目"><button class="btn">搜索</button></div><div class="notice"><b>项目与任务统一管理</b><span>项目开关、任务数据和员工项目配置集中处理。</span></div><div class="project-grid"><div class="project-card"><h4>芝麻租赁</h4><p>品牌应用 · 更新 07-09</p><div class="project-foot"><span class="status">启用</span><a class="link">查看任务</a></div></div><div class="project-card"><h4>红果短剧 APP</h4><p>品牌短剧 · 更新 07-04</p><div class="project-foot"><span class="status">启用</span><a class="link">员工配置</a></div></div><div class="project-card"><h4>移动云盘</h4><p>品牌网盘 · 更新 07-03</p><div class="project-foot"><span class="status">启用</span><a class="link">查看任务</a></div></div><div class="project-card"><h4>可灵 AI</h4><p>海外故事 · 更新 07-25</p><div class="project-foot"><span class="status">启用</span><a class="link">员工配置</a></div></div></div>`,revenue:`<div class="toolbar"><div class="seg"><button>今天</button><button>7天</button><button class="active">本月</button><button>累计</button></div><input class="date" type="date"><span>至</span><input class="date" type="date"><div class="spacer"></div><button class="btn">导出明细</button></div><div class="summary"><div class="stat revenue"><div class="label">订单总收益</div><div class="value">¥101.41</div></div><div class="stat revenue"><div class="label">推广收益</div><div class="value">¥71.50</div></div><div class="stat employee"><div class="label">员工收益</div><div class="value">¥29.91</div></div></div><table class="table" style="margin-top:18px"><thead><tr><th>项目</th><th>员工</th><th>订单收益</th><th>推广收益</th><th>员工收益</th><th>结算状态</th><th>时间</th></tr></thead><tbody><tr><td>番茄小说-短剧</td><td>用户1641</td><td>¥29.00</td><td>¥27.55</td><td>¥1.45</td><td><span class="status warn">未结算</span></td><td>2026-07-08</td></tr><tr><td>番茄小说-漫剧</td><td>用户6569</td><td>¥14.50</td><td>¥13.77</td><td>¥0.73</td><td><span class="status">已结算</span></td><td>2026-07-08</td></tr></tbody></table>`};
 function tip(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1400)}function bindSeg(){document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active')})}bindSeg();document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const k=b.dataset.panel;document.getElementById('mainPanel').innerHTML=k==='overview'?overview:panels[k];document.getElementById('overviewExtra').style.display=k==='overview'?'grid':'none';document.getElementById('employeeExtra').style.display=k==='overview'?'block':'none';bindSeg()});document.addEventListener('click',e=>{if(e.target.classList&&e.target.classList.contains('link')&&e.target.textContent.trim()==='管理')location.href='pc-employee-operation.html'})
+function openPanel(k){const tab=[...document.querySelectorAll('.tab')].find(x=>x.dataset.panel===k);if(tab)tab.click()}
 </script>
 </body>
 </html>
