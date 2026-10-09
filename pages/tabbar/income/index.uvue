@@ -45,17 +45,38 @@
 					</view>
 
 					<view class="inc-body">
-							<view class="inc-list-tabs"><view :class="{ active: incomeListTab == 'orders' }" @tap="incomeListTab = 'orders'"><text>订单明细</text></view><view :class="{ active: incomeListTab == 'keywords' }" @tap="incomeListTab = 'keywords'"><text>关键词统计</text></view></view>
+							<view class="inc-list-tabs"><view :class="{ active: incomeListTab == 'orders' }" @tap="incomeListTab = 'orders'"><text>订单收益</text></view><view :class="{ active: incomeListTab == 'keywords' }" @tap="incomeListTab = 'keywords'"><text>关键词统计</text></view><view :class="{ active: incomeListTab == 'overseas' }" @tap="openOverseasHome"><text>海外订单</text></view></view>
+							<view v-if="incomeListTab == 'overseas'" class="inc-overseas">
+								<view v-if="overseasView == 'projects'">
+									<view class="inc-overseas-head"><text>海外项目</text><text>全部 · 246笔 · 4,326.80元</text></view>
+									<view v-for="group in overseasGroups" :key="group.type" class="inc-overseas-group">
+										<view class="inc-overseas-group-head"><view class="inc-overseas-kind" :class="group.tone"><text>{{ group.icon }}</text></view><view><text>{{ group.type }}</text><text>{{ group.projectCount }}个项目 · {{ group.orderCount }}笔订单 · {{ group.amount }}元</text></view></view>
+										<view v-for="project in group.projects" :key="project.name" class="inc-overseas-project" @tap="openOverseasProject(project)"><view class="inc-overseas-logo" :class="project.tone"><text>{{ project.logo }}</text></view><view class="inc-overseas-project-copy"><text>{{ project.name }}</text><text>{{ project.contentCount }}部内容 · {{ project.orderCount }}笔订单</text></view><view class="inc-overseas-project-money"><text>{{ project.amount }}元</text><text>待结算 {{ project.pending }}元</text></view><text class="inc-overseas-arrow">›</text></view>
+									</view>
+								</view>
+								<view v-else-if="overseasView == 'contents'">
+									<view class="inc-overseas-nav" @tap="overseasView = 'projects'"><text>‹</text><view><text>{{ selectedOverseasProject?.name ?? '' }}</text><text>海外订单 › {{ selectedOverseasProject?.type ?? '' }}</text></view></view>
+									<view class="inc-overseas-summary"><text>项目总收益（当前时间范围）</text><text>{{ selectedOverseasProject?.amount ?? '0.00' }}元</text><view><view><text>已结算</text><text>{{ selectedOverseasProject?.settled ?? '0.00' }}元</text></view><view><text>待结算</text><text>{{ selectedOverseasProject?.pending ?? '0.00' }}元</text></view></view></view>
+									<view class="inc-overseas-head"><text>内容作品</text><text>按内容名称查看归因订单</text></view>
+									<view class="inc-overseas-content-grid"><view v-for="content in overseasContents" :key="content.name" class="inc-overseas-content" @tap="openOverseasContent(content)"><view><text>{{ content.name }}</text><text>明细 ›</text></view><text>订单数 · {{ content.orderCount }}</text><text>已结算 · {{ content.settled }}元</text><text class="pending">待结算 · {{ content.pending }}元</text><text>最近出单 · {{ content.latest }}</text></view></view>
+								</view>
+								<view v-else>
+									<view class="inc-overseas-nav" @tap="overseasView = 'contents'"><text>‹</text><view><text>{{ selectedOverseasContent?.name ?? '' }}</text><text>{{ selectedOverseasProject?.name ?? '' }} › 内容订单</text></view></view>
+									<view class="inc-overseas-order-filter"><view class="active"><text>全部状态</text></view><view><text>已结算</text></view><view><text>待结算</text></view><text>全部时间⌄</text></view>
+									<view class="inc-overseas-order-summary"><view><text>订单数</text><text>{{ selectedOverseasContent?.orderCount ?? 0 }}</text></view><view><text>已结算</text><text>{{ selectedOverseasContent?.settled ?? '0.00' }}元</text></view><view><text>待结算</text><text>{{ selectedOverseasContent?.pending ?? '0.00' }}元</text></view></view>
+									<view v-for="order in overseasOrders" :key="order.id" class="inc-overseas-order"><view><text>{{ order.id }}</text><text>+{{ order.amount }}元</text></view><text>{{ selectedOverseasContent?.name ?? '' }}</text><view><text>推广方式 · {{ order.method }}</text><text :class="{ settled: order.status == '已结算' }">{{ order.status }}</text></view><view><text>订单产生：{{ order.createdAt }}</text><text>更新：{{ order.updatedAt }}</text></view></view>
+								</view>
+							</view>
 							<view v-if="incomeListTab == 'keywords'" class="inc-keyword-list"><view v-if="keywordLoading" class="inc-list-state"><cl-loading :loading="true" :size="24" color="#5375ed"></cl-loading></view><view v-else-if="keywordStats.length == 0" class="inc-list-state"><text class="inc-list-state-text">暂无关键词数据</text></view><view v-for="item in keywordStats" :key="item.name" class="inc-keyword-row"><view><text class="inc-keyword-name">{{ item.name }}</text><text class="inc-keyword-count">{{ item.count }} 笔订单</text></view><text class="inc-keyword-amount">{{ item.amount }}元</text></view></view>
 
-							<view v-else-if="listLoading && orderList.length == 0" class="inc-list-state">
+							<view v-else-if="incomeListTab == 'orders' && listLoading && orderList.length == 0" class="inc-list-state">
 							<cl-loading :loading="true" :size="28" color="#2b59c3"></cl-loading>
 							<text class="inc-list-state-text">加载中...</text>
 						</view>
-						<view v-else-if="orderList.length == 0" class="inc-list-state">
+						<view v-else-if="incomeListTab == 'orders' && orderList.length == 0" class="inc-list-state">
 							<text class="inc-list-state-text">暂无收益数据</text>
 						</view>
-						<view v-else class="inc-order-list">
+						<view v-else-if="incomeListTab == 'orders'" class="inc-order-list">
 							<view class="inc-order-card" v-for="item in orderList" :key="item.id">
 								<view class="inc-order-head">
 									<text class="inc-order-title">{{ item.project_title }}</text>
@@ -209,6 +230,39 @@
 	const selectedRevenue = ref("—");
 	const revenueError = ref(false);
 	const incomeListTab = ref("orders");
+	type OverseasProject = { name: string; type: string; logo: string; tone: string; contentCount: number; orderCount: number; amount: string; settled: string; pending: string };
+	type OverseasGroup = { type: string; icon: string; tone: string; projectCount: number; orderCount: number; amount: string; projects: OverseasProject[] };
+	type OverseasContent = { name: string; orderCount: number; settled: string; pending: string; latest: string };
+	type OverseasOrder = { id: string; amount: string; method: string; status: string; createdAt: string; updatedAt: string };
+	const overseasView = ref("projects");
+	const selectedOverseasProject = ref<OverseasProject | null>(null);
+	const selectedOverseasContent = ref<OverseasContent | null>(null);
+	const overseasGroups: OverseasGroup[] = [
+		{ type: "海外小说", icon: "书", tone: "novel", projectCount: 3, orderCount: 175, amount: "2,848.30", projects: [
+			{ name: "MegaNovel", type: "海外小说", logo: "M", tone: "mega", contentCount: 6, orderCount: 86, amount: "1,680.40", settled: "824.20", pending: "856.20" },
+			{ name: "GoodNovel", type: "海外小说", logo: "G", tone: "good", contentCount: 4, orderCount: 54, amount: "842.30", settled: "531.70", pending: "310.60" },
+			{ name: "MotoNovel", type: "海外小说", logo: "Mo", tone: "moto", contentCount: 3, orderCount: 35, amount: "325.60", settled: "206.80", pending: "118.80" }
+		] },
+		{ type: "海外短剧", icon: "剧", tone: "drama", projectCount: 2, orderCount: 71, amount: "1,478.50", projects: [
+			{ name: "ReelShort", type: "海外短剧", logo: "R", tone: "reel", contentCount: 5, orderCount: 48, amount: "969.20", settled: "566.80", pending: "402.40" },
+			{ name: "DramaBox", type: "海外短剧", logo: "D", tone: "box", contentCount: 3, orderCount: 23, amount: "509.30", settled: "318.10", pending: "191.20" }
+		] }
+	];
+	const overseasContents: OverseasContent[] = [
+		{ name: "The Final Experiment", orderCount: 16, settled: "226.53", pending: "522.79", latest: "2026.10.09" },
+		{ name: "No Free Room for You", orderCount: 11, settled: "120.30", pending: "84.20", latest: "2026.10.09" },
+		{ name: "Frozen on Examination Day", orderCount: 13, settled: "305.75", pending: "69.68", latest: "2026.10.08" },
+		{ name: "Too Late, My Love", orderCount: 28, settled: "171.62", pending: "179.53", latest: "2026.10.08" }
+	];
+	const overseasOrders: OverseasOrder[] = [
+		{ id: "R42805", amount: "69.73", method: "口令码 · MEGA8K2F", status: "待结算", createdAt: "2026.10.09 12:23", updatedAt: "12:23" },
+		{ id: "R42786", amount: "69.73", method: "推广链接 · 链接02", status: "待结算", createdAt: "2026.10.09 06:23", updatedAt: "06:23" },
+		{ id: "R42119", amount: "17.39", method: "口令码 · MEGA8K2F", status: "已结算", createdAt: "2026.10.08 21:23", updatedAt: "10.09 08:12" },
+		{ id: "R38618", amount: "34.84", method: "推广链接 · 链接01", status: "已结算", createdAt: "2026.10.07 23:23", updatedAt: "10.08 08:02" }
+	];
+	function openOverseasHome() { incomeListTab.value = "overseas"; overseasView.value = "projects"; }
+	function openOverseasProject(project: OverseasProject) { selectedOverseasProject.value = project; overseasView.value = "contents"; }
+	function openOverseasContent(content: OverseasContent) { selectedOverseasContent.value = content; overseasView.value = "orders"; }
 	type KeywordStat = { name: string; count: number; amount: string };
 	const keywordStats = ref<KeywordStat[]>([]);
 	const keywordLoading = ref(false);
@@ -1615,4 +1669,31 @@
 .inc-keyword-name { display: block; font-size: 13px; line-height: 20px; color: #303649; overflow-wrap: anywhere; }
 .inc-keyword-count { display: block; margin-top: 2px; font-size: 11px; line-height: 17px; color: #89909e; }
 .inc-keyword-amount { flex-shrink: 0; font-size: 15px; line-height: 22px; color: #5375ed; font-weight: 600; }
+.inc-overseas { display: flex; flex-direction: column; }
+.inc-overseas-head { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 4px 2px 8px; }
+.inc-overseas-head > text:first-child { font-size: 14px; line-height: 21px; color: #303649; font-weight: 600; }
+.inc-overseas-head > text:last-child { font-size: 10px; line-height: 16px; color: #89909e; }
+.inc-overseas-group { margin-bottom: 10px; overflow: hidden; border-radius: 10px; background: #fff; }
+.inc-overseas-group-head { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 9px 10px; background: #f0effb; }
+.inc-overseas-kind, .inc-overseas-logo { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-weight: 600; }
+.inc-overseas-kind { width: 28px; height: 28px; border-radius: 7px; }
+.inc-overseas-kind > text { font-size: 11px; }
+.inc-overseas-kind.novel { background: #7278d8; }.inc-overseas-kind.drama { background: #e16b7e; }
+.inc-overseas-group-head > view:last-child > text { display: block; }
+.inc-overseas-group-head > view:last-child > text:first-child { font-size: 13px; line-height: 19px; color: #303649; font-weight: 600; }
+.inc-overseas-group-head > view:last-child > text:last-child { font-size: 10px; line-height: 16px; color: #89909e; }
+.inc-overseas-project { display: flex; flex-direction: row; align-items: center; padding: 11px 10px; border-bottom: 1px solid #edf0f4; }
+.inc-overseas-project:last-child { border-bottom: 0; }
+.inc-overseas-logo { width: 30px; height: 30px; margin-right: 9px; border-radius: 7px; background: #5375ed; }
+.inc-overseas-logo > text { font-size: 10px; }.inc-overseas-logo.good { background: #ed4c64; }.inc-overseas-logo.moto { background: #f29335; }.inc-overseas-logo.reel { background: #df4260; }.inc-overseas-logo.box { background: #6d58d5; }
+.inc-overseas-project-copy { flex: 1; min-width: 0; }.inc-overseas-project-copy > text, .inc-overseas-project-money > text { display: block; }
+.inc-overseas-project-copy > text:first-child { font-size: 13px; line-height: 19px; color: #303649; font-weight: 600; }.inc-overseas-project-copy > text:last-child { font-size: 10px; line-height: 16px; color: #89909e; }
+.inc-overseas-project-money { flex-shrink: 0; text-align: right; }.inc-overseas-project-money > text:first-child { font-size: 14px; line-height: 20px; color: #303649; font-weight: 600; }.inc-overseas-project-money > text:last-child { font-size: 9px; line-height: 15px; color: #89909e; }
+.inc-overseas-arrow { margin-left: 8px; font-size: 18px; color: #a8aebb; }
+.inc-overseas-nav { display: flex; flex-direction: row; align-items: center; gap: 7px; margin-bottom: 9px; }.inc-overseas-nav > text { font-size: 25px; color: #303649; }.inc-overseas-nav > view > text { display: block; }.inc-overseas-nav > view > text:first-child { font-size: 16px; font-weight: 600; color: #303649; }.inc-overseas-nav > view > text:last-child { font-size: 10px; color: #89909e; }
+.inc-overseas-summary { padding: 13px; margin-bottom: 10px; border-radius: 10px; background: linear-gradient(115deg,#f3f4ff,#eeecff); }.inc-overseas-summary > text { display: block; }.inc-overseas-summary > text:first-child { font-size: 10px; color: #727887; }.inc-overseas-summary > text:nth-child(2) { margin: 2px 0 10px; font-size: 25px; line-height: 31px; color: #303649; font-weight: 700; }.inc-overseas-summary > view { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); background: #fff; border-radius: 7px; }.inc-overseas-summary > view > view { padding: 8px; text-align: center; }.inc-overseas-summary > view > view + view { border-left: 1px solid #edf0f4; }.inc-overseas-summary > view text { display: block; font-size: 10px; color: #89909e; }.inc-overseas-summary > view text:last-child { margin-top: 2px; font-size: 13px; color: #303649; font-weight: 600; }
+.inc-overseas-content-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }.inc-overseas-content { min-width: 0; padding: 11px; border-radius: 9px; background: #fff; }.inc-overseas-content > view { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 5px; }.inc-overseas-content > view > text:first-child { height: 38px; overflow: hidden; font-size: 13px; line-height: 19px; color: #303649; font-weight: 600; }.inc-overseas-content > view > text:last-child { flex-shrink: 0; font-size: 10px; color: #7278c8; }.inc-overseas-content > text { display: block; margin-top: 4px; font-size: 10px; color: #7e8796; }.inc-overseas-content > text.pending { color: #d97a3c; }
+.inc-overseas-order-filter { display: flex; flex-direction: row; align-items: center; gap: 5px; margin-bottom: 8px; }.inc-overseas-order-filter > view { padding: 5px 8px; border: 1px solid #e1e5ec; border-radius: 5px; background: #fff; }.inc-overseas-order-filter > view > text { font-size: 10px; color: #717b8c; }.inc-overseas-order-filter > view.active { border-color: #777cc7; background: #777cc7; }.inc-overseas-order-filter > view.active > text { color: #fff; }.inc-overseas-order-filter > text { margin-left: auto; font-size: 10px; color: #7b8594; }
+.inc-overseas-order-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin-bottom: 8px; border-radius: 8px; background: #fff; }.inc-overseas-order-summary > view { padding: 8px 4px; text-align: center; }.inc-overseas-order-summary > view + view { border-left: 1px solid #edf0f4; }.inc-overseas-order-summary text { display: block; font-size: 9px; color: #89909e; }.inc-overseas-order-summary text:last-child { margin-top: 2px; font-size: 12px; color: #303649; font-weight: 600; }
+.inc-overseas-order { padding: 11px; margin-bottom: 7px; border-radius: 9px; background: #fff; }.inc-overseas-order > view { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }.inc-overseas-order > view:first-child > text:first-child { font-size: 13px; color: #303649; font-weight: 600; }.inc-overseas-order > view:first-child > text:last-child { font-size: 15px; color: #303649; font-weight: 600; }.inc-overseas-order > text { display: block; margin: 4px 0 8px; font-size: 11px; color: #596274; }.inc-overseas-order > view:nth-child(3) { padding-top: 7px; border-top: 1px solid #edf0f4; }.inc-overseas-order > view:nth-child(3) > text { font-size: 9px; color: #89909e; }.inc-overseas-order > view:nth-child(3) > text:last-child { padding: 2px 6px; border-radius: 4px; background: #fff1e8; color: #d86a36; }.inc-overseas-order > view:nth-child(3) > text.settled { background: #eaf7f1; color: #32805e; }.inc-overseas-order > view:last-child { margin-top: 7px; }.inc-overseas-order > view:last-child > text { font-size: 9px; color: #9098a6; }
 </style>
