@@ -166,6 +166,16 @@
 					"path": "detail",
 					"style": { "navigationStyle": "custom" },
 					"meta": { "isAuth": false }
+				},
+				{
+					"path": "overseas-project",
+					"style": { "navigationStyle": "custom" },
+					"meta": { "isAuth": false }
+				},
+				{
+					"path": "overseas-orders",
+					"style": { "navigationStyle": "custom" },
+					"meta": { "isAuth": false }
 				}
 			]
 		},
