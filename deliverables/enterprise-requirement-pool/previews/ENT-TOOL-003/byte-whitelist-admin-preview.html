@@ -1,0 +1,1531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>企业号 · 字节开白管理</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="企业号 · 字节开白管理" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;企业号 · 字节开白管理&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: var(--border-radius-lg, 12.5px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+    [aria-pressed=&quot;true&quot;],
+    [aria-selected=&quot;true&quot;],
+    .is-selected
+  ) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;byte-admin-mock&quot;&gt;
+  &lt;style&gt;
+    #byte-admin-mock {
+      --ba-blue: #4d5fff;
+      --ba-blue-soft: #eef0ff;
+      --ba-text: #303133;
+      --ba-sub: #606266;
+      --ba-muted: #909399;
+      --ba-line: #ebeef5;
+      --ba-bg: #f5f6f8;
+      --ba-green: #67c23a;
+      --ba-orange: #e6a23c;
+      color: var(--ba-text);
+      background: var(--ba-bg);
+      font-family: Inter, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, Arial, sans-serif;
+      width: 100%;
+      min-height: 760px;
+      overflow: hidden;
+      font-size: 14px;
+    }
+    #byte-admin-mock * { box-sizing: border-box; }
+    #byte-admin-mock button, #byte-admin-mock input, #byte-admin-mock select, #byte-admin-mock textarea { font: inherit; }
+    #byte-admin-mock .ba-shell { display: grid; grid-template-columns: 68px 180px minmax(720px, 1fr); min-height: 760px; }
+    #byte-admin-mock .ba-rail { background: #fff; border-right: 1px solid var(--ba-line); display: flex; flex-direction: column; align-items: center; }
+    #byte-admin-mock .ba-brand { height: 96px; width: 100%; display: grid; place-items: center; border-bottom: 1px solid var(--ba-line); }
+    #byte-admin-mock .ba-brand-mark { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(145deg,#fff2da,#ffe0d9 54%,#f4f5f7 55%); box-shadow: inset 0 0 18px rgba(255,255,255,.8); }
+    #byte-admin-mock .ba-rail-item { width: 100%; min-height: 64px; border: 0; border-left: 3px solid transparent; background: #fff; color: #8b93a6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
+    #byte-admin-mock .ba-rail-item.active { color: var(--ba-blue); background: #f2f4ff; border-left-color: var(--ba-blue); }
+    #byte-admin-mock .ba-rail-icon { font-size: 19px; line-height: 1; }
+    #byte-admin-mock .ba-rail-label { font-size: 12px; }
+    #byte-admin-mock .ba-side { background: #fff; border-right: 1px solid #e4e7ed; }
+    #byte-admin-mock .ba-system { height: 48px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--ba-line); font-size: 14px; }
+    #byte-admin-mock .ba-menu-title { height: 46px; width: 100%; padding: 0 17px; display: flex; align-items: center; gap: 9px; font-weight: 500; border: 0; border-bottom: 1px solid #f0f1f4; background: #fff; color: #303133; cursor: pointer; }
+    #byte-admin-mock .ba-chevron { margin-left: auto; color: #777; }
+    #byte-admin-mock .ba-menu-item { height: 46px; padding: 0 0 0 42px; display: flex; align-items: center; border-right: 2px solid transparent; cursor: pointer; background: #fff; }
+    #byte-admin-mock .ba-menu-item.active { background: var(--ba-blue-soft); color: var(--ba-blue); border-right-color: var(--ba-blue); font-weight: 500; }
+    #byte-admin-mock .ba-menu-group.collapsed .ba-menu-children { display: none; }
+    #byte-admin-mock .ba-menu-group.collapsed .ba-chevron { transform: rotate(180deg); }
+    #byte-admin-mock .ba-menu-children { overflow: hidden; }
+    #byte-admin-mock .ba-content { min-width: 0; display: flex; flex-direction: column; }
+    #byte-admin-mock .ba-top { height: 48px; background: #fff; border-bottom: 1px solid var(--ba-line); display: flex; align-items: center; padding: 0 18px; }
+    #byte-admin-mock .ba-crumb { display: flex; gap: 11px; align-items: center; color: #777; }
+    #byte-admin-mock .ba-crumb b { color: #50545d; font-weight: 500; }
+    #byte-admin-mock .ba-tools { margin-left: auto; display: flex; align-items: center; gap: 16px; color: #555; }
+    #byte-admin-mock .ba-avatar { width: 34px; height: 34px; border-radius: 50%; background: #bdc2cc; }
+    #byte-admin-mock .ba-page-tab { height: 42px; background: #fff; display: flex; align-items: flex-end; padding-left: 16px; }
+    #byte-admin-mock .ba-page-tab-label { height: 42px; min-width: 110px; padding: 0 18px; display: flex; align-items: center; color: var(--ba-blue); background: #f0f2ff; border-top: 2px solid var(--ba-blue); }
+    #byte-admin-mock .ba-page { padding: 16px; min-width: 0; }
+    #byte-admin-mock .ba-panel { background: #fff; border-radius: 4px; }
+    #byte-admin-mock .ba-tabs { height: 56px; padding: 0 20px; border-bottom: 1px solid var(--ba-line); display: flex; gap: 34px; }
+    #byte-admin-mock .ba-tab { position: relative; border: 0; background: transparent; color: #606266; padding: 0 5px; cursor: pointer; }
+    #byte-admin-mock .ba-tab.active { color: var(--ba-blue); font-weight: 500; }
+    #byte-admin-mock .ba-tab.active::after { content: &quot;&quot;; position: absolute; height: 2px; left: 0; right: 0; bottom: 0; background: var(--ba-blue); }
+    #byte-admin-mock .ba-filter { padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; border-bottom: 1px solid #f1f2f5; }
+    #byte-admin-mock .ba-sync-note { margin: 16px 20px 0; min-height: 42px; padding: 10px 13px; border: 1px solid #d9e1ff; background: #f5f7ff; color: #59627a; display: flex; align-items: center; gap: 9px; border-radius: 4px; }
+    #byte-admin-mock .ba-sync-note strong { color: #3546d3; font-weight: 500; }
+    #byte-admin-mock .ba-field { display: flex; align-items: center; gap: 10px; color: #555; }
+    #byte-admin-mock .ba-input, #byte-admin-mock .ba-select { width: 158px; height: 34px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 11px; color: #606266; background: #fff; outline: none; }
+    #byte-admin-mock .ba-input:focus, #byte-admin-mock .ba-select:focus { border-color: var(--ba-blue); }
+    #byte-admin-mock .ba-button { height: 34px; border-radius: 4px; padding: 0 16px; border: 1px solid #dcdfe6; color: #606266; background: #fff; cursor: pointer; }
+    #byte-admin-mock .ba-button.primary { border-color: var(--ba-blue); background: var(--ba-blue); color: #fff; }
+    #byte-admin-mock .ba-button.outline { border-color: #9aa5ff; color: var(--ba-blue); }
+    #byte-admin-mock .ba-button.ghost { border-color: transparent; color: var(--ba-blue); padding: 0 7px; background: transparent; }
+    #byte-admin-mock .ba-table-wrap { padding: 18px 20px 0; overflow-x: auto; }
+    #byte-admin-mock table { width: 100%; min-width: 890px; border-collapse: collapse; table-layout: fixed; }
+    #byte-admin-mock th { height: 48px; background: #f7f8fa; color: #42464f; font-weight: 500; text-align: left; padding: 0 14px; white-space: nowrap; }
+    #byte-admin-mock td { height: 64px; border-bottom: 1px solid var(--ba-line); padding: 0 14px; color: #606266; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #byte-admin-mock .ba-status { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 3px; font-size: 12px; }
+    #byte-admin-mock .ba-status.on, #byte-admin-mock .ba-status.approved { color: #5daf34; background: #f0f9eb; border: 1px solid #d9ecce; }
+    #byte-admin-mock .ba-status.off { color: #909399; background: #f4f4f5; border: 1px solid #e9e9eb; }
+    #byte-admin-mock .ba-status.pending { color: #d58a18; background: #fdf6ec; border: 1px solid #faecd8; }
+    #byte-admin-mock .ba-status.rejected { color: #f56c6c; background: #fef0f0; border: 1px solid #fde2e2; }
+    #byte-admin-mock .ba-status.syncing { color: #d58a18; background: #fdf6ec; border: 1px solid #faecd8; }
+    #byte-admin-mock .ba-switch { width: 36px; height: 20px; border: 0; border-radius: 12px; padding: 2px; cursor: pointer; background: #c0c4cc; transition: .2s; vertical-align: middle; }
+    #byte-admin-mock .ba-switch span { display: block; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+    #byte-admin-mock .ba-switch.on { background: var(--ba-blue); }
+    #byte-admin-mock .ba-switch.on span { transform: translateX(16px); }
+    #byte-admin-mock .ba-pagination { min-height: 62px; padding: 14px 20px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: #777; }
+    #byte-admin-mock .ba-page-btn { width: 30px; height: 30px; border: 1px solid #dcdfe6; border-radius: 3px; background: #fff; color: #666; }
+    #byte-admin-mock .ba-page-btn.active { border-color: var(--ba-blue); color: var(--ba-blue); }
+    #byte-admin-mock .ba-empty { height: 320px; display: grid; place-items: center; color: #aaa; }
+    #byte-admin-mock .ba-mask { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.38); display: none; align-items: center; justify-content: center; }
+    #byte-admin-mock .ba-mask.open { display: flex; }
+    #byte-admin-mock .ba-dialog { width: min(480px, calc(100vw - 36px)); background: #fff; border-radius: 6px; box-shadow: 0 14px 44px rgba(0,0,0,.18); }
+    #byte-admin-mock .ba-dialog-head { height: 54px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--ba-line); font-size: 16px; font-weight: 500; }
+    #byte-admin-mock .ba-dialog-close { margin-left: auto; border: 0; background: transparent; color: #999; font-size: 20px; cursor: pointer; }
+    #byte-admin-mock .ba-dialog-body { padding: 24px 28px 14px; }
+    #byte-admin-mock .ba-form-row { display: grid; grid-template-columns: 86px 1fr; align-items: center; margin-bottom: 19px; }
+    #byte-admin-mock .ba-form-row label { text-align: right; padding-right: 14px; color: #606266; }
+    #byte-admin-mock .ba-form-row label::before { content: &quot;*&quot;; color: #f56c6c; margin-right: 4px; }
+    #byte-admin-mock .ba-form-row input { height: 36px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 12px; outline: none; }
+    #byte-admin-mock .ba-form-hint { grid-column: 2; margin-top: 6px; font-size: 12px; color: #a0a3aa; }
+    #byte-admin-mock .ba-dialog-foot { padding: 10px 28px 22px; display: flex; justify-content: flex-end; gap: 10px; }
+    #byte-admin-mock .ba-button.danger { border-color: #f56c6c; color: #f56c6c; background: #fff; }
+    #byte-admin-mock .ba-audit-summary { padding: 13px 15px; border: 1px solid #e3e6ee; background: #f8f9fb; border-radius: 4px; line-height: 24px; color: #606266; }
+    #byte-admin-mock .ba-audit-summary b { color: #303133; font-weight: 500; }
+    #byte-admin-mock .ba-audit-label { display: block; margin: 20px 0 8px; color: #606266; }
+    #byte-admin-mock .ba-audit-label::before { content: &quot;*&quot;; margin-right: 4px; color: #f56c6c; }
+    #byte-admin-mock .ba-textarea { display: block; width: 100%; min-height: 92px; padding: 10px 12px; resize: vertical; border: 1px solid #dcdfe6; border-radius: 4px; outline: none; color: #606266; }
+    #byte-admin-mock .ba-textarea:focus { border-color: var(--ba-blue); }
+    #byte-admin-mock .ba-audit-hint { margin-top: 7px; color: #909399; font-size: 12px; }
+    #byte-admin-mock .ba-toast { position: fixed; z-index: 30; left: 50%; top: 70px; transform: translate(-50%,-12px); padding: 10px 17px; border-radius: 4px; color: #4f8d30; border: 1px solid #c2e7b0; background: #f0f9eb; opacity: 0; pointer-events: none; transition: .25s; }
+    #byte-admin-mock .ba-toast.show { opacity: 1; transform: translate(-50%,0); }
+    #byte-admin-mock .ba-result-count { margin-right: auto; color: #909399; font-size: 13px; }
+    #byte-admin-mock .ba-link { border: 0; padding: 0; color: var(--ba-blue); background: transparent; cursor: pointer; }
+    #byte-admin-mock .ba-fail-reason { color: #f56c6c; white-space: normal; line-height: 20px; }
+    #byte-admin-mock .ba-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 24px; }
+    #byte-admin-mock .ba-detail-item { min-width: 0; }
+    #byte-admin-mock .ba-detail-item span { display: block; color: #909399; margin-bottom: 6px; }
+    #byte-admin-mock .ba-detail-item b { display: block; color: #3f4249; font-weight: 400; overflow-wrap: anywhere; }
+    #byte-admin-mock .ba-shot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; }
+    #byte-admin-mock .ba-shot { border: 1px solid #dfe3ec; border-radius: 4px; overflow: hidden; cursor: pointer; background: #f7f8fa; }
+    #byte-admin-mock .ba-shot-visual { height: 142px; padding: 15px; background: linear-gradient(145deg,#e9edff,#f8f9fc 58%,#e7eaf3); display: flex; align-items: center; justify-content: center; color: #7c86ac; }
+    #byte-admin-mock .ba-shot-phone { width: 72px; height: 116px; border: 3px solid #6d7488; border-radius: 10px; background: #fff; padding: 13px 7px; display: flex; flex-direction: column; gap: 7px; }
+    #byte-admin-mock .ba-shot-line { height: 5px; background: #dfe3f4; border-radius: 3px; }
+    #byte-admin-mock .ba-shot-line.blue { background: #6977ff; height: 16px; }
+    #byte-admin-mock .ba-shot-label { height: 36px; display: flex; align-items: center; justify-content: center; color: #606266; }
+    @media (max-width: 820px) {
+      #byte-admin-mock .ba-shell { grid-template-columns: 52px 146px minmax(650px,1fr); }
+      #byte-admin-mock .ba-side { font-size: 13px; }
+      #byte-admin-mock .ba-menu-item { padding-left: 30px; }
+      #byte-admin-mock .ba-page { padding: 10px; }
+    }
+  &lt;/style&gt;
+
+  &lt;div class=&quot;ba-shell&quot;&gt;
+    &lt;aside class=&quot;ba-rail&quot;&gt;
+      &lt;div class=&quot;ba-brand&quot;&gt;&lt;div class=&quot;ba-brand-mark&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;button class=&quot;ba-rail-item active&quot;&gt;&lt;span class=&quot;ba-rail-icon&quot;&gt;▣&lt;/span&gt;&lt;span class=&quot;ba-rail-label&quot;&gt;企业号&lt;/span&gt;&lt;/button&gt;
+    &lt;/aside&gt;
+
+    &lt;aside class=&quot;ba-side&quot;&gt;
+      &lt;div class=&quot;ba-system&quot;&gt;右豹2.0系统&lt;/div&gt;
+      &lt;div class=&quot;ba-menu-group&quot;&gt;
+        &lt;button class=&quot;ba-menu-title&quot;&gt;&lt;span&gt;▱&lt;/span&gt;&lt;span&gt;企业管理&lt;/span&gt;&lt;span class=&quot;ba-chevron&quot;&gt;⌃&lt;/span&gt;&lt;/button&gt;
+        &lt;div class=&quot;ba-menu-children&quot;&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;企业配置&lt;/div&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;项目授权&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;ba-menu-group&quot;&gt;
+        &lt;button class=&quot;ba-menu-title&quot;&gt;&lt;span&gt;▤&lt;/span&gt;&lt;span&gt;业务管理&lt;/span&gt;&lt;span class=&quot;ba-chevron&quot;&gt;⌃&lt;/span&gt;&lt;/button&gt;
+        &lt;div class=&quot;ba-menu-children&quot;&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;回填管理&lt;/div&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;题词管理&lt;/div&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;订单管理&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;ba-menu-group&quot;&gt;
+        &lt;button class=&quot;ba-menu-title&quot;&gt;&lt;span&gt;▦&lt;/span&gt;&lt;span&gt;数据管理&lt;/span&gt;&lt;span class=&quot;ba-chevron&quot;&gt;⌃&lt;/span&gt;&lt;/button&gt;
+        &lt;div class=&quot;ba-menu-children&quot;&gt;&lt;div class=&quot;ba-menu-item active&quot;&gt;字节开白&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;ba-menu-group collapsed&quot;&gt;
+        &lt;button class=&quot;ba-menu-title&quot;&gt;&lt;span&gt;⚙&lt;/span&gt;&lt;span&gt;平台配置&lt;/span&gt;&lt;span class=&quot;ba-chevron&quot;&gt;⌃&lt;/span&gt;&lt;/button&gt;
+        &lt;div class=&quot;ba-menu-children&quot;&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;前端配置&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;ba-menu-group collapsed&quot;&gt;
+        &lt;button class=&quot;ba-menu-title&quot;&gt;&lt;span&gt;♙&lt;/span&gt;&lt;span&gt;用户与结算&lt;/span&gt;&lt;span class=&quot;ba-chevron&quot;&gt;⌃&lt;/span&gt;&lt;/button&gt;
+        &lt;div class=&quot;ba-menu-children&quot;&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;用户列表&lt;/div&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;收益明细&lt;/div&gt;&lt;div class=&quot;ba-menu-item&quot;&gt;实名认证&lt;/div&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/aside&gt;
+
+    &lt;main class=&quot;ba-content&quot;&gt;
+      &lt;header class=&quot;ba-top&quot;&gt;
+        &lt;div class=&quot;ba-crumb&quot;&gt;&lt;span&gt;◁&lt;/span&gt;&lt;b&gt;企业号&lt;/b&gt;&lt;span&gt;/&lt;/span&gt;&lt;span&gt;数据管理&lt;/span&gt;&lt;span&gt;/&lt;/span&gt;&lt;span&gt;字节开白&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;ba-tools&quot;&gt;&lt;span&gt;↻&lt;/span&gt;&lt;span&gt;⛶&lt;/span&gt;&lt;div class=&quot;ba-avatar&quot;&gt;&lt;/div&gt;&lt;span&gt;小宇⌄&lt;/span&gt;&lt;span&gt;⚙&lt;/span&gt;&lt;/div&gt;
+      &lt;/header&gt;
+      &lt;div class=&quot;ba-page-tab&quot;&gt;&lt;div class=&quot;ba-page-tab-label&quot;&gt;•&amp;nbsp; 字节开白&lt;/div&gt;&lt;/div&gt;
+
+      &lt;section class=&quot;ba-page&quot;&gt;
+        &lt;div class=&quot;ba-panel&quot;&gt;
+          &lt;nav class=&quot;ba-tabs&quot; aria-label=&quot;数据视图&quot;&gt;
+            &lt;button class=&quot;ba-tab active&quot; data-tab=&quot;whitelist&quot;&gt;字节开白&lt;/button&gt;
+            &lt;button class=&quot;ba-tab&quot; data-tab=&quot;bindings&quot;&gt;绑定记录&lt;/button&gt;
+          &lt;/nav&gt;
+
+          &lt;div class=&quot;ba-tab-pane&quot; data-pane=&quot;whitelist&quot;&gt;
+            &lt;div class=&quot;ba-sync-note&quot;&gt;&lt;strong&gt;右豹同步&lt;/strong&gt;&lt;span&gt;企业号权限变更后进入同步队列，由定时任务自动同步；企业主ID即右豹ID，可在右豹后台直接查询。最近同步：2026-08-11 14:20:00&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;ba-filter&quot;&gt;
+              &lt;label class=&quot;ba-field&quot;&gt;企业主ID &lt;input class=&quot;ba-input&quot; id=&quot;ba-owner-filter&quot; placeholder=&quot;请输入企业主ID&quot;&gt;&lt;/label&gt;
+              &lt;label class=&quot;ba-field&quot;&gt;开放状态
+                &lt;select class=&quot;ba-select&quot; id=&quot;ba-status-filter&quot;&gt;&lt;option value=&quot;&quot;&gt;全部&lt;/option&gt;&lt;option value=&quot;on&quot;&gt;已开启&lt;/option&gt;&lt;option value=&quot;off&quot;&gt;已关闭&lt;/option&gt;&lt;/select&gt;
+              &lt;/label&gt;
+              &lt;button class=&quot;ba-button primary&quot; id=&quot;ba-search-owner&quot;&gt;查询&lt;/button&gt;
+              &lt;button class=&quot;ba-button&quot; id=&quot;ba-reset-owner&quot;&gt;重置&lt;/button&gt;
+              &lt;button class=&quot;ba-button outline&quot; id=&quot;ba-add-owner&quot;&gt;添加企业主&lt;/button&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;ba-table-wrap&quot;&gt;
+              &lt;table style=&quot;min-width:950px&quot;&gt;
+                &lt;thead&gt;&lt;tr&gt;&lt;th style=&quot;width:80px&quot;&gt;ID&lt;/th&gt;&lt;th style=&quot;width:145px&quot;&gt;企业主ID（右豹ID）&lt;/th&gt;&lt;th style=&quot;width:190px&quot;&gt;开放时间&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;操作人&lt;/th&gt;&lt;th style=&quot;width:115px&quot;&gt;开白状态&lt;/th&gt;&lt;th style=&quot;width:150px&quot;&gt;是否同步右豹&lt;/th&gt;&lt;th style=&quot;width:140px&quot;&gt;操作&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+                &lt;tbody id=&quot;ba-owner-body&quot;&gt;&lt;/tbody&gt;
+              &lt;/table&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;ba-pagination&quot;&gt;&lt;span class=&quot;ba-result-count&quot; id=&quot;ba-owner-count&quot;&gt;&lt;/span&gt;&lt;span&gt;共 4 条&lt;/span&gt;&lt;button class=&quot;ba-page-btn&quot;&gt;‹&lt;/button&gt;&lt;button class=&quot;ba-page-btn active&quot;&gt;1&lt;/button&gt;&lt;button class=&quot;ba-page-btn&quot;&gt;›&lt;/button&gt;&lt;/div&gt;
+          &lt;/div&gt;
+
+          &lt;div class=&quot;ba-tab-pane&quot; data-pane=&quot;bindings&quot; hidden&gt;
+            &lt;div class=&quot;ba-sync-note&quot;&gt;&lt;strong&gt;手动审核流程&lt;/strong&gt;&lt;span&gt;待审核记录由管理员核对字节UID、手机号及两张截图后手动处理；审核拒绝时必须填写失败原因，企业主可查看最新绑定结果。&lt;/span&gt;&lt;/div&gt;
+            &lt;div class=&quot;ba-filter&quot;&gt;
+              &lt;label class=&quot;ba-field&quot;&gt;用户ID &lt;input class=&quot;ba-input&quot; id=&quot;ba-user-filter&quot; placeholder=&quot;请输入用户ID&quot;&gt;&lt;/label&gt;
+              &lt;label class=&quot;ba-field&quot;&gt;字节UID &lt;input class=&quot;ba-input&quot; id=&quot;ba-uid-filter&quot; placeholder=&quot;请输入字节UID&quot;&gt;&lt;/label&gt;
+              &lt;label class=&quot;ba-field&quot;&gt;审核状态
+                &lt;select class=&quot;ba-select&quot; id=&quot;ba-audit-filter&quot;&gt;&lt;option value=&quot;&quot;&gt;全部&lt;/option&gt;&lt;option value=&quot;pending&quot;&gt;待审核&lt;/option&gt;&lt;option value=&quot;approved&quot;&gt;已通过&lt;/option&gt;&lt;option value=&quot;rejected&quot;&gt;已拒绝&lt;/option&gt;&lt;/select&gt;
+              &lt;/label&gt;
+              &lt;button class=&quot;ba-button primary&quot; id=&quot;ba-search-binding&quot;&gt;查询&lt;/button&gt;
+              &lt;button class=&quot;ba-button&quot; id=&quot;ba-reset-binding&quot;&gt;重置&lt;/button&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;ba-table-wrap&quot;&gt;
+              &lt;table style=&quot;min-width:2040px&quot;&gt;
+                &lt;thead&gt;&lt;tr&gt;&lt;th style=&quot;width:70px&quot;&gt;ID&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;企业主ID&lt;/th&gt;&lt;th style=&quot;width:130px&quot;&gt;用户ID&lt;/th&gt;&lt;th style=&quot;width:160px&quot;&gt;字节UID&lt;/th&gt;&lt;th style=&quot;width:145px&quot;&gt;手机号码&lt;/th&gt;&lt;th style=&quot;width:105px&quot;&gt;截图1&lt;/th&gt;&lt;th style=&quot;width:105px&quot;&gt;截图2&lt;/th&gt;&lt;th style=&quot;width:120px&quot;&gt;数据来源&lt;/th&gt;&lt;th style=&quot;width:115px&quot;&gt;审核状态&lt;/th&gt;&lt;th style=&quot;width:230px&quot;&gt;失败原因&lt;/th&gt;&lt;th style=&quot;width:180px&quot;&gt;提交时间&lt;/th&gt;&lt;th style=&quot;width:180px&quot;&gt;审核时间&lt;/th&gt;&lt;th style=&quot;width:120px&quot;&gt;审核人&lt;/th&gt;&lt;th style=&quot;width:170px&quot;&gt;操作&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+                &lt;tbody id=&quot;ba-binding-body&quot;&gt;&lt;/tbody&gt;
+              &lt;/table&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;ba-pagination&quot;&gt;&lt;span class=&quot;ba-result-count&quot; id=&quot;ba-binding-count&quot;&gt;&lt;/span&gt;&lt;span&gt;共 5 条&lt;/span&gt;&lt;button class=&quot;ba-page-btn&quot;&gt;‹&lt;/button&gt;&lt;button class=&quot;ba-page-btn active&quot;&gt;1&lt;/button&gt;&lt;button class=&quot;ba-page-btn&quot;&gt;›&lt;/button&gt;&lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+    &lt;/main&gt;
+
+    &lt;div class=&quot;ba-mask&quot; id=&quot;ba-dialog-mask&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;ba-dialog-title&quot;&gt;
+      &lt;div class=&quot;ba-dialog&quot;&gt;
+        &lt;div class=&quot;ba-dialog-head&quot;&gt;&lt;span id=&quot;ba-dialog-title&quot;&gt;添加企业主&lt;/span&gt;&lt;button class=&quot;ba-dialog-close&quot; id=&quot;ba-dialog-close&quot; aria-label=&quot;关闭&quot;&gt;×&lt;/button&gt;&lt;/div&gt;
+        &lt;div class=&quot;ba-dialog-body&quot;&gt;
+          &lt;div class=&quot;ba-form-row&quot;&gt;&lt;label for=&quot;ba-new-owner&quot;&gt;企业主ID&lt;/label&gt;&lt;input id=&quot;ba-new-owner&quot; placeholder=&quot;请输入企业主用户ID&quot;&gt;&lt;div class=&quot;ba-form-hint&quot;&gt;开通后，该企业主前端将展示“字节任务台”管理入口&lt;/div&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;ba-dialog-foot&quot;&gt;&lt;button class=&quot;ba-button&quot; id=&quot;ba-dialog-cancel&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;ba-button primary&quot; id=&quot;ba-dialog-confirm&quot;&gt;确定开通&lt;/button&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;ba-mask&quot; id=&quot;ba-detail-mask&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;ba-detail-title&quot;&gt;
+      &lt;div class=&quot;ba-dialog&quot; style=&quot;width:min(620px,calc(100vw - 36px))&quot;&gt;
+        &lt;div class=&quot;ba-dialog-head&quot;&gt;&lt;span id=&quot;ba-detail-title&quot;&gt;绑定记录详情&lt;/span&gt;&lt;button class=&quot;ba-dialog-close&quot; id=&quot;ba-detail-close&quot; aria-label=&quot;关闭&quot;&gt;×&lt;/button&gt;&lt;/div&gt;
+        &lt;div class=&quot;ba-dialog-body&quot; id=&quot;ba-detail-body&quot;&gt;&lt;/div&gt;
+        &lt;div class=&quot;ba-dialog-foot&quot;&gt;&lt;button class=&quot;ba-button primary&quot; id=&quot;ba-detail-ok&quot;&gt;我知道了&lt;/button&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;ba-mask&quot; id=&quot;ba-audit-mask&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;ba-audit-title&quot;&gt;
+      &lt;div class=&quot;ba-dialog&quot; style=&quot;width:min(540px,calc(100vw - 36px))&quot;&gt;
+        &lt;div class=&quot;ba-dialog-head&quot;&gt;&lt;span id=&quot;ba-audit-title&quot;&gt;手动处理绑定申请&lt;/span&gt;&lt;button class=&quot;ba-dialog-close&quot; id=&quot;ba-audit-close&quot; aria-label=&quot;关闭&quot;&gt;×&lt;/button&gt;&lt;/div&gt;
+        &lt;div class=&quot;ba-dialog-body&quot;&gt;
+          &lt;div class=&quot;ba-audit-summary&quot; id=&quot;ba-audit-summary&quot;&gt;&lt;/div&gt;
+          &lt;label class=&quot;ba-audit-label&quot; for=&quot;ba-audit-reason&quot;&gt;拒绝原因&lt;/label&gt;
+          &lt;textarea class=&quot;ba-textarea&quot; id=&quot;ba-audit-reason&quot; maxlength=&quot;100&quot; placeholder=&quot;审核拒绝时必填，将同步展示给企业主&quot;&gt;&lt;/textarea&gt;
+          &lt;div class=&quot;ba-audit-hint&quot;&gt;审核通过无需填写；重新处理已拒绝记录时，可修改原失败原因。&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;ba-dialog-foot&quot;&gt;&lt;button class=&quot;ba-button&quot; id=&quot;ba-audit-cancel&quot;&gt;取消&lt;/button&gt;&lt;button class=&quot;ba-button danger&quot; id=&quot;ba-audit-reject&quot;&gt;审核拒绝&lt;/button&gt;&lt;button class=&quot;ba-button primary&quot; id=&quot;ba-audit-approve&quot;&gt;审核通过&lt;/button&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;ba-toast&quot; id=&quot;ba-toast&quot;&gt;操作成功&lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    (() =&gt; {
+      const root = document.getElementById(&#x27;byte-admin-mock&#x27;);
+      const owners = [
+        { id: 104, ownerId: &#x27;10086321&#x27;, time: &#x27;2026-08-11 10:26:18&#x27;, operator: &#x27;小宇&#x27;, status: &#x27;on&#x27;, synced: true, syncTime: &#x27;2026-08-11 10:30:02&#x27;, record: &#x27;RB-BYTE-00861&#x27; },
+        { id: 103, ownerId: &#x27;10075296&#x27;, time: &#x27;2026-08-10 16:40:05&#x27;, operator: &#x27;管理员&#x27;, status: &#x27;on&#x27;, synced: true, syncTime: &#x27;2026-08-10 16:50:01&#x27;, record: &#x27;RB-BYTE-00860&#x27; },
+        { id: 102, ownerId: &#x27;10061938&#x27;, time: &#x27;2026-08-08 09:15:42&#x27;, operator: &#x27;小宇&#x27;, status: &#x27;off&#x27;, synced: false, syncTime: &#x27;&#x27;, record: &#x27;&#x27; },
+        { id: 101, ownerId: &#x27;10050017&#x27;, time: &#x27;2026-08-06 14:22:31&#x27;, operator: &#x27;管理员&#x27;, status: &#x27;on&#x27;, synced: true, syncTime: &#x27;2026-08-06 14:30:01&#x27;, record: &#x27;RB-BYTE-00858&#x27; }
+      ];
+      const bindings = [
+        { id: 206, ownerId: &#x27;10086321&#x27;, userId: &#x27;20563971&#x27;, uid: &#x27;UID729638451&#x27;, mobile: &#x27;138****6217&#x27;, source: &#x27;右豹导入&#x27;, status: &#x27;pending&#x27;, reason: &#x27;&#x27;, time: &#x27;2026-08-11 11:06:24&#x27;, auditTime: &#x27;&#x27;, auditor: &#x27;&#x27; },
+        { id: 205, ownerId: &#x27;10086321&#x27;, userId: &#x27;20558806&#x27;, uid: &#x27;UID638207149&#x27;, mobile: &#x27;186****3095&#x27;, source: &#x27;右豹导入&#x27;, status: &#x27;approved&#x27;, reason: &#x27;&#x27;, time: &#x27;2026-08-11 09:37:12&#x27;, auditTime: &#x27;2026-08-11 10:12:08&#x27;, auditor: &#x27;小宇&#x27; },
+        { id: 204, ownerId: &#x27;10075296&#x27;, userId: &#x27;20541029&#x27;, uid: &#x27;UID501836492&#x27;, mobile: &#x27;152****7742&#x27;, source: &#x27;右豹导入&#x27;, status: &#x27;approved&#x27;, reason: &#x27;&#x27;, time: &#x27;2026-08-10 17:14:53&#x27;, auditTime: &#x27;2026-08-10 17:36:20&#x27;, auditor: &#x27;管理员&#x27; },
+        { id: 203, ownerId: &#x27;10075296&#x27;, userId: &#x27;20539814&#x27;, uid: &#x27;UID408172635&#x27;, mobile: &#x27;177****4806&#x27;, source: &#x27;右豹导入&#x27;, status: &#x27;rejected&#x27;, reason: &#x27;字节UID与截图中的账号信息不一致&#x27;, time: &#x27;2026-08-10 15:02:46&#x27;, auditTime: &#x27;2026-08-10 15:18:31&#x27;, auditor: &#x27;小宇&#x27; },
+        { id: 202, ownerId: &#x27;10050017&#x27;, userId: &#x27;20517042&#x27;, uid: &#x27;UID294710386&#x27;, mobile: &#x27;139****1258&#x27;, source: &#x27;右豹导入&#x27;, status: &#x27;pending&#x27;, reason: &#x27;&#x27;, time: &#x27;2026-08-09 13:28:09&#x27;, auditTime: &#x27;&#x27;, auditor: &#x27;&#x27; }
+      ];
+      const q = (selector) =&gt; root.querySelector(selector);
+      const qa = (selector) =&gt; Array.from(root.querySelectorAll(selector));
+      const toast = (message) =&gt; {
+        const el = q(&#x27;#ba-toast&#x27;);
+        el.textContent = message;
+        el.classList.add(&#x27;show&#x27;);
+        clearTimeout(el._timer);
+        el._timer = setTimeout(() =&gt; el.classList.remove(&#x27;show&#x27;), 1700);
+      };
+      const renderOwners = () =&gt; {
+        const keyword = q(&#x27;#ba-owner-filter&#x27;).value.trim();
+        const status = q(&#x27;#ba-status-filter&#x27;).value;
+        const rows = owners.filter(item =&gt; (!keyword || item.ownerId.includes(keyword)) &amp;&amp; (!status || item.status === status));
+        q(&#x27;#ba-owner-body&#x27;).innerHTML = rows.length ? rows.map(item =&gt; `
+          &lt;tr data-owner=&quot;${item.id}&quot;&gt;&lt;td&gt;${item.id}&lt;/td&gt;&lt;td&gt;${item.ownerId}&lt;/td&gt;&lt;td&gt;${item.time}&lt;/td&gt;&lt;td&gt;${item.operator}&lt;/td&gt;
+          &lt;td&gt;&lt;span class=&quot;ba-status ${item.status}&quot;&gt;${item.status === &#x27;on&#x27; ? &#x27;已开启&#x27; : &#x27;已关闭&#x27;}&lt;/span&gt;&lt;/td&gt;
+          &lt;td&gt;&lt;span class=&quot;ba-status ${item.synced ? &#x27;approved&#x27; : &#x27;syncing&#x27;}&quot;&gt;${item.synced ? &#x27;是&#x27; : &#x27;否&#x27;}&lt;/span&gt;&lt;/td&gt;
+          &lt;td&gt;&lt;button class=&quot;ba-switch ${item.status === &#x27;on&#x27; ? &#x27;on&#x27; : &#x27;&#x27;}&quot; data-toggle=&quot;${item.id}&quot; aria-label=&quot;切换开放状态&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;/button&gt;&lt;button class=&quot;ba-button ghost&quot; data-edit=&quot;${item.id}&quot;&gt;编辑&lt;/button&gt;&lt;/td&gt;&lt;/tr&gt;`).join(&#x27;&#x27;) : &#x27;&lt;tr&gt;&lt;td colspan=&quot;7&quot;&gt;&lt;div class=&quot;ba-empty&quot;&gt;暂无匹配数据&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;;
+        q(&#x27;#ba-owner-count&#x27;).textContent = `已展示 ${rows.length} 条`;
+        qa(&#x27;[data-toggle]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; {
+          const item = owners.find(row =&gt; row.id === Number(button.dataset.toggle));
+          item.status = item.status === &#x27;on&#x27; ? &#x27;off&#x27; : &#x27;on&#x27;;
+          item.synced = false;
+          item.syncTime = &#x27;&#x27;;
+          item.record = &#x27;&#x27;;
+          renderOwners();
+          toast(&#x27;权限已更新，等待定时任务同步至右豹&#x27;);
+          setTimeout(() =&gt; {
+            item.synced = true;
+            item.syncTime = &#x27;2026-08-11 14:40:01&#x27;;
+            item.record = `RB-BYTE-${String(900 + item.id)}`;
+            renderOwners();
+            toast(&#x27;定时任务已完成右豹同步&#x27;);
+          }, 2600);
+        }));
+        qa(&#x27;[data-edit]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; toast(&#x27;已进入企业主权限编辑&#x27;)));
+      };
+      const renderBindings = () =&gt; {
+        const user = q(&#x27;#ba-user-filter&#x27;).value.trim();
+        const uid = q(&#x27;#ba-uid-filter&#x27;).value.trim();
+        const audit = q(&#x27;#ba-audit-filter&#x27;).value;
+        const labels = { pending: &#x27;待审核&#x27;, approved: &#x27;已通过&#x27;, rejected: &#x27;已拒绝&#x27; };
+        const rows = bindings.filter(item =&gt; (!user || item.userId.includes(user)) &amp;&amp; (!uid || item.uid.includes(uid)) &amp;&amp; (!audit || item.status === audit));
+        q(&#x27;#ba-binding-body&#x27;).innerHTML = rows.length ? rows.map(item =&gt; `
+          &lt;tr&gt;&lt;td&gt;${item.id}&lt;/td&gt;&lt;td&gt;${item.ownerId}&lt;/td&gt;&lt;td&gt;${item.userId}&lt;/td&gt;&lt;td&gt;${item.uid}&lt;/td&gt;&lt;td&gt;${item.mobile}&lt;/td&gt;
+          &lt;td&gt;&lt;button class=&quot;ba-link&quot; data-detail=&quot;${item.id}&quot; data-shot=&quot;1&quot;&gt;查看截图&lt;/button&gt;&lt;/td&gt;&lt;td&gt;&lt;button class=&quot;ba-link&quot; data-detail=&quot;${item.id}&quot; data-shot=&quot;2&quot;&gt;查看截图&lt;/button&gt;&lt;/td&gt;
+          &lt;td&gt;${item.source}&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;ba-status ${item.status}&quot;&gt;${labels[item.status]}&lt;/span&gt;&lt;/td&gt;&lt;td&gt;${item.reason ? `&lt;span class=&quot;ba-fail-reason&quot;&gt;${item.reason}&lt;/span&gt;` : &#x27;—&#x27;}&lt;/td&gt;&lt;td&gt;${item.time}&lt;/td&gt;&lt;td&gt;${item.auditTime || &#x27;—&#x27;}&lt;/td&gt;&lt;td&gt;${item.auditor || &#x27;—&#x27;}&lt;/td&gt;
+          &lt;td&gt;${item.status === &#x27;approved&#x27; ? &#x27;&#x27; : `&lt;button class=&quot;ba-button ghost&quot; data-audit=&quot;${item.id}&quot;&gt;${item.status === &#x27;pending&#x27; ? &#x27;手动处理&#x27; : &#x27;重新处理&#x27;}&lt;/button&gt;`}&lt;button class=&quot;ba-button ghost&quot; data-detail=&quot;${item.id}&quot;&gt;详情&lt;/button&gt;&lt;/td&gt;&lt;/tr&gt;`).join(&#x27;&#x27;) : &#x27;&lt;tr&gt;&lt;td colspan=&quot;14&quot;&gt;&lt;div class=&quot;ba-empty&quot;&gt;暂无匹配数据&lt;/div&gt;&lt;/td&gt;&lt;/tr&gt;&#x27;;
+        q(&#x27;#ba-binding-count&#x27;).textContent = `已展示 ${rows.length} 条`;
+        qa(&#x27;[data-detail]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; openBindingDetail(Number(button.dataset.detail), button.dataset.shot || &#x27;&#x27;)));
+        qa(&#x27;[data-audit]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; openManualAudit(Number(button.dataset.audit))));
+      };
+      const shotMarkup = (label, variant) =&gt; `&lt;div class=&quot;ba-shot&quot; data-preview=&quot;${variant}&quot;&gt;&lt;div class=&quot;ba-shot-visual&quot;&gt;&lt;div class=&quot;ba-shot-phone&quot;&gt;&lt;div class=&quot;ba-shot-line blue&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ba-shot-line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ba-shot-line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ba-shot-line&quot;&gt;&lt;/div&gt;&lt;div class=&quot;ba-shot-line&quot;&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div class=&quot;ba-shot-label&quot;&gt;${label} · 点击放大&lt;/div&gt;&lt;/div&gt;`;
+      const openBindingDetail = (id, preferredShot) =&gt; {
+        const item = bindings.find(row =&gt; row.id === id);
+        if (!item) return;
+        const labels = { pending: &#x27;待审核&#x27;, approved: &#x27;已通过&#x27;, rejected: &#x27;已拒绝&#x27; };
+        q(&#x27;#ba-detail-body&#x27;).innerHTML = `&lt;div class=&quot;ba-detail-grid&quot;&gt;
+          &lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;企业主ID&lt;/span&gt;&lt;b&gt;${item.ownerId}&lt;/b&gt;&lt;/div&gt;&lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;用户ID&lt;/span&gt;&lt;b&gt;${item.userId}&lt;/b&gt;&lt;/div&gt;
+          &lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;字节UID&lt;/span&gt;&lt;b&gt;${item.uid}&lt;/b&gt;&lt;/div&gt;&lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;手机号码&lt;/span&gt;&lt;b&gt;${item.mobile}&lt;/b&gt;&lt;/div&gt;
+          &lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;数据来源&lt;/span&gt;&lt;b&gt;${item.source}&lt;/b&gt;&lt;/div&gt;&lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;审核状态&lt;/span&gt;&lt;b&gt;${labels[item.status]}&lt;/b&gt;&lt;/div&gt;
+          &lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;提交时间&lt;/span&gt;&lt;b&gt;${item.time}&lt;/b&gt;&lt;/div&gt;&lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;审核时间&lt;/span&gt;&lt;b&gt;${item.auditTime || &#x27;—&#x27;}&lt;/b&gt;&lt;/div&gt;
+          &lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;审核人&lt;/span&gt;&lt;b&gt;${item.auditor || &#x27;—&#x27;}&lt;/b&gt;&lt;/div&gt;&lt;div class=&quot;ba-detail-item&quot;&gt;&lt;span&gt;失败原因&lt;/span&gt;&lt;b class=&quot;${item.reason ? &#x27;ba-fail-reason&#x27; : &#x27;&#x27;}&quot;&gt;${item.reason || &#x27;—&#x27;}&lt;/b&gt;&lt;/div&gt;
+        &lt;/div&gt;&lt;div class=&quot;ba-shot-grid&quot;&gt;${shotMarkup(&#x27;截图1 · 右豹导入&#x27;,&#x27;1&#x27;)}${shotMarkup(&#x27;截图2 · 右豹导入&#x27;,&#x27;2&#x27;)}&lt;/div&gt;`;
+        q(&#x27;#ba-detail-mask&#x27;).classList.add(&#x27;open&#x27;);
+        if (preferredShot) setTimeout(() =&gt; toast(`已定位截图${preferredShot}`), 100);
+        qa(&#x27;[data-preview]&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; toast(`正在预览截图${button.dataset.preview}`)));
+      };
+      let activeAuditId = null;
+      const openManualAudit = (id) =&gt; {
+        const item = bindings.find(row =&gt; row.id === id);
+        if (!item) return;
+        activeAuditId = id;
+        q(&#x27;#ba-audit-summary&#x27;).innerHTML = `&lt;b&gt;记录 #${item.id}&lt;/b&gt;&lt;br&gt;企业主ID：${item.ownerId}　用户ID：${item.userId}&lt;br&gt;字节UID：${item.uid}　手机号：${item.mobile}`;
+        q(&#x27;#ba-audit-reason&#x27;).value = item.status === &#x27;rejected&#x27; ? item.reason : &#x27;&#x27;;
+        q(&#x27;#ba-audit-mask&#x27;).classList.add(&#x27;open&#x27;);
+      };
+      const closeAudit = () =&gt; { q(&#x27;#ba-audit-mask&#x27;).classList.remove(&#x27;open&#x27;); activeAuditId = null; };
+      const finishAudit = (status) =&gt; {
+        const item = bindings.find(row =&gt; row.id === activeAuditId);
+        if (!item) return;
+        const reason = q(&#x27;#ba-audit-reason&#x27;).value.trim();
+        if (status === &#x27;rejected&#x27; &amp;&amp; !reason) { toast(&#x27;审核拒绝时请填写失败原因&#x27;); q(&#x27;#ba-audit-reason&#x27;).focus(); return; }
+        item.status = status;
+        item.reason = status === &#x27;rejected&#x27; ? reason : &#x27;&#x27;;
+        item.auditTime = &#x27;2026-08-11 14:46:30&#x27;;
+        item.auditor = &#x27;小宇&#x27;;
+        closeAudit();
+        renderBindings();
+        toast(status === &#x27;approved&#x27; ? &#x27;已手动审核通过&#x27; : &#x27;已手动审核拒绝，失败原因将展示给企业主&#x27;);
+      };
+      qa(&#x27;.ba-tab&#x27;).forEach(tab =&gt; tab.addEventListener(&#x27;click&#x27;, () =&gt; {
+        qa(&#x27;.ba-tab&#x27;).forEach(item =&gt; item.classList.toggle(&#x27;active&#x27;, item === tab));
+        qa(&#x27;.ba-tab-pane&#x27;).forEach(pane =&gt; pane.hidden = pane.dataset.pane !== tab.dataset.tab);
+      }));
+      qa(&#x27;.ba-menu-title&#x27;).forEach(button =&gt; button.addEventListener(&#x27;click&#x27;, () =&gt; button.closest(&#x27;.ba-menu-group&#x27;).classList.toggle(&#x27;collapsed&#x27;)));
+      qa(&#x27;.ba-menu-item&#x27;).forEach(item =&gt; item.addEventListener(&#x27;click&#x27;, () =&gt; {
+        if (item.textContent.trim() === &#x27;字节开白&#x27;) return;
+        toast(`${item.textContent.trim()}为菜单交互示意`);
+      }));
+      q(&#x27;#ba-search-owner&#x27;).addEventListener(&#x27;click&#x27;, renderOwners);
+      q(&#x27;#ba-reset-owner&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; { q(&#x27;#ba-owner-filter&#x27;).value = &#x27;&#x27;; q(&#x27;#ba-status-filter&#x27;).value = &#x27;&#x27;; renderOwners(); });
+      q(&#x27;#ba-search-binding&#x27;).addEventListener(&#x27;click&#x27;, renderBindings);
+      q(&#x27;#ba-reset-binding&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; { q(&#x27;#ba-user-filter&#x27;).value = &#x27;&#x27;; q(&#x27;#ba-uid-filter&#x27;).value = &#x27;&#x27;; q(&#x27;#ba-audit-filter&#x27;).value = &#x27;&#x27;; renderBindings(); });
+      const closeDialog = () =&gt; q(&#x27;#ba-dialog-mask&#x27;).classList.remove(&#x27;open&#x27;);
+      q(&#x27;#ba-add-owner&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; { q(&#x27;#ba-new-owner&#x27;).value = &#x27;&#x27;; q(&#x27;#ba-dialog-mask&#x27;).classList.add(&#x27;open&#x27;); setTimeout(() =&gt; q(&#x27;#ba-new-owner&#x27;).focus(), 50); });
+      q(&#x27;#ba-dialog-close&#x27;).addEventListener(&#x27;click&#x27;, closeDialog);
+      q(&#x27;#ba-dialog-cancel&#x27;).addEventListener(&#x27;click&#x27;, closeDialog);
+      q(&#x27;#ba-dialog-mask&#x27;).addEventListener(&#x27;click&#x27;, event =&gt; { if (event.target === q(&#x27;#ba-dialog-mask&#x27;)) closeDialog(); });
+      const closeDetail = () =&gt; q(&#x27;#ba-detail-mask&#x27;).classList.remove(&#x27;open&#x27;);
+      q(&#x27;#ba-detail-close&#x27;).addEventListener(&#x27;click&#x27;, closeDetail);
+      q(&#x27;#ba-detail-ok&#x27;).addEventListener(&#x27;click&#x27;, closeDetail);
+      q(&#x27;#ba-detail-mask&#x27;).addEventListener(&#x27;click&#x27;, event =&gt; { if (event.target === q(&#x27;#ba-detail-mask&#x27;)) closeDetail(); });
+      q(&#x27;#ba-audit-close&#x27;).addEventListener(&#x27;click&#x27;, closeAudit);
+      q(&#x27;#ba-audit-cancel&#x27;).addEventListener(&#x27;click&#x27;, closeAudit);
+      q(&#x27;#ba-audit-approve&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; finishAudit(&#x27;approved&#x27;));
+      q(&#x27;#ba-audit-reject&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; finishAudit(&#x27;rejected&#x27;));
+      q(&#x27;#ba-audit-mask&#x27;).addEventListener(&#x27;click&#x27;, event =&gt; { if (event.target === q(&#x27;#ba-audit-mask&#x27;)) closeAudit(); });
+      q(&#x27;#ba-dialog-confirm&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; {
+        const ownerId = q(&#x27;#ba-new-owner&#x27;).value.trim();
+        if (!/^\d+$/.test(ownerId)) { toast(&#x27;请输入正确的企业主ID&#x27;); return; }
+        const item = { id: Math.max(...owners.map(row =&gt; row.id)) + 1, ownerId, time: &#x27;2026-08-11 14:35:00&#x27;, operator: &#x27;小宇&#x27;, status: &#x27;on&#x27;, synced: false, syncTime: &#x27;&#x27;, record: &#x27;&#x27; };
+        owners.unshift(item);
+        closeDialog(); renderOwners(); toast(&#x27;企业主已开通，等待定时任务同步右豹&#x27;);
+        setTimeout(() =&gt; {
+          item.synced = true;
+          item.syncTime = &#x27;2026-08-11 14:40:01&#x27;;
+          item.record = `RB-BYTE-${String(900 + item.id)}`;
+          renderOwners();
+          toast(&#x27;定时任务已完成右豹同步&#x27;);
+        }, 2600);
+      });
+      renderOwners();
+      renderBindings();
+    })();
+  &lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>
